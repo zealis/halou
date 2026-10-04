@@ -244,6 +244,86 @@ button { font-family: inherit; cursor: pointer; }
     color: var(--ha-text-sub);
 }
 
+/* ---------- 通用 Tabs 组件（v1.2.20） ----------
+   外观参考「分段控件 / Segmented Control」：整条浅灰底槽，
+   选中项为白色胶囊 + 轻投影 —— 用「底色深浅 + 悬浮白块」表达选中，
+   而不是下划线或实色填充。
+   为什么不用实色填充：本应用主色 #00A0E9 已经在发送按钮、可点图标上
+   密集出现，标签页再用实色会把侧栏顶部的视觉重心整个拉走；
+   白胶囊既明确又安静，且与消息气泡（白底 + 圆角）同一套语言。
+
+   ⚠️ 结构约定（插件扩展必须遵守）：
+   <div class="ha-tabs" id="haSideTabs">
+     <button class="ha-tab is-active" data-tab="chat"><span class="ha-tab-lb">消息</span></button>
+     <button class="ha-tab" data-tab="friends"><span class="ha-tab-lb">联系人</span></button>
+   </div>
+   - 选中态由 `is-active` 类表达，**不要**用 :nth-child 或 JS 内联样式 ——
+     插件可在任意位置插入标签，位置会变。
+   - 面板切换由 JS 控制（.ha-tab-panel 的 display），本组件只管标签条外观。 */
+.ha-tabs {
+    display: flex; display: -webkit-flex;
+    align-items: center; -webkit-align-items: center;
+    gap: 2px;
+    padding: 3px;
+    margin: 10px 12px 6px;
+    background: var(--ha-bg-sub);
+    border-radius: 9px;
+    /* 标签数量多时（插件可能加）允许横向滚动，不换行撑高侧栏 */
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;              /* Firefox：隐藏滚动条，条本身已很矮 */
+    -webkit-overflow-scrolling: touch;
+}
+.ha-tabs::-webkit-scrollbar { display: none; }   /* WebKit：同上 */
+.ha-tab {
+    flex: 1 1 auto; -webkit-flex: 1 1 auto;
+    min-width: 0;
+    /* 3px 上下 + 13px 字号 → 标签条总高约 34px，与侧栏其它控件同一档 */
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--ha-text-sub);
+    cursor: pointer;
+    white-space: nowrap;
+    /* 背景色过渡，切换时不闪 */
+    transition: background-color .15s, color .15s, box-shadow .15s;
+    -webkit-transition: background-color .15s, color .15s, box-shadow .15s;
+}
+.ha-tab:hover { color: var(--ha-text-title); }
+.ha-tab.is-active {
+    background: #FFFFFF;
+    color: var(--ha-text-title);
+    font-weight: 600;
+    /* 投影极轻：分段控件靠「白块浮起」而非靠重阴影表达选中 */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .08);
+    cursor: default;
+}
+.ha-tab.is-active:hover { color: var(--ha-text-title); }
+/* 插件新增的标签允许带角标（如未读数），用 .ha-tab-badge 套在 .ha-tab-lb 之后 */
+.ha-tab .ha-tab-badge {
+    display: inline-block;
+    vertical-align: 1px;
+    min-width: 14px;
+    margin-left: 4px;
+    padding: 0 4px;
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 14px;
+    text-align: center;
+    border-radius: 7px;
+    background: var(--ha-primary);
+    color: #FFFFFF;
+}
+/* ⚠️ 窄屏（移动端抽屉）下侧栏宽度不变仍是 240px，无需特殊处理；
+   但真机小屏字体偏小时把标签条略微收紧，避免 3 个以上标签被挤到滚动 */
+@media (max-width: 400px) {
+    .ha-tabs { margin: 8px 8px 4px; }
+    .ha-tab { padding: 6px 8px; font-size: 12px; }
+}
+
 /* ---------- 头像 ---------- */
 .ha-avatar {
     /* v1.1.8：补 display:inline-block —— **行内元素不接受 width/height**。

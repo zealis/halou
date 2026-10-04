@@ -992,10 +992,25 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
        . ow_icon('more-v', 16) . '</button></div>'
        // v1.1.0：列表已是「群聊 + 私聊」聚合，标题改为「聊天」；
        // 徽标数字含义同步改为「会话总数」，由 conversations 接口返回的 total 在前端回填
-       // v1.1.24：切到联系人视图时标题变「联系人」（聊天会话消失、联系人列表出现）。
-       // 文字与徽标各自套 span，是为了只改文字时不误碰徽标数字。
-       . '<div class="ha-side-title"><span id="haSideTitleText">聊天</span> <span class="ha-badge-num" id="haRoomCount">' . count($rooms) . '</span></div>'
-       . '<ul class="ha-room-list" id="haRoomList"></ul>'
+       // v1.2.20：「聊天」标题 + 数量徽标整体**换成 Tabs 标签条**。
+       //   ① 「消息 / 联系人」从「品牌区下拉菜单里的一个菜单项」上移为常驻标签，
+       //      切换路径从「点下拉 → 找菜单项 → 点」缩短为「点标签」，也顺带
+       //      解决了「联系人是菜单里一个不起眼的入口、没人发现」的问题。
+       //   ② 数量徽标（#haRoomCount）**取消**：会话数在列表本身就一目了然，
+       //      这个数字既不稳定也不重要，占着标题行右侧反而抢视线。
+       //   ③ 标签条下方留 #haSideTabs 容器，插件通过 Plugin::fire('sidebar.tabs')
+       //      或前端 HaChat.onSideTabs 追加自己的标签页（见插件文档）。
+       // ⚠️ 标签的 data-tab 值是**面板标识**，JS 侧据此切 .ha-tab-panel 显隐；
+       //    核心只认 chat / friends 两个，插件可加自己的。
+       . '<div class="ha-tabs" id="haSideTabs">'
+       . '<button class="ha-tab is-active" data-tab="chat" type="button"><span class="ha-tab-lb">消息</span></button>'
+       . '<button class="ha-tab" data-tab="friends" type="button"><span class="ha-tab-lb">联系人</span></button>'
+       . Plugin::collect('sidebar.tabs')
+       . '</div>'
+       // 聊天面板（核心两个面板之一是「消息」，另一个是「联系人」）
+       . '<ul class="ha-room-list ha-tab-panel is-active" id="haRoomList" data-panel="chat"></ul>'
+       // 插件面板容器：由 HaChat 在切换时创建/复用，插件标签对应的内容挂这里
+       . '<div class="ha-tab-panels" id="haSidePanels" style="display:none"></div>'
        . '<div class="ha-me" id="haMe"></div>'
        // 登录用户的操作入口收进个人资料区菜单（点击 haMe 弹出）；游客仍直接给登录按钮
        . ($user ? '' : '<div class="ha-side-actions"><a class="ha-btn ha-btn-ghost" href="?page=register">注册</a><a class="ha-btn ha-btn-primary" href="?page=login">登录</a></div>')

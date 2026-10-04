@@ -455,6 +455,38 @@ class Plugin
         }
     }
 
+    /**
+     * 与 fire() 相同地触发钩子，但**收集各处理器的字符串返回值并拼接**（v1.2.20）。
+     *
+     * 为什么需要它：fire() 是 void —— 插件只能自己 echo / 直接改传入的引用参数，
+     * 无法「产出片段让主程序决定插到哪里」。而「插件往标签条里加一个标签」
+     * 这类需求本质是**产出 HTML 片段**，必须能把返回值收回来。
+     *
+     * 约定：处理器返回 string（或可转 string 的值）即被采纳，返回 null / false / 空串忽略。
+     * ⚠️ 单个插件抛异常只丢弃它这一段，不影响其它插件与主流程（与 fire 同口径）。
+     *
+     * @param string $hook 钩子名
+     * @param array  $args 传给各处理器的参数（与 fire 相同）
+     * @return string 拼接后的 HTML（无插件产出时为空串）
+     */
+    public static function collect(string $hook, array $args = []): string
+    {
+        foreach (self::$order as $name) {
+            if (empty(self::$loaded[$name])
+                && in_array($hook, self::$manifest[$name]['hooks'] ?? [], true)) {
+                self::loadPlugin($name);
+            }
+        }
+        $out = '';
+        foreach (self::$hooks[$hook] ?? [] as $fn) {
+            try {
+                $r = $fn(...$args);
+                if (is_string($r) && $r !== '') $out .= $r;
+            } catch (Throwable $e) { /* 插件异常不影响主流程 */ }
+        }
+        return $out;
+    }
+
     public static function dispatch(string $action, array $ctx)
     {
         foreach (self::$order as $name) {

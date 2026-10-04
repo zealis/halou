@@ -836,6 +836,8 @@
 
         bindEvents: function () {
             var self = this;
+            // v1.2.20：侧栏标签条（消息 / 联系人 / 插件标签）
+            self.bindSideTabs();
             $('haBtnSend').onclick = function () { self.send(); };
             var input = $('haInput');
             // 随内容自动增高；恢复上次手动拖出的高度
@@ -1134,13 +1136,15 @@
          * 会话列表此刻是多余的请求，且会覆盖 `conversations` 字段导致切回来时列表闪空。
          */
         loadConversations: function () {            var self = this;
-            if (this.view === 'friends') return;
+            // v1.2.20：不在「消息」标签时不拉会话 —— 拉回来也会被别的面板覆盖，
+            // 白打接口。⚠️ 判断必须写成 `!== 'chat'` 而不是 `=== 'friends'`：
+            //   view 现在还可能是插件标签（如 'orders'），只挡 friends 会漏。
+            if (this.view !== 'chat') return;
             HaApi.post('conversations', {}, function (r) {
                 if (!r.ok) return;
                 self.conversations = r.data;
-                // 侧栏「聊天」徽标 = 会话总数（群聊数 + 私聊会话数），服务端已回传 total
-                var badge = $('haRoomCount');
-                if (badge) badge.innerHTML = (r.total != null ? r.total : r.data.length);
+                // v1.2.20：原「会话总数徽标」已随标题一起移除（标签条不需要计数，
+                // 数量在列表里本就一目了然）。r.total 仍在响应里，留给需要的地方用。
                 // 私聊视图的标题用的是进入时的昵称；若当时列表未到（标题为占位「私聊」），
                 // 这里用刚取到的真实昵称补正，避免刷新后标题一直停在占位文案
                 if (self.dm && self.roomName === '私聊') {
@@ -1154,40 +1158,143 @@
             });
         },
 
-        /* ---------- 联系人视图（v1.1.24） ----------
-           点品牌区菜单「联系人」后，左侧栏从「聊天会话」切成「联系人名单」：
-             标题  聊天 → 联系人
-             内容  群聊 + 私聊会话 → 我加的联系人
-             头像  群用剪影图 / 私聊用用户头像 → 统一用**联系人自己的头像**
-             副行  最后一条消息摘要 → **个性签名**（signature 插件，未启用则留空）
-           点联系人行 = 开私聊（私聊不依赖好友关系，见 Chat::dmPeerKey）。
-           再点菜单同一项（此时文案变「返回聊天」）切回会话列表。 */
-        view: 'chat',              // 'chat' | 'friends'
+        /* ---------- 侧栏标签页（v1.2.20，通用 Tabs 组件） ----------
+           v1.1.24 时「联系人」藏在品牌区下拉菜单里，入口深、发现不了。
+           v1.2.20 把它上移为侧栏顶部的常驻标签，与「消息」并列。
+
+           面板模型：核心只有两个面板，**都不靠 DOM 创建/销毁**：
+             chat    → #haRoomList（就在 HTML 里，切换只改显隐）
+             friends → 复用同一个 #haRoomList 容器渲染联系人（ChatList 轮子）
+           所以「切面板」= 换数据源重渲染 + 切标签高亮，不涉及容器搬运。
+
+           插件面板：标签由服务端 Plugin::collect('sidebar.tabs') 产出 HTML，
+           或前端 HaChat.onSideTabs 追加；其内容由插件自己往 #haSidePanels 里写。
+           点插件标签时核心只切换标签高亮并触发 'panel' 回调，不碰插件内容。 */
+        view: 'chat',              // 当前标签：'chat' | 'friends' | 插件自定义名
         friends: [],               // 好友列表（含签名，签名可能为空串）
         _sigProbe: null,           // signature 批量接口是否可用（探测一次，缓存结果）
+        _tabsExt: [],              // 插件扩展：{ id, label, onShow } 数组
+        _tabsInited: false,        // 标签条事件是否已绑定（只绑一次）
 
         /**
-         * 切换联系人 / 聊天视图。noArg=true 时强制切到聊天（供「返回」类入口用）。
-         * 切到联系人：拉 friends + 批量签名 → 渲染。
-         * 切回聊天：直接渲染**已在内存**的 conversations（不必重新请求，列表是 10s 轮询维护的）。
+         * 插件扩展点：往侧栏标签条追加一个标签页。
+         *
+         * @param {Object} opt
+         * @param {string}   opt.id      标签标识（= 服务端标签的 data-tab，需唯一）
+         * @param {string}   opt.label   显示文字
+         * @param {Function} opt.onShow  切到该标签时调用，参数为面板容器节点，
+         *                               插件把自己的内容写进去（可重复调用，需自行做幂等）
+         * @example
+         * HaChat.onSideTabs({
+         *     id: 'orders', label: '订单',
+         *     onShow: function (panel) { panel.innerHTML = '<div>我的订单</div>'; }
+         * });
          */
-        toggleFriendsView: function (noArg) {
-            if (noArg) this.view = 'chat';
-            else this.view = (this.view === 'friends' ? 'chat' : 'friends');
-            var title = $('haSideTitleText');
-            if (title) title.textContent = (this.view === 'friends' ? '联系人' : '聊天');
-            if (this.view === 'friends') {
+        onSideTabs: function (opt) {
+            if (!opt || !opt.id || !opt.label) return;
+            // 同 id 重复注册时覆盖，避免插件重复启用后出现两个同名标签
+            for (var i = 0; i < this._tabsExt.length; i++) {
+                if (this._tabsExt[i].id === opt.id) { this._tabsExt[i] = opt; return; }
+            }
+            this._tabsExt.push(opt);
+        },
+
+        /** 绑定标签条点击（委托，只绑一次；插件后加的标签也自动生效） */
+        bindSideTabs: function () {
+            if (this._tabsInited) return;
+            var bar = $('haSideTabs');
+            if (!bar) return;
+            var self = this;
+            bar.onclick = function (e) {
+                e = e || w.event;
+                var t = e.target || e.srcElement;
+                // 从点击点向上找带 data-tab 的按钮（点的是里面的 span 文字）
+                while (t && t !== bar && !t.getAttribute) t = t.parentNode;
+                while (t && t !== bar && !t.getAttribute('data-tab')) t = t.parentNode;
+                if (!t || t === bar) return;
+                var tab = t.getAttribute('data-tab');
+                if (tab) self.switchTab(tab);
+            };
+            this._tabsInited = true;
+        },
+
+        /** 切到指定标签（核心与插件标签统一入口） */
+        switchTab: function (tab) {
+            if (!tab) return;
+            if (tab === this.view) return;
+            this.view = tab;
+            this._paintTabs();
+            if (tab === 'chat') {
+                this.renderConversations();
+                // ⚠️ 兜底：若进页面后一直待在别处，conversations 可能从未拉过，
+                //   此时列表是空的。补拉一次；已拉过则跳过（不白打接口）。
+                if (!this.conversations) this.loadConversations();
+            } else if (tab === 'friends') {
                 this.loadFriends();
             } else {
-                var badge = $('haRoomCount');
-                // 切回来时恢复会话总数徽标（列表此刻就在内存里，不用再请求）
-                if (badge) badge.innerHTML = this.conversations ? this.conversations.length : 0;
-                this.renderConversations();
-                // ⚠️ 兜底：若进页面后一直待在联系人视图，conversations 可能从未拉过
-                //   （loadConversations 在 friends 视图下直接 return），此时列表会是空的。
-                //   补拉一次；已拉过则跳过（避免每次切回都打接口）。
-                if (!this.conversations) this.loadConversations();
+                // 插件标签：把面板容器交给插件自己填
+                this._showExtPanel(tab);
             }
+        },
+
+        /** 只更新标签高亮 + 面板显隐（不碰数据） */
+        _paintTabs: function () {
+            var bar = $('haSideTabs');
+            if (bar) {
+                var btns = bar.getElementsByClassName('ha-tab'), i;
+                for (i = 0; i < btns.length; i++) {
+                    var on = btns[i].getAttribute('data-tab') === this.view;
+                    // ⚠️ 用 classList 逐项增删而不是整体赋值 ——
+                    //   插件可能在自己标签上加了自己的类（如角标定位类），
+                    //   整体覆盖 className 会把插件的类一起抹掉。
+                    if (btns[i].classList) btns[i].classList[on ? 'add' : 'remove']('is-active');
+                    else btns[i].className = on ? 'ha-tab is-active' : 'ha-tab';
+                }
+            }
+            // 核心面板：只有「消息 / 联系人」两个，共用 #haRoomList
+            var isCore = (this.view === 'chat' || this.view === 'friends');
+            var list = $('haRoomList'), panels = $('haSidePanels');
+            if (list) list.style.display = isCore ? '' : 'none';
+            if (panels) panels.style.display = isCore ? 'none' : '';
+        },
+
+        /** 插件面板：在 #haSidePanels 里为该标签准备一个容器并回调插件填充 */
+        _showExtPanel: function (tab) {
+            var wrap = $('haSidePanels');
+            if (!wrap) return;
+            var panel = document.getElementById('haExtPanel-' + tab);
+            if (!panel) {
+                panel = document.createElement('div');
+                panel.className = 'ha-tab-panel is-active';
+                panel.id = 'haExtPanel-' + tab;
+                panel.setAttribute('data-panel', tab);
+                wrap.appendChild(panel);
+            }
+            // 隐藏同容器内其它插件面板（插件面板之间互斥）
+            var kids = wrap.children, i;
+            for (i = 0; i < kids.length; i++) {
+                if (kids[i] !== panel) kids[i].style.display = 'none';
+            }
+            panel.style.display = '';
+            for (i = 0; i < this._tabsExt.length; i++) {
+                if (this._tabsExt[i].id === tab) {
+                    try { this._tabsExt[i].onShow(panel); } catch (e) {}
+                    return;
+                }
+            }
+            // 标签是服务端渲染的、但前端没注册 onShow：给个空态，不留白板
+            if (!panel.innerHTML) {
+                panel.innerHTML = '<div class="ha-cl-empty">该标签页没有内容</div>';
+            }
+        },
+
+        /**
+         * 兼容旧入口：v1.1.24 的「联系人视图」切换。
+         * noArg=true 时强制切到聊天（供「返回」类入口用）。
+         * @deprecated 保留是因为插件/外部可能还在调；内部请直接用 switchTab。
+         */
+        toggleFriendsView: function (noArg) {
+            this.switchTab(noArg ? 'chat' : (this.view === 'friends' ? 'chat' : 'friends'));
         },
 
         /**
@@ -1280,8 +1387,7 @@
                     last_at: f.added_at || 0,
                 });
             }
-            var badge = $('haRoomCount');
-            if (badge) badge.innerHTML = rows.length;
+            // v1.2.20：联系人数量徽标一并移除（与消息标签同理，计数非必要信息）
             ChatList.render(rows, {
                 container: 'haRoomList',
                 activeKey: this.dm ? ('dm:' + this.dm.peer) : '',
@@ -1317,10 +1423,11 @@
         /** 会话列表渲染 + 行点击分发（群聊走密码房流程，私聊进私聊页） */
         renderConversations: function () {
             var self = this, list = this.conversations || [];
-            // v1.1.24：联系人视图下**不要**渲染会话列表 —— 会把联系人名单冲掉。
-            // loadConversations 已拦了一道，这里再兜一道：
-            // 任何直接调 renderConversations 的路径（切会话、openDm 等）都不该踩坏联系人视图。
-            if (this.view === 'friends') return;
+            // v1.2.20：非「消息」标签下**不要**渲染会话列表 —— 会把它上面板的内容冲掉。
+            // loadConversations 已拦了一道，这里再兜一道：任何直接调
+            // renderConversations 的路径（切会话、openDm 等）都不该踩坏别的面板。
+            // ⚠️ 同样用 `!== 'chat'`，把插件标签一并挡掉。
+            if (this.view !== 'chat') return;
             var activeKey = this.dm ? ('dm:' + this.dm.peer) : ('room:' + this.room);
             ChatList.render(list, {
                 container: 'haRoomList',
@@ -2843,9 +2950,6 @@
             if (menu.style.display !== 'none' && menu._from === 'brand') { this.hideCtxMenu(); return; }
 
             var items = [];
-            // 游客态：整份菜单**全部禁用但可见**（需求明确要求）。
-            // 不隐藏按钮 —— 隐藏会让游客以为功能不存在，禁用 + 提示原因更清楚。
-            var isGuest = (this.cfg.actor || {}).kind === 'guest';
             // ① 头像 + 昵称。html 走白名单构造（头像/昵称都经 esc 或 avatarHtml 转义）
             if (me) {
                 items.push({
@@ -2863,18 +2967,10 @@
                         + '<span class="ha-me-name">' + esc(this.cfg.actor.nickname || '游客') + '</span></span>',
                 });
             }
-            // ② 联系人：**toggle 语义**（v1.1.24）——
-            // 已切到联系人视图时再点同一项 = 切回聊天列表。
-            // 游客：按需求「可见但禁用」—— 与首行同口径，避免出现唯独它能点的例外。
-            if (isGuest) {
-                items.push({ t: '联系人', dis: true, tip: '请先登录后使用联系人' });
-            } else {
-                items.push({
-                    t: this.view === 'friends' ? '返回聊天' : '联系人',
-                    run: function () { self.toggleFriendsView(); }
-                });
-            }
-            // ③ 插件扩展
+            // ② v1.2.20：原「联系人」菜单项**已移除** —— 它上移为侧栏标签了。
+            // 菜单里再留一个同功能入口，用户会以为两者行为不同（尤其「返回聊天」
+            // 那种 toggle 文案，会让人以为菜单项和标签是两套东西）。
+            // 插件扩展位后移为 ②，编号沿用注释的语义顺序。
             for (var i = 0; i < this._brandExt.length; i++) {
                 try { this._brandExt[i](items, { actor: this.cfg.actor, me: me }); } catch (e) {}
             }
