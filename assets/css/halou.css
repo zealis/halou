@@ -798,7 +798,11 @@ button { font-family: inherit; cursor: pointer; }
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 10px;
-    min-width: 200px; max-width: 300px;
+    /* v1.2.18：固定宽度（原先 min-width:200px / max-width:300px 随内容伸缩，
+       同一批附件卡片会宽窄不一，扫读时参差不齐）。
+       max-width:100% 仍要留：视口窄于 260px 时压缩，否则会撑破消息区。
+       高度不固定 —— 文件名两行、大小一行，行数固定，实际高度自然一致。 */
+    width: 260px; max-width: 100%;
     padding: 10px 12px;
     background: var(--ha-bg);
     border: 1px solid var(--ha-border);

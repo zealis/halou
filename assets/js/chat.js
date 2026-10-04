@@ -253,18 +253,129 @@
     }
 
     /* 文件消息卡片：图标 + 文件名 + 大小 + 下载（下载链接带签名，服务端再校验房间权限）
-       v1.2.14：第二行去掉「ZIP · 」这类扩展名前缀（与文件图标信息重复，且挤占文件名空间）。 */
+       v1.2.14：第二行去掉「ZIP · 」这类扩展名前缀（与文件图标信息重复，且挤占文件名空间）。
+       v1.2.18：文件名加 data-name 存**完整名**（中间省略只改显示，不改数据源），
+       并补 title —— 省略后鼠标悬停仍能看到全名。 */
     function fileCardHtml(m) {
         var info = null;
         try { info = JSON.parse(m.content); } catch (e) { info = null; }
         if (!info) return '<span class="ha-file-card">文件内容已失效</span>';
         var s = HaApi.sign('file_download');
         var dl = '?action=file_download&id=' + m.id + '&ts=' + s.ts + '&sign=' + s.sign;
+        var nm = info.name || '文件';
         return '<div class="ha-file-card">'
             + '<span class="ha-file-ico">' + fileIconSvg(info.ext) + '</span>'
-            + '<span class="ha-file-meta"><span class="ha-file-name">' + esc(info.name || '文件') + '</span>'
+            + '<span class="ha-file-meta"><span class="ha-file-name" data-name="' + esc(nm)
+            + '" title="' + esc(nm) + '">' + esc(nm) + '</span>'
             + '<span class="ha-file-size">' + esc(sizeText(info.size)) + '</span></span>'
             + '<a class="ha-file-dl" href="' + dl + '" title="下载">' + haSvg('download', 18) + '</a></div>';
+    }
+
+    /* ---------- 文件名「中间省略」（v1.2.18） ----------
+       CSS 的 text-overflow: ellipsis 只能砍**尾部**，而尾部恰好是扩展名 ——
+       「…年度报表.xlsx」砍成「…年度报表.xls」甚至「…年度报表」，
+       恰好把「这是什么文件」这条最关键的信息抹掉。
+       这里改成保留「开头 + …… + 结尾（连扩展名）」，中间省略：
+           啊啊啊啊啊啊……哈哈.txt
+
+       ⚠️ 为什么不能用纯 CSS 兜底：
+       - text-overflow: ellipsis —— 只能尾部，且**不换行**是前提；
+       - direction: rtl + ellipsis —— 省略号会跑到开头，但 bidi 会把 .txt
+         之类的拉丁片段甩到左侧，文件名视觉顺序直接乱掉，中文场景不可用；
+       - 多层 background 渐变遮罩 —— 只能遮，不能真正改变文字内容，
+         复制文件名出去还是被砍掉的那串。
+       所以只能 JS 量像素后重排文本。
+
+       ⚠️ 必须**元素已入 DOM 之后**才能做：要读 clientWidth/scrollWidth，
+       在 innerHTML 字符串阶段还没布局，量不到宽度。
+       ⚠️ 完整名始终从 data-name 重取，**绝不能基于已截断的 textContent 再算** ——
+       否则 resize 二次调用会把「上次的截断结果」当成原文，越截越短。 */
+    var FIT_ELLIPSIS = '……';
+    function fitFileName(el) {
+        var full = el.getAttribute('data-name') || '';
+        if (!full) return;
+        el.textContent = full;              // 先还原全名，再按**当前**宽度重算
+        var avail = el.clientWidth;
+        if (avail <= 0) return;             // 容器还没布局（页面隐藏 / display:none），跳过
+        if (el.scrollWidth <= avail) return; // 放得下，原样显示
+
+        // 拆扩展名：下标 > 0 的最后一个点才算（.gitignore 这类以点开头的没有扩展名）
+        var dot = full.lastIndexOf('.');
+        var ext = dot > 0 ? full.slice(dot) : '';
+        var stem = dot > 0 ? full.slice(0, dot) : full;
+
+        /* 二分「首尾一共保留多少个 stem 字符」。
+           宽度对「保留字符数」单调递增，所以二分有效。
+           head 用 ceil 略多于 tail：结尾往往只剩半个词，
+           开头留多一点更符合读名习惯（结尾的扩展名已由 ext 单独占位）。 */
+        var lo = 0, hi = stem.length, best = null;
+        while (lo <= hi) {
+            var k = (lo + hi) >> 1;
+            var head = (k + 1) >> 1, tail = k - head;
+            var s = stem.slice(0, head) + FIT_ELLIPSIS
+                + stem.slice(stem.length - tail) + ext;
+            el.textContent = s;
+            if (el.scrollWidth <= avail) { best = s; lo = k + 1; }
+            else hi = k - 1;
+        }
+        if (best) { el.textContent = best; return; }
+
+        /* 走到这里 = 连 stem 一个字符都不留、只靠「……+ 扩展名」都还是超宽，
+           即**扩展名本身就比卡片还长**（如「报告.a…a」几百个字符的畸形扩展名）。
+           ⚠️ 这里绝不能直接 return —— 二分过程已经把 textContent 改成了
+           「某半截 stem + …… + ext」的残骸，直接返回会把这份超宽残骸留在界面上，
+           表现为「明明做了中间省略却仍横向溢出」。
+           正确做法：先保证扩展名自己塞得下（同样按中间省略压到 avail 以内），
+           再把它接回去；连压后的扩展名仍放不下，才彻底交给 CSS 的 ellipsis。 */
+        el.textContent = ext;
+        if (el.scrollWidth <= avail) { el.textContent = FIT_ELLIPSIS + ext; return; }
+        ext = shrinkToWidth(el, ext, avail);
+        el.textContent = ext;   // 极端情况：只留被压短的扩展名（保底一定不溢出）
+    }
+
+    /**
+     * 把 s 压到不超过 avail 宽（二分，保留首尾）。
+     * 用于扩展名本身超长的兜底 —— 正常文件名走不到这里。
+     */
+    function shrinkToWidth(el, s, avail) {
+        var lo = 0, hi = s.length, best = null;
+        while (lo <= hi) {
+            var k = (lo + hi) >> 1;
+            var head = (k + 1) >> 1, tail = k - head;
+            var t = s.slice(0, head) + FIT_ELLIPSIS + s.slice(s.length - tail);
+            el.textContent = t;
+            if (el.scrollWidth <= avail) { best = t; lo = k + 1; }
+            else hi = k - 1;
+        }
+        // 连「……」都放不下（极窄视口）：只留首字符，后面交给 CSS ellipsis
+        return best || s.slice(0, 1);
+    }
+
+    /* 合并同一帧内的多次调用：懒加载一次插 30 条，若逐条立即量宽会强制 reflow 30 次。
+       ⚠️ 入参是**整条消息的容器节点**，不是文件名元素本身 ——
+       fitFileName 读的是元素自己的 data-name，直接把容器传进去会拿到 null 而静默返回。
+       所以这里统一向下找出文件名节点。 */
+    var fitQueue = [], fitRaf = 0;
+    function scheduleFitFileName(box) {
+        fitQueue.push(box);
+        if (fitRaf) return;
+        fitRaf = requestAnimationFrame(function () {
+            var q = fitQueue;
+            fitQueue = [];
+            fitRaf = 0;
+            for (var i = 0; i < q.length; i++) {
+                if (!q[i] || !q[i].getElementsByClassName) continue;
+                var list = q[i].getElementsByClassName('ha-file-name');
+                for (var j = 0; j < list.length; j++) fitFileName(list[j]);
+            }
+        });
+    }
+    /** 重算消息区里所有文件名（窗口尺寸变化后卡片可用宽度跟着变） */
+    function refitAllFileNames() {
+        var box = $('haMessages');
+        if (!box) return;
+        var list = box.getElementsByClassName('ha-file-name');
+        for (var i = 0; i < list.length; i++) fitFileName(list[i]);
     }
     function sizeText(n) {
         n = parseInt(n, 10) || 0;
@@ -848,6 +959,16 @@
                 if (self.historyDone || self.loadingHistory) return;
                 self.loadHistory();
             };
+            /* v1.2.18：窗口尺寸变化后重算文件名中间省略。
+               卡片是固定宽度，但 .ha-file-card 仍有 max-width:100% ——
+               视口窄于卡片时会被压缩，可用宽度随之变化，必须重排。
+               去抖 120ms：拖窗口时 resize 会连续触发几十次，
+               每次都遍历全部消息重排会明显卡顿。 */
+            var fitTimer = 0;
+            window.addEventListener('resize', function () {
+                if (fitTimer) clearTimeout(fitTimer);
+                fitTimer = setTimeout(function () { fitTimer = 0; refitAllFileNames(); }, 120);
+            });
             /* 消息时间：悬停「消息气泡」满 2 秒才显示，移开立即隐藏（v1.1.0）
                为什么不用 CSS :hover —— CSS 无法表达「持续满 N 秒」，
                一 hover 就出现会与快速扫读打架，也会让昵称行一直跳。
@@ -1905,6 +2026,9 @@
             }
             if (this.needTimeDivider(prevTs, m.ts)) box.appendChild(this.buildTimeDivider(m.ts));
             box.appendChild(div);
+            // v1.2.18：文件名中间省略必须在**入 DOM 之后**量宽（见 fitFileName 注释），
+            // 同一帧内的多次插入由 scheduleFitFileName 合并成一次重排。
+            if (b.html.indexOf('ha-file-name') >= 0) scheduleFitFileName(div);
 
             // ⚠️ 裁剪条件必须按**消息条数**算，不能用 children.length ——
             // children 里混着时间戳节点，用它算会让上限被时间戳虚增，
@@ -2040,6 +2164,8 @@
             //   insertBefore 的第二个参数必须是 div 的**已在 DOM 中的后继节点**。
             //   若先插 divider，就得拿还没入 DOM 的 div 当参照 → 抛 NotFoundError。
             box.insertBefore(div, ref);
+            // v1.2.18：同上，插入后才有宽度可量
+            if (b.html.indexOf('ha-file-name') >= 0) scheduleFitFileName(div);
             var prevTs = this.tsOfRef(ref);
             if (this.needTimeDivider(prevTs, m.ts)) {
                 box.insertBefore(this.buildTimeDivider(m.ts), div);
