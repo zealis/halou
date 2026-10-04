@@ -540,8 +540,27 @@ if ($action !== '') {
                 Api::json(['ok' => false, 'msg' => '站点未开放用户创建群聊']);
             }
             $name = trim($p('name'));
-            if (mb_strlen($name) < 2 || mb_strlen($name) > 30) Api::json(['ok' => false, 'msg' => '群名称需 2-30 个字符']);
-            Chat::filterText($name, 'room_name', $actor);   // 敏感词过滤
+            /* v1.2.19：群名称改为**可选**。留空时自动命名为「<昵称>的群聊」。
+               原先强制 2-30 字符，等于逼用户先想好名字才能建群 ——
+               而多数人建群时只想拉人开聊，名字是次要的。
+
+               ⚠️ 默认名**不再走敏感词过滤**：昵称是已受控来源（注册/改昵称时
+               已过滤过），重复过滤会把含敏感词的昵称打成「***的群聊」，
+               用户看到只觉得莫名其妙（昵称本身在消息里也照样显示）。
+               用户**自己填**的名字仍照常过滤。
+               ⚠️ 也要截断到 30（与下方校验上限对齐）：但**截昵称、不截后缀** ——
+               先给「的群聊」留足 3 个字，再截昵称。若反过来写成
+               mb_substr(nick.'的群聊', 0, 30)，昵称一长（>27 字）后缀就被整个切掉，
+               剩下 30 个「长」而不是「xxx的群聊」，与需求形态不符。 */
+            if ($name === '') {
+                $name = mb_substr($actor['nickname'], 0, 27) . '的群聊';
+            } else {
+                if (mb_strlen($name) < 2 || mb_strlen($name) > 30) {
+                    Api::json(['ok' => false, 'msg' => '群名称需 2-30 个字符（留空则自动命名为「'
+                        . $actor['nickname'] . '的群聊」）']);
+                }
+                Chat::filterText($name, 'room_name', $actor);   // 敏感词过滤
+            }
             $desc = trim((string)($_POST['description'] ?? ''));
             Chat::filterText($desc, 'room_desc', $actor);
             $type = $p('type');

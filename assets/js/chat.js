@@ -1811,9 +1811,15 @@
                 }
                 return h;
             };
+            /* v1.2.19：群名称改为**可选**，留空由服务端补「<昵称>的群聊」。
+               前端这里只负责把「留空会得到什么」讲清楚 —— 不要等到创建完
+               才发现群叫了个自己没写的名字。 */
+            var me0 = this.cfg.me || {};
+            var autoName = ((me0.nickname || '') || '我') + '的群聊';
             this.openModal(
                 '<h3>创建群聊</h3>'
-                + '<div class="ha-form-item"><label>群名称</label><input class="ha-input" id="haRCName" maxlength="30" placeholder="2-30 个字符"></div>'
+                + '<div class="ha-form-item"><label>群名称（可选）</label><input class="ha-input" id="haRCName" maxlength="30"'
+                + ' placeholder="留空默认「' + esc(autoName) + '」"></div>'
                 + '<div class="ha-form-item"><label>类型</label><select class="ha-input" id="haRCType">'
                 + opts(TYPE, ['public', 'password', 'role'], 'public') + '</select></div>'
                 + '<div class="ha-form-item" id="haRCPassRow" style="display:none"><label>房间密码</label><input class="ha-input" type="password" id="haRCPass" placeholder="密码群必须设置密码"></div>'
@@ -1887,7 +1893,14 @@
             var submit = function () {
                 if (notEnough) { msg.innerHTML = '<span style="color:#C41D1F">积分不足，无法创建</span>'; return; }
                 var name = $('haRCName').value.replace(/^\s+|\s+$/g, '');
-                if (name.length < 2) { msg.innerHTML = '<span style="color:#C41D1F">群名称至少 2 个字符</span>'; return; }
+                /* v1.2.19：空 = 合法（走默认名）；填了才校验长度。
+                   ⚠️ 不能写成 `name.length < 2` —— 那会把「留空」也判成非法，
+                   与「可选」的设计直接矛盾。 */
+                if (name !== '' && (name.length < 2 || name.length > 30)) {
+                    msg.innerHTML = '<span style="color:#C41D1F">群名称需 2-30 个字符，'
+                        + '或留空自动命名为「' + esc(autoName) + '」</span>';
+                    return;
+                }
                 var t = typeSel.value;
                 if (t === 'password' && !$('haRCPass').value) {
                     msg.innerHTML = '<span style="color:#C41D1F">密码群必须设置密码</span>'; return;
