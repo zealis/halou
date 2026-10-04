@@ -808,7 +808,16 @@ button { font-family: inherit; cursor: pointer; }
 /* 文件图标统一 block：inline SVG 的基线间隙会让卡片高度多出几像素 */
 .ha-file-ico svg { display: block; }
 /* 彩色文件图标自带 fill，不继承 .ha-file-ico 的 currentColor 描边色 */
-.ha-file-meta { flex: 1; -webkit-flex: 1; min-width: 0; }
+.ha-file-meta {
+    flex: 1; -webkit-flex: 1; min-width: 0;
+    /* v1.2.17：**必须显式 left**。
+       .ha-msg.mine .ha-msg-body 有 text-align:right（自己发的消息整块靠右），
+       会继承进卡片，把「文件名 / 文件大小」两行一起推到右边 ——
+       表现为自己的附件里两行字都贴右、与图标之间大片空白。
+       卡片内部是「图标 + 文本 + 下载」的固定版式，文本必须始终从图标右侧起读，
+       不随消息在左在右而变，故在此显式声明覆盖继承。 */
+    text-align: left;
+}
 /* 名称与大小两行「竖着对齐」（v1.2.16）：
    两行都是 block，左边缘天然在同一条竖线上；
    再把 line-height 统一成 18px（原来跟字号走：13px→16.9、12px→15.6，行高不等，
