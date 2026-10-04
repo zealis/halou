@@ -690,9 +690,14 @@ button { font-family: inherit; cursor: pointer; }
    调色轨迹（白底对比度）：
      #E8E8E8 1.23 → #E4E4E4 1.27 → #D5D5D5 1.47 → #CCCCCC 1.61 → **#8E8EA0 3.22 ✅**
    ⚠️ 再往深（#767686 4.46:1）会让昵称逐渐抢正文焦点，与「退后」的设计意图相反。
-     本档既达标又不抢眼，建议就此定版。 */
+     本档既达标又不抢眼，建议就此定版。
+
+   v1.2.15：**去掉 hover 变色**（原 :hover → --ha-primary-dark）。
+     昵称虽然仍可点开资料卡（cursor:pointer 保留），但不再用颜色变化提示可点性 ——
+     变绿/变蓝的昵称会在快速扫读时形成一串闪烁的高亮点，抢正文焦点，
+     与这条昵称色「退后、不抢眼」的定版意图自相矛盾。
+     hover 反馈改由头像的 opacity 承担（.ha-msg-av:hover），语义更贴合「这是个可点对象」。 */
 .ha-msg-meta .ha-msg-nick { color: #8E8EA0; font-weight: 600; cursor: pointer; margin-right: 4px; }
-.ha-msg-meta .ha-msg-nick:hover { color: var(--ha-primary-dark); }
 /* meta 行 flex：时间紧跟昵称之后（v1.1.0：不再推到远离头像的一端）。
    显隐由 JS 控制——悬停消息气泡满 2 秒才加 .ha-time-show，
    CSS :hover 无法表达「持续满 N 秒」，一 hover 就出现会与快速扫读打架。 */
@@ -788,7 +793,15 @@ button { font-family: inherit; cursor: pointer; }
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     display: block;
 }
-.ha-file-size { font-size: 12px; color: var(--ha-text-sub); margin-top: 2px; }
+.ha-file-size {
+    font-size: 12px; color: var(--ha-text-sub);
+    display: block;
+    /* v1.2.15：2px → 8px，与卡片 gap 对齐；**必须先有 display:block**。
+       本元素是 <span>，默认 display:inline —— **内联元素的垂直 margin 不生效**，
+       浏览器会直接忽略 margin-top，间距实为 0（探测到的 1px 是两行行高差，不是 margin）。
+       所以调大 margin-top 之前必须先把 display 改成 block，否则改了等于没改。 */
+    margin-top: 8px;
+}
 .ha-file-dl { flex-shrink: 0; -webkit-flex-shrink: 0; color: var(--ha-primary-strong); text-decoration: none; }
 .ha-file-dl svg { display: block; }
 .ha-file-dl:hover { color: var(--ha-primary-dark); }

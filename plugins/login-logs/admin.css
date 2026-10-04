@@ -1,0 +1,87 @@
+/**
+ * 登录日志插件 - 后台样式（v1.0.0）
+ * 复用主程序 ha- 前缀变量，移动端适配表格横向滚动。
+ * 选择器限定 #haLLTable，避免影响其他后台表格。
+ */
+
+/* 覆盖主程序 .ha-table{width:100%}，让表格按内容撑开，
+   外层容器 overflow-x:auto 负责横向滚动 */
+#haLLTable {
+    width: auto;
+    min-width: 100%;
+    table-layout: auto;
+}
+
+/* 单元格不换行，中文不逐字拆分 */
+#haLLTable th,
+#haLLTable td {
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
+}
+
+/* 邮箱列（第 4 列）允许超长省略 */
+#haLLTable td:nth-child(4) {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* User-Agent 列（第 7 列）允许超长省略 */
+#haLLTable td:nth-child(7) {
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 统计卡片三栏自适应 */
+#haLLStatCard {
+    display: flex;
+    display: -webkit-flex;
+    flex-wrap: wrap;
+    -webkit-flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 16px;
+}
+.haLLStatItem {
+    flex: 1 1 160px;
+    -webkit-flex: 1 1 160px;
+    min-width: 140px;
+}
+.haLLStatItem .num {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--ha-text, #333);
+    line-height: 1.2;
+}
+.haLLStatItem .lbl {
+    font-size: 12px;
+    color: var(--ha-text-sub, #999);
+    margin-top: 2px;
+}
+
+/* 移动端：筛选表单纵向堆叠 */
+@media (max-width: 720px) {
+    .ha-form-row {
+        flex-direction: column;
+        -webkit-flex-direction: column;
+        align-items: stretch;
+        -webkit-align-items: stretch;
+    }
+    .ha-form-row .ha-form-item {
+        min-width: 0 !important;
+        width: 100%;
+    }
+    .ha-form-row > .ha-btn {
+        width: 100%;
+    }
+    #haLLStat {
+        display: block;
+        margin-left: 0 !important;
+        margin-top: 8px;
+    }
+    #haLLTable td:nth-child(4) { max-width: 130px; }
+    #haLLTable td:nth-child(7) { max-width: 160px; }
+}
