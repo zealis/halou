@@ -678,16 +678,17 @@ button { font-family: inherit; cursor: pointer; }
 }
 .ha-msg-av:hover { opacity: .85; }
 .ha-msg-meta { font-size: 12px; color: var(--ha-text-sub); margin-bottom: 2px; }
-/* v1.2.10：昵称色 #E4E4E4 → #D5D5D5（实测 #E4E4E4 过于隐形，用户确认后加深一档）。
-   对比度：#D5D5D5 在白底上 1.47:1、消息区底 #F5F5F5 上 1.35:1，
-   仍低于 WCAG 非文本 3:1，属「刻意弱化」区间而非「可读性达标」区间。
-   之所以可接受：昵称是纯装饰性辅助信息，不承载操作或状态
+/* v1.2.11：昵称色 #D5D5D5 → #CCCCCC（实测 #D5D5D5 略深，#E8E8E8 反而更隐形，
+   经确认取「略深于上一版但仍明显退后」的 #CCCCCC）。
+   对比度：#CCCCCC 在白底上 1.61:1、消息区底 #F5F5F5 上 1.47:1，
+   仍低于 WCAG 非文本 3:1，属「刻意弱化」区间。
+   理由：昵称是纯装饰性辅助信息，不承载操作或状态
    （点头像/昵称均可打开资料卡，群聊里消息本身已通过头像区分说话人），
-   视觉层级上要的就是「能看出是谁说的，但明显退在正文之后」。
-   ⚠️ 若要真正达到 3:1 需用 #999999（2.85:1）乃至 #767676（4.17:1），
-   那会让昵称重新比正文抢眼 —— 与本设计意图相反，故不取。
+   视觉层级要的就是「能看出是谁说的，但明显退在正文之后」。
+   ⚠️ 调色收敛点：#D5D5D5=1.47、#CCCCCC=1.61、#BFBFBF≈1.76、#999999=2.85。
+     再深到 #999999 附近昵称就会重新比正文抢眼，与设计意图相反，故不建议。
    font-weight:600 的加粗在低对比度下略微补偿辨识度。 */
-.ha-msg-meta .ha-msg-nick { color: #D5D5D5; font-weight: 600; cursor: pointer; margin-right: 4px; }
+.ha-msg-meta .ha-msg-nick { color: #CCCCCC; font-weight: 600; cursor: pointer; margin-right: 4px; }
 .ha-msg-meta .ha-msg-nick:hover { color: var(--ha-primary-dark); }
 /* meta 行 flex：时间紧跟昵称之后（v1.1.0：不再推到远离头像的一端）。
    显隐由 JS 控制——悬停消息气泡满 2 秒才加 .ha-time-show，
