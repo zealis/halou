@@ -1557,7 +1557,15 @@
                 + ' <span class="ha-msg-nick" onclick="HaChat.userCard(' + (m.uid || 0) + ',\'' + esc(m.nickname) + '\')">' + esc(m.nickname) + '</span>';
             // v1.1.0：去掉昵称后的「→ 昵称」私信文字标签。
             // 私聊会话页双方已确定；群聊内的 @提及 足以定位发给人，额外标注纯噪音。
-            var meta = isSys ? '' :
+            //
+            // v1.2.8：**私聊不显示 meta 行**（昵称与角色标签都不显示）。
+            // 私聊只有两个人、页面本身就是对话，顶部已写明对方是谁，
+            // 每条消息上方再重复一遍昵称是纯噪音。头像仍保留（可点开资料卡）。
+            // 判定用 m.dm（服务端下发的私聊标识），不靠 m.type —— v1.2.1 起
+            // 私聊里的图片/文件消息 type 分别是 image/file，用 type 会漏判。
+            // ⚠️ 悬停时间也一并去掉：meta 行整体不渲染，留个空 div 只会破坏
+            // flex 布局与 .ha-msg-body 的基线对齐。
+            var meta = (isSys || m.dm) ? '' :
                 '<div class="ha-msg-meta">' + mainPart + timeHtml + '</div>';
 
             return {
