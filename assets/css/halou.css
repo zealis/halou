@@ -694,7 +694,10 @@ button { font-family: inherit; cursor: pointer; }
     display: inline-block;
     padding: 8px 12px;
     border-radius: 8px;
-    background: var(--ha-bg-sub);
+    /* v1.2.7：气泡底色 #FFFFFF（纯白）。原为 --ha-bg-sub(#F5F7FA) 浅灰。
+       依赖边框（--ha-border #E0E4E8）与消息区底色（--ha-bg-chat #F5F5F5）区分层次，
+       白底 + 1px 边框在 #F5F5F5 底上仍有足够可辨的轮廓。 */
+    background: #FFFFFF;
     border: 1px solid var(--ha-border);
     word-break: break-word;
     word-wrap: break-word;          /* 老内核 */
@@ -705,8 +708,13 @@ button { font-family: inherit; cursor: pointer; }
 }
 .ha-msg.mine { flex-direction: row-reverse; -webkit-flex-direction: row-reverse; }
 .ha-msg.mine .ha-msg-body { text-align: right; }
-.ha-msg.mine .ha-msg-content { background: var(--ha-blue-light); border-color: #91d5ff; text-align: left; }
-.ha-msg.mention .ha-msg-content { background: #fffbe6; border-color: #ffe58f; }
+/* v1.2.7：自己消息的气泡也改为 #FFFFFF。原先是 --ha-blue-light(#E6F7FF 浅蓝)，
+   靠色相区分左右；改白后左右气泡同为白底，改由**位置（左右分栏）+ 头像**区分，
+   边框色也从 #91d5ff 回到中性 --ha-border，避免与白底冲突显得脏。 */
+.ha-msg.mine .ha-msg-content { background: #FFFFFF; border-color: var(--ha-border); text-align: left; }
+/* v1.2.7：@ 提及原为 #fffbe6（浅黄），在纯白气泡体系下与白色几乎无法分辨。
+       加深到 #FFF3C4 并把边框同步加深，保留「这条是在叫我」的视觉提示。 */
+.ha-msg.mention .ha-msg-content { background: #FFF3C4; border-color: #E6B800; }
 /* v1.1.0：私聊消息使用与群聊完全一致的气泡配色与昵称行。
    此前私聊用紫色气泡 + ::after 追加「[私信]」标签，与群聊视觉割裂，
    且在私聊会话页里「这是私信」本就是废话（页面本身就是私聊）。 */
