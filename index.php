@@ -992,7 +992,8 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
        // 右侧「竖三点」：打开群聊信息侧栏（v1.1.1 替代原在线成员人形图标）
        . '<button class="ha-icon-btn" id="haTogglePanel" aria-label="群聊信息" title="群聊信息">' . ow_icon('more-v') . '</button>'
        . '</header>'
-       . '<div class="ha-messages" id="haMessages"><div class="ha-load-more" id="haLoadMore">加载更早消息…</div></div>'
+       // v1.2.6：消息区初始为空，更早的消息靠向上滚动懒加载（不再有「加载更早消息…」入口）
+       . '<div class="ha-messages" id="haMessages"></div>'
        . '<div class="ha-inputbar">'
        . '<div class="ha-toolbar">'
        // 工具栏图标统一 16px（比消息区图标小一号，避免抢视觉重心）

@@ -612,6 +612,8 @@
                             if (r.data.length) self.since = r.data[r.data.length - 1].id;
                             self.scrollBottom();
                             if (r.data.length < 30) self.historyDone = true;
+                            // v1.2.6 懒加载：填不满屏幕就自动往前补
+                            self.fillIfShort();
                         } else if (r.need_password) {
                             self.passForget(self.room);
                             self.askRoomPassword(self.room, first ? first.name : '', function (pw) { load(pw); });
@@ -748,8 +750,15 @@
                 if (o && o.className.indexOf('open') >= 0) setPanel(false);
                 if (s && s.className.indexOf('open') >= 0) setSide(false);
             }) : (document.onclick = null);
+            /* v1.2.6 懒加载：向上滚到接近顶部时自动拉更早的一批，
+               不再有「加载更早消息…」那个可点入口。
+               阈值 120px 而非 40px：触屏上手指惯性滑动很容易冲到 0，
+               贴着 0 才触发会出现「已经到底了却没反应」的错觉。
+               loadingHistory 是并发闸门 —— 一次请求未回前不再发第二次。 */
             $('haMessages').onscroll = function () {
-                if (this.scrollTop < 40 && !self.historyDone && !self.loadingHistory) self.loadHistory();
+                if (this.scrollTop > 120) return;
+                if (self.historyDone || self.loadingHistory) return;
+                self.loadHistory();
             };
             /* 消息时间：悬停「消息气泡」满 2 秒才显示，移开立即隐藏（v1.1.0）
                为什么不用 CSS :hover —— CSS 无法表达「持续满 N 秒」，
@@ -785,14 +794,8 @@
                 if (to && node.contains && node.contains(to)) return;
                 self.hideMsgTime();
             };
-            /* 「加载更早消息…」每次切换会话都会被 innerHTML 重建，元素换了，
-               直接 onclick 绑定会失效（v1.1.0 私聊复用同一消息区后暴露）。改用父容器委托。
-               注意：引用跳转仍走 buildMessage 里的内联 onclick（ha-quote-link），不归这里管。 */
-            $('haMessages').onclick = function (e) {
-                e = e || w.event;
-                var t = e.target || e.srcElement;
-                if (t && t.id === 'haLoadMore') self.loadHistory();
-            };
+            // v1.2.6：「加载更早消息…」入口节点已移除，改为滚动懒加载
+            // （见上面的 onscroll），故这里不再需要 haLoadMore 的点击委托。
             // 右键消息气泡 → 操作菜单（@/私信/收藏/撤回，插件可追加）
             $('haMessages').oncontextmenu = function (e) {
                 e = e || w.event;
@@ -1187,7 +1190,7 @@
             this.clearQuote();
             $('haRoomName').innerHTML = esc(this.roomName);
             this.hideMsgTime();   // v1.1.0：消息区重渲染前清掉悬停计时（引用的元素已不存在）
-            $('haMessages').innerHTML = '<div class="ha-load-more" id="haLoadMore">加载更早消息…</div>';
+            $('haMessages').innerHTML = '';   // v1.2.6：改懒加载，不再放「加载更早消息…」入口节点
             ChatList.activate('haRoomList', 'dm:' + peer);
             $('haSidebar').className = $('haSidebar').className.replace(' open', '');
             this.setDmUrl(peer);
@@ -1207,12 +1210,10 @@
                 if (r.data.length) self.since = r.data[r.data.length - 1].id;
                 self.scrollBottom();
                 if (r.data.length < 30) self.historyDone = true;
-                // 没有历史时移除「加载更早消息…」，避免空会话里悬空一个不可用入口
-                if (!r.data.length) {
-                    self.historyDone = true;
-                    var lm = $('haLoadMore');
-                    if (lm) lm.parentNode.removeChild(lm);
-                }
+                if (!r.data.length) self.historyDone = true;
+                // v1.2.6 懒加载：消息太少填不满屏幕时自动往前补，
+                // 否则去掉「加载更早消息…」入口后，这类会话上方会一直留白。
+                self.fillIfShort();
             });
             this.dmPollLoop();
             this.renderRoomPanel();   // v1.1.1：私聊视图下侧栏群设置区显示占位提示
@@ -1385,12 +1386,15 @@
                 this.pollGen = (this.pollGen || 0) + 1;   // 旧循环醒来即自杀
             }
             this.room = id; this.roomName = name; this.since = 0; this.historyDone = false;
+            // ⚠️ 必须重置 loadingHistory：切群时若上一批懒加载还在途，锁会一直卡在 true，
+            // 导致新群的懒加载彻底不响应（onscroll 与 fillIfShort 都被它挡住）。
+            this.loadingHistory = false;
             this.syncRoomOwner();
             this.renderMe();   // 资料区身份标签随群聊变化（群主/会员归属当前群）
             this.clearQuote();
             $('haRoomName').innerHTML = esc(name);
             this.hideMsgTime();   // v1.1.0：消息区重渲染前清掉悬停计时（引用的元素已不存在）
-            $('haMessages').innerHTML = '<div class="ha-load-more" id="haLoadMore">加载更早消息…</div>';
+            $('haMessages').innerHTML = '';   // v1.2.6：改懒加载，不再放「加载更早消息…」入口节点
             var items = $('haRoomList').getElementsByTagName('li'), i;
             for (i = 0; i < items.length; i++) {
                 items[i].className = items[i].className.replace(' active', '');
@@ -1412,6 +1416,8 @@
                         if (r.data.length < 30) self.historyDone = true;
                         // 从私聊切回群聊时群聊长轮询是停的，需在此重新拉起
                         if (!self._roomPollRunning) { self._roomPollRunning = true; self.startPoll(); }
+                        // v1.2.6 懒加载：填不满屏幕就自动往前补
+                        self.fillIfShort();
                     } else if (r.need_password) {
                         // 通行授权已过期 → 重新验证，验证成功后自动重试
                         self.passForget(id);
@@ -1850,13 +1856,22 @@
         },
 
         /**
-         * 加载更早消息（向上翻页）。v1.1.0：按当前视图分流——
-         * 群聊走 history(room_id)，私聊走 dm_history(peer)，两者都是「取 before 之前的 30 条」。
+         * 懒加载更早的一批消息（v1.2.6）。触发方有两个：
+         *   1. 消息区向上滚到接近顶部（见 bindEvents 里的 onscroll）
+         *   2. 首屏渲染完若**填不满容器**，自动续拉（见 fillIfShort）
+         * 不再有「加载更早消息…」可点入口 —— 那是 v1.1.0 之前的做法。
+         *
+         * 视图分流沿用 v1.1.0：群聊走 history(room_id)，私聊走 dm_history(peer)，
+         * 两者都是「取 before 之前的 30 条」。
+         *
+         * @param {function} done 加载完成回调（成功/失败/已切走都会调）
          */
-        loadHistory: function () {
+        loadHistory: function (done) {
             var self = this, box = $('haMessages');
+            var finish = function () { if (typeof done === 'function') done(); };
+            if (this.historyDone || this.loadingHistory) { finish(); return; }
             var first = box.querySelector('.ha-msg');
-            if (!first) { this.historyDone = true; return; }
+            if (!first) { this.historyDone = true; finish(); return; }   // 一条都没有 = 拉完了
             var before = parseInt(first.id.replace('haMsg', ''), 10);
             var isDm = !!this.dm, peer = isDm ? this.dm.peer : '';
             var action = isDm ? 'dm_history' : 'history';
@@ -1864,14 +1879,42 @@
             this.loadingHistory = true;
             HaApi.post(action, payload, function (r) {
                 self.loadingHistory = false;
-                if (self.dm !== isDm || (isDm && (!self.dm || self.dm.peer !== peer))) return;  // 已切走
-                if (!r.ok || !r.data.length) { self.historyDone = true; if ($('haLoadMore')) $('haLoadMore').innerHTML = '没有更早的消息了'; return; }
+                // ⚠️ 两边都必须先 !! 归一再比。
+                // 群聊首次进入时 self.dm 从未被赋值，是 undefined；而 isDm 是 !!this.dm
+                // 得到的 boolean false。直接用 !== 比较 undefined 与 false 恒为 true，
+                // 会把每次响应都当成「已切走」丢弃 —— 表现为「懒加载永远不生效、
+                // 往上滚什么都没反应」，且没有任何报错，很难定位。
+                var nowIsDm = !!self.dm;
+                if (nowIsDm !== isDm || (isDm && self.dm.peer !== peer)) { finish(); return; }
+                if (!r.ok) { self.historyDone = true; finish(); return; }
+                if (!r.data.length) { self.historyDone = true; finish(); return; }
+
+                // ⚠️ 插入新节点会改变 scrollHeight，必须**先记旧高度、插完再按差值回推**，
+                // 否则浏览器会保持 scrollTop 不变 → 视口猛地跳到新加载内容的位置（老实现就这毛病）。
                 var oldH = box.scrollHeight, i;
-                for (i = r.data.length - 1; i >= 0; i--) {
-                    self.addMessageBefore(r.data[i], first);
-                }
+                for (i = r.data.length - 1; i >= 0; i--) self.addMessageBefore(r.data[i], first);
                 box.scrollTop = box.scrollHeight - oldH;
+
+                // 不足一屏（scrollHeight <= clientHeight）说明还有空间，继续往前拉，
+                // 避免新群/新会话只显示最后几条、上方却是一片空白。
+                var short = box.scrollHeight <= box.clientHeight + 4;
+                if (short && r.data.length >= 30) { self.loadHistory(finish); return; }
+                if (r.data.length < 30) self.historyDone = true;   // 不足一页 = 没有更早的了
+                finish();
             });
+        },
+
+        /**
+         * 首屏渲染完成后调用：若消息区填不满容器，自动续拉更早的消息直到填满或拉完。
+         * v1.2.6 懒加载配套 —— 少了「加载更早消息…」入口后，消息少的会话
+         * 若不自动补，用户会看到上方空白且没有任何提示。
+         */
+        fillIfShort: function () {
+            var box = $('haMessages');
+            if (!box || this.historyDone || this.loadingHistory) return;
+            if (box.scrollHeight > box.clientHeight + 4) return;   // 已填满，不用管
+            if (!box.querySelector('.ha-msg')) return;           // 还没拿到任何消息，等首屏回调
+            this.loadHistory();
         },
 
         addMessageBefore: function (m, ref) {
@@ -2930,23 +2973,45 @@
 
         /**
          * 点击引用块 → 滚动到被引用的原消息并高亮闪烁。
-         * 原消息不在当前页面（更早的历史未加载）时给出提示。
+         *
+         * v1.2.6：原消息还没被懒加载到时，**自动往前拉**直到找到为止
+         * （此前只能提示「请加载更早的消息」，但入口节点已移除，那样等于死路）。
+         * 找不到时最多连拉 HISTORY_JUMP_MAX 页，避免无意义的无限翻页。
          */
         jumpToQuote: function (msgId) {
-            var el = $('haMsg' + msgId);
-            if (!el) { toast('原消息不在当前页面，请加载更早的消息'); return; }
-            try {
-                el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-            } catch (e) {
-                // 老浏览器无 smooth 参数：手动滚动到居中
-                var box = $('haMessages'), r = el.getBoundingClientRect(), br = box.getBoundingClientRect();
-                box.scrollTop += r.top - br.top - br.height / 2 + r.height / 2;
-            }
-            el.classList.remove('ha-msg-jump');
-            // 强制重排以重启动画
-            void el.offsetWidth;
-            el.classList.add('ha-msg-jump');
-            setTimeout(function () { el.classList.remove('ha-msg-jump'); }, 1800);
+            var self = this;
+            var tryJump = function () {
+                var el = $('haMsg' + msgId);
+                if (!el) return false;
+                try {
+                    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                } catch (e) {
+                    // 老浏览器无 smooth 参数：手动滚动到居中
+                    var box = $('haMessages'), r = el.getBoundingClientRect(), br = box.getBoundingClientRect();
+                    box.scrollTop += r.top - br.top - br.height / 2 + r.height / 2;
+                }
+                el.classList.remove('ha-msg-jump');
+                // 强制重排以重启动画
+                void el.offsetWidth;
+                el.classList.add('ha-msg-jump');
+                setTimeout(function () { el.classList.remove('ha-msg-jump'); }, 1800);
+                return true;
+            };
+            if (tryJump()) return;
+
+            var n = 0, max = 10;
+            var pull = function () {
+                if (self.historyDone || n >= max) {
+                    if (!tryJump()) toast('原消息在更早的历史里，已加载到底');
+                    return;
+                }
+                n++;
+                self.loadHistory(function () {
+                    if (tryJump()) return;
+                    pull();          // 这一批里没有，继续往前拉
+                });
+            };
+            pull();
         },
 
         /**

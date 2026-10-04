@@ -635,14 +635,8 @@ button { font-family: inherit; cursor: pointer; }
     background-color: var(--ha-bg-chat);
     background-image: var(--ha-bg-chat-grad);
 }
-.ha-load-more {
-    text-align: center;
-    font-size: 12px;
-    color: var(--ha-primary-strong);
-    padding: 6px;
-    cursor: pointer;
-}
-.ha-load-more:hover { color: var(--ha-primary-dark); }
+/* 「加载更早消息…」的样式（.ha-load-more）随 v1.2.6 懒加载一并移除：
+   消息区不再有这个可点入口节点，向上滚动即自动加载。 */
 /* 消息流时间戳（v1.2.5）：相邻消息间隔超过 5 分钟时在两者之间插入一条居中分隔。
    插入与否由 JS 判断（见 HaChat.needTimeDivider），CSS 只负责呈现。
    上下留白要略大于 .ha-msg 的 14px 下边距，否则会与气泡贴得太近、像气泡的一部分。 */
