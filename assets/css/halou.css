@@ -643,6 +643,28 @@ button { font-family: inherit; cursor: pointer; }
     cursor: pointer;
 }
 .ha-load-more:hover { color: var(--ha-primary-dark); }
+/* 消息流时间戳（v1.2.5）：相邻消息间隔超过 5 分钟时在两者之间插入一条居中分隔。
+   插入与否由 JS 判断（见 HaChat.needTimeDivider），CSS 只负责呈现。
+   上下留白要略大于 .ha-msg 的 14px 下边距，否则会与气泡贴得太近、像气泡的一部分。 */
+.ha-time-divider {
+    text-align: center;
+    margin: 16px 0 14px;
+    user-select: none; -webkit-user-select: none;
+}
+.ha-time-divider span {
+    display: inline-block; -webkit-inline-block;
+    font-size: 12px;
+    line-height: 20px;
+    padding: 0 10px;
+    border-radius: 10px;
+    color: var(--ha-text-sub);
+    background: var(--ha-bg-sub);
+}
+/* 窄屏下时间戳文字相对更抢眼，缩一档字号并收窄留白 */
+@media (max-width: 640px) {
+    .ha-time-divider { margin: 12px 0 10px; }
+    .ha-time-divider span { font-size: 11px; padding: 0 8px; }
+}
 .ha-msg {
     display: flex; display: -webkit-flex;
     gap: 10px;

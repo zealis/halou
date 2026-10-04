@@ -1698,6 +1698,77 @@
             });
         },
 
+        /* ---------- 消息流时间戳（v1.2.5） ---------- */
+        /**
+         * 相邻消息间隔阈值（秒）：超过才插时间戳。
+         * 5 分钟是个平衡点：密集聊天时列表不被时间戳打断，
+         * 而一段明显停顿（午休、下班、隔天回来）又能让人知道时间断层在哪。
+         */
+        TIME_DIVIDER_GAP: 300,
+
+        /**
+         * 是否需要在这条消息前插时间戳。
+         * @param {number|null} prevTs 上一条消息的 ts（秒）；null = 消息流里的第一条
+         * @param {number}      ts      当前消息的 ts
+         */
+        needTimeDivider: function (prevTs, ts) {
+            // 流里第一条：上一条是「加载更早消息…」之类的非消息节点，
+            // 不拿它当上一条消息比时间，否则会在列表最顶部多出一条无意义的时间戳。
+            if (!prevTs || !ts) return false;
+            return Math.abs(ts - prevTs) > this.TIME_DIVIDER_GAP;
+        },
+
+        /**
+         * 时间戳文案分档（与气泡悬停时间 date('H:i') 的 24 小时制保持一致）：
+         *   今天        → 13:00
+         *   昨天        → 昨天 13:00
+         *   本周内      → 周三 13:00
+         *   更早        → 10月4日 13:00
+         * 跨年时「更早」档补上年份，避免「去年 3 月 5 日」和今年混淆。
+         */
+        timeDividerText: function (ts) {
+            var d = new Date(ts * 1000), now = new Date();
+            var hm = (function (x) {
+                return (x < 10 ? '0' : '') + x;
+            });
+            var timeStr = hm(d.getHours()) + ':' + hm(d.getMinutes());
+
+            // 归零到当天 00:00 再算天数差，避开时分秒带来的小数误差
+            var d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            var n0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            var dayDiff = Math.round((n0 - d0) / 86400000);
+
+            if (dayDiff === 0) return timeStr;                       // 今天
+            if (dayDiff === 1) return '昨天 ' + timeStr;              // 昨天
+            if (dayDiff < 7) return '周' + '日一二三四五六'[d.getDay()] + ' ' + timeStr;
+            var ymd = (d.getMonth() + 1) + '月' + d.getDate() + '日';
+            if (d.getFullYear() !== now.getFullYear()) ymd = d.getFullYear() + '年' + ymd;
+            return ymd + ' ' + timeStr;
+        },
+
+        /** 生成一个时间戳分隔节点（不进 msgCache，它不是消息） */
+        buildTimeDivider: function (ts) {
+            var el = document.createElement('div');
+            el.className = 'ha-time-divider';
+            var span = document.createElement('span');
+            span.textContent = this.timeDividerText(ts);
+            el.appendChild(span);
+            return el;
+        },
+
+        /**
+         * 取「插入点参考节点 ref 自身」的时间戳 ts。
+         *
+         * 向上翻页时新消息插在 ref **之前**，所以要比的时间是 **ref 自己**的时间，
+         * 不是 ref 之前那条 —— 后者在本轮插入前根本不存在（这批更早的消息还没渲染），
+         * 那是 addMessage 追加路径才需要的。
+         */
+        tsOfRef: function (ref) {
+            if (!ref || !ref.id || ref.id.indexOf('haMsg') !== 0) return 0;
+            var c = this.msgCache[parseInt(ref.id.replace('haMsg', ''), 10)];
+            return c ? (parseInt(c.ts, 10) || 0) : 0;
+        },
+
         addMessage: function (m, batch) {
 
             var box = $('haMessages');
@@ -1713,12 +1784,38 @@
             div.className = b.cls;
             div.id = 'haMsg' + m.id;
             div.innerHTML = b.html;
+
+            // 时间戳：与已渲染的最后一条比时间（末尾追加路径）
+            var lastMsg = null, kids = box.querySelectorAll('.ha-msg'), i;
+            for (i = kids.length - 1; i >= 0; i--) { lastMsg = kids[i]; break; }
+            var prevTs = 0;
+            if (lastMsg) {
+                var c = this.msgCache[parseInt(lastMsg.id.replace('haMsg', ''), 10)];
+                prevTs = c ? (parseInt(c.ts, 10) || 0) : 0;
+            }
+            if (this.needTimeDivider(prevTs, m.ts)) box.appendChild(this.buildTimeDivider(m.ts));
             box.appendChild(div);
-            if (!batch && box.children.length > 500) {
-                var old = box.children[1];
-                var oid = parseInt((old.id || '').replace('haMsg', ''), 10);
-                if (oid) delete this.msgCache[oid];
-                box.removeChild(old);
+
+            // ⚠️ 裁剪条件必须按**消息条数**算，不能用 children.length ——
+            // children 里混着时间戳节点，用它算会让上限被时间戳虚增，
+            // 导致实际消息数远未到 500 就开始裁（表现为「消息莫名变少」）。
+            if (!batch) {
+                var msgCount = box.getElementsByClassName('ha-msg').length;
+                while (msgCount > 500) {
+                    // 只删「最靠上的那条消息」，并连带它**之后**紧跟的时间戳节点，
+                    // 否则会留下一个失去参照的孤儿时间戳在顶部。
+                    var old = box.querySelector('.ha-msg');
+                    if (!old) break;
+                    var oid = parseInt((old.id || '').replace('haMsg', ''), 10);
+                    if (oid) delete this.msgCache[oid];
+                    var after = old.nextSibling;
+                    box.removeChild(old);
+                    if (after && after.className
+                        && after.className.indexOf('ha-time-divider') >= 0) {
+                        box.removeChild(after);
+                    }
+                    msgCount--;
+                }
             }
         },
 
@@ -1786,7 +1883,15 @@
             div.className = b.cls;
             div.id = 'haMsg' + m.id;
             div.innerHTML = b.html;
+            // 时间戳：与 ref（更晚的那条）比时间，插在**更早这条的上方**。
+            // ⚠️ 顺序必须是「先 div 后 divider」：
+            //   insertBefore 的第二个参数必须是 div 的**已在 DOM 中的后继节点**。
+            //   若先插 divider，就得拿还没入 DOM 的 div 当参照 → 抛 NotFoundError。
             box.insertBefore(div, ref);
+            var prevTs = this.tsOfRef(ref);
+            if (this.needTimeDivider(prevTs, m.ts)) {
+                box.insertBefore(this.buildTimeDivider(m.ts), div);
+            }
         },
 
         /* ---------- 消息右键菜单（@ / 私信 / 收藏贴纸 / 撤回，插件可扩展） ---------- */
