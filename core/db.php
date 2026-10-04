@@ -271,11 +271,16 @@ class DB
         self::addColumn('users', 'points', 'int', '0');   // 用户积分
         self::addColumn('users', 'birthdate', 'varchar(10)', "''");   // 出生日期（年龄限制注册用）
         // v1.1.0 软删除：deleted=1 表示「已删除」。行保留（昵称/时间/IP 可审计），
-        // content 同步清空（原内容不可恢复），到期由 Chat::purgeDeleted() 物理删除。
+        // content 同步清空（原内容不可恢复），到期由 Chat::purgeExpired() 物理删除。
         // 与 recalled（撤回）区分：撤回是用户自己的动作且不涉及合规留痕。
         self::addColumn('messages', 'deleted', 'int', '0');
         self::addColumn('messages', 'deleted_at', 'int', '0');
         self::addColumn('messages', 'deleted_by', 'varchar(64)', "''");
+        // v1.2.3 免清理标记：keep_forever=1 的消息**永不物理删除**。
+        // 用于「群主 / 超级管理员撤回的违规内容」——这类撤回是合规动作，
+        // 记录本身有留存价值，故不受 msg_retain_days 约束。
+        // purgeExpired() 的 WHERE 里必须带 keep_forever=0，漏了这条标记就形同虚设。
+        self::addColumn('messages', 'keep_forever', 'int', '0');
         // 已废弃字段：rooms.min_age（进入该房间的最低年龄）随 1.0.31 下线，应用层已不再读写。
         // 保留此行仅为兼容历史数据库（列仍存在且幂等），勿在业务代码中重新启用。
         self::addColumn('rooms', 'min_age', 'int', '0');
@@ -484,13 +489,9 @@ class DB
             'msg_rate_limit'   => '5',   // 每条消息最小间隔(秒)内的最大条数窗口
             'msg_rate_window'  => '10',  // 频率窗口(秒)
             'msg_rate_max'     => '8',   // 窗口内最大消息数
-            // v1.1.0 软删除保留期（天）：超期后由 Chat::purgeDeleted() 物理清除。
-            // 0 = 永久保留（不物理删除，行一直留着）
-            'msg_deleted_retain_days' => '30',
-            // v1.2.2 消息服务器保留期（天）：**未删除**的正常消息超过本期限后
-            // 由 Chat::purgeExpired() 物理清除，附件文件同步删除（无法恢复）。
-            // 与上面「已删除消息保留期」是两个独立维度：
-            //   前者管「已删除消息的审计行留多久」，后者管「正常消息本身留多久」。
+            // v1.2.2 消息服务器保留期（天）：消息超过本期限后由 Chat::purgeExpired() 物理清除，
+            // 附件文件同步删除（无法恢复）。v1.2.3 起这是**唯一**的消息保留期设置项 ——
+            // 原「已删除消息保留期」(msg_deleted_retain_days) 已下线，删除消息同样适用本期限。
             // 0 = 永久保留。默认 90 天（约三个月）。
             'msg_retain_days' => '90',
             'mail_rate_limit'  => '60',  // 邮件发送最小间隔(秒)

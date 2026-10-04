@@ -4,6 +4,13 @@
  */
 class Chat
 {
+    /**
+     * 撤回窗口（秒）：仅对**普通用户自己发的消息**生效。
+     * 群主 / 超级管理员撤回任何时间的消息都放行（用于处理违规内容），不受此限制。
+     * v1.2.3 由 180 秒（3 分钟）放宽为 300 秒（5 分钟）。
+     */
+    private const RECALL_WINDOW = 300;
+
     // ---------- 联系人（v1.1.24） ----------
     /**
      * 好友列表（只返回**我主动加的**那些，即 friends 表里 user_id = 我的行）。
@@ -511,8 +518,7 @@ class Chat
     // ---------- 历史消息（向上翻页） ----------
     public static function history(array $actor, int $roomId, int $beforeId, int $limit = 30): array
     {
-        self::purgeDeleted();   // v1.1.0：顺带清理过保留期的软删除消息（内部有小时级节流）
-        self::purgeExpired();   // v1.2.2：顺带清理过服务器保留期的正常消息 + 其附件
+        self::purgeExpired();   // v1.2.2：顺带清理过服务器保留期的消息 + 其附件
         self::purgeHides();     // v1.1.14：顺带清理指向已消失消息的隐藏行
         $sql = 'SELECT * FROM messages WHERE room_id=?';
         $args = [$roomId];
@@ -552,23 +558,29 @@ class Chat
     }
 
     /**
-     * 把一条消息加入「仅自己隐藏」（幂等）。
-     * 只允许注册用户调用；不校验房间权限——隐藏是**纯个人视图**行为，
+     * 把一条消息加入「仅本机不再看到」（幂等）。
+     * 只允许注册用户调用；不校验房间权限 —— 这是**纯个人视图**行为，
      * 看不见的消息自然也不会出现在自己的列表里，拦不拦没有实际区别。
+     *
+     * v1.2.3：对外文案统一叫「删除」（见 deleteMessage 的说明），
+     * 但表名与函数名仍沿用 hide / message_hides —— 它们准确描述了内部机制，
+     * 不为了对齐用户文案去改表名（那是无谓的迁移风险）。
+     * 返回文案刻意带上「仅本机」：否则用户会以为所有人都看不到了，那是欺骗。
      */
     public static function hideMessage(array $actor, int $msgId): array
     {
         if (($actor['kind'] ?? '') !== 'user') return [false, '请先登录后再使用该功能'];
         $m = DB::one('SELECT id FROM messages WHERE id=?', [$msgId]);
         if (!$m) return [false, '消息不存在'];
+        $tip = '已删除（仅本机不再看到这条消息，其他人不受影响）';
         if ((int)DB::val('SELECT 1 FROM message_hides WHERE user_id=? AND message_id=?',
                 [(int)$actor['id'], $msgId]) > 0) {
-            return [true, '已隐藏'];
+            return [true, $tip];
         }
         DB::insert('message_hides', [
             'user_id' => (int)$actor['id'], 'message_id' => $msgId, 'created_at' => time(),
         ]);
-        return [true, '已隐藏'];
+        return [true, $tip];
     }
 
     // ---------- 长轮询（主通道，零依赖替代 WebSocket） ----------
@@ -972,9 +984,13 @@ class Chat
      *
      * 权限矩阵（唯一口径，前端只按下发的 scope 显示文案，不自行判身份）：
      *   管理员 / 该群群主 / 消息作者本人 → scope='delete'：真删除，**所有人**都不再看到
-     *     （软删除，清空正文 + 留行审计，见下方说明）；
+     *     （软删除，清空正文 + 留行审计；行与附件到保留期后由 purgeExpired() 物理清除）；
      *   其他任何人（含游客）              → scope='hide'：只写 message_hides，
-     *     **仅自己**不再看到这条，别人照常能看到、消息也仍在库里。
+     *     **仅本机**不再看到这条，别人照常能看到、消息也仍在库里（换设备不生效）。
+     *
+     * ⚠️ v1.2.3：两种结果的**对外文案都叫「删除」**（原 hide 分支叫「已隐藏」）。
+     * 行为没变，只是措辞统一到用户心智；hide 分支的提示语必须带
+     * 「仅本机不再看到」以免误导 —— 否则用户会以为所有人都看不到了。
      *
      * 「删除他人的消息只是自己眼不见」是需求明确要求的产品行为：
      * 聊天是公共空间，任何人都有权屏蔽自己不想看的发言；但把「我不看」升格成
@@ -1001,10 +1017,16 @@ class Chat
         if (self::isDmRow($m)) $can = $mine;
 
         if (!$can) {
-            // 无权真删除 → 降级为「仅自己隐藏」。这是**降级而非拒绝**：
+            // 无权真删除 → 降级为「仅本机生效」。这是**降级而非拒绝**：
             // 前端对任何消息都提供「删除」入口，若服务端直接报错就是死按钮。
+            //
+            // v1.2.3：文案统一叫「删除」了，但**行为不变** —— 仍只写 message_hides，
+            // 仅当前设备/账号不再看到，库里消息还在、别人照常看得到（换设备不生效）。
+            // 之所以要改名：产品上「删除」是用户唯一的心智模型，
+            // 而「隐藏」这个词暴露了实现细节，用户会困惑「我删了为什么别人还在」。
+            // 代价是提示语必须说清「仅你不再看到」，否则就是欺骗。
             [$ok, $msg] = self::hideMessage($actor, $msgId);
-            return [$ok, $ok ? '已隐藏（仅你不再看到这条消息）' : $msg, 'hide'];
+            return [$ok, $ok ? '已删除（仅本机不再看到这条消息，其他人不受影响）' : $msg, 'hide'];
         }
 
         // 钩子：可放行或拦截（$allow 置 false 即拒绝，$reason 为展示给用户的理由）
@@ -1031,32 +1053,14 @@ class Chat
     }
 
     /**
-     * 清理超过保留期的软删除消息（物理 DELETE，行彻底消失）。
-     * 保留期由系统设置 msg_deleted_retain_days 控制，0 = 不清理（永久保留）。
-     * 每次读消息时顺带触发一次（低频、不在事务里），避免额外的定时任务依赖。
-     */
-    public static function purgeDeleted(): void
-    {
-        static $lastRun = 0;
-        $days = (int)DB::setting('msg_deleted_retain_days', 30);
-        if ($days <= 0) return;                       // 0 = 永久保留
-        if (time() - $lastRun < 3600) return;         // 每小时最多跑一次
-        $lastRun = time();
-        $before = time() - $days * 86400;
-        try {
-            $n = DB::run('DELETE FROM messages WHERE deleted=1 AND deleted_at > 0 AND deleted_at < ?', [$before]);
-            if ($n > 0) Sec::log('msg_purge', 'system', ['count' => (int)$n, 'retain_days' => $days]);
-        } catch (Throwable $e) {
-            // 清理失败绝不能影响正常读消息，静默即可
-        }
-    }
-
-    /**
-     * 清理超过**服务器保留期**的正常消息（物理 DELETE，行与附件文件彻底消失）。
+     * 清理超过**服务器保留期**的消息（物理 DELETE，行与附件文件彻底消失）。
      *
-     * v1.2.2 新增。与 purgeDeleted() 是**两个独立维度**，务必分清：
-     *   - purgeDeleted()  管「已删除消息的审计行留多久」（deleted=1 才处理）
-     *   - purgeExpired()  管「正常消息本身留多久」（deleted=0 的活消息，到期即清）
+     * v1.2.3 起**统一由 msg_retain_days 一个设置项控制**，不再区分正常消息与已删除消息：
+     *   - 正常消息（deleted=0）：到期清除
+     *   - 已删除消息（deleted=1）：同样到期清除（「已删除消息保留期」已下线并对齐本项）
+     *
+     * 唯一豁免：keep_forever=1 —— 群主 / 超管撤回的违规内容，标记后永不清除。
+     * 原因：这类撤回是合规动作，「处理过违规内容」这件事本身需要留痕。
      *
      * 保留期由系统设置 msg_retain_days 控制，0 = 永久保留。
      * 站点不提供聊天记录导出，故到期即物理清除——**无法恢复**，这是有意为之：
@@ -1066,7 +1070,7 @@ class Chat
      * （图片/头像/贴纸不动 —— 那些可能被收藏贴纸引用，生命周期与消息不同）。
      * 删除只对 uploads/file/ 下的路径生效，且经 fileAbs() 二次校验（阻断路径穿越）。
      *
-     * 安全：逐条 DELETE 而非大范围 WHERE，避��一次锁表；
+     * 安全：逐条 DELETE 而非大范围 WHERE，避免一次锁表；
      * 单条失败只跳过该条（记入日志），绝不影响读消息主流程。
      */
     public static function purgeExpired(): void
@@ -1078,10 +1082,12 @@ class Chat
         $lastRun = time();
         $before = time() - $days * 86400;
         try {
-            // 只取「未被删除」的超期消息：已删除的交给 purgeDeleted() 按其自身期限处理，
-            // 这里不去抢，避免两个策略在同一批行上互相干扰（各自保留期不同）。
+            // keep_forever=0 是硬性条件：群主/超管撤回的消息靠它豁免，漏掉这条等于标记失效。
+            // 时间基准统一用 created_at（消息本身的年龄），不用 deleted_at ——
+            // 否则「刚删掉一条很旧的消息」会因 deleted_at 很新而多留一轮，语义不统一。
             $rows = DB::all(
-                'SELECT id, type, content FROM messages WHERE deleted=0 AND created_at < ? ORDER BY id LIMIT 500',
+                'SELECT id, type, content FROM messages
+                 WHERE keep_forever=0 AND created_at < ? ORDER BY id LIMIT 500',
                 [$before]
             );
             if (!$rows) return;
@@ -1161,29 +1167,77 @@ class Chat
         return [true, '已保存'];
     }
 
+    /**
+     * 撤回消息。v1.2.3 起的完整规则：
+     *
+     * 撤回窗口（谁能在多长时间内撤回）：
+     *   - 消息作者本人：5 分钟内（v1.2.3 由 3 分钟放宽）
+     *   - 该群群主 / 超级管理员：任何时间（处理违规内容用）
+     *   - 私聊：超管不得撤回他人私聊，仅双方 5 分钟内可撤回自己发的
+     *
+     * 免清理（v1.2.3 新增）：
+     *   群主 / 超级管理员撤回的消息标记 keep_forever=1，**永不被 purgeExpired 清除**。
+     *   原因：这类撤回是合规动作（处理违反规则的内容），记录本身有留存价值，
+     *   不能因为过了保留期就消失，否则违规内容「处理过」这件事也无据可查。
+     *   普通用户自己撤回的**不享受**此豁免，仍受 msg_retain_days 约束。
+     *
+     * 附件：撤回 file 消息时，其附件文件**立即物理删除**（撤回即视为内容不应留存）。
+     * 图片/头像/贴纸不动 —— 贴纸可能被收藏引用，生命周期与消息不同。
+     */
     public static function recall(array $actor, int $msgId): array
     {
         $m = DB::one('SELECT * FROM messages WHERE id=?', [$msgId]);
         if (!$m || $m['recalled']) return [false, '消息不存在或已撤回'];
         $mine = ($actor['kind'] === 'user' && (int)$m['user_id'] === $actor['id'])
              || ($actor['kind'] === 'guest' && (int)$m['guest_id'] === $actor['id']);
-        $can = false;
-        if ($actor['role'] === 'admin') $can = true;
-        if ($can && self::isDmRow($m)) $can = $mine;   // 私聊：超管不得撤回他人私聊（同 deleteMessage）
-        if (!$can && $mine && time() - (int)$m['created_at'] <= 180) $can = true;
-        if (!$can) {
-            $room = self::room((int)$m['room_id']);
-            if ($room && $actor['kind'] === 'user' && (int)$room['owner_id'] === $actor['id']) $can = true;
+
+        // 群主判定（仅群聊有房主；私聊无房主概念）
+        $isRoomOwner = false;
+        if ($actor['kind'] === 'user' && (int)$m['room_id'] > 0) {
+            $ownerId = (int)(DB::val('SELECT owner_id FROM rooms WHERE id=?', [(int)$m['room_id']]) ?: 0);
+            $isRoomOwner = $ownerId !== 0 && $ownerId === (int)$actor['id'];
         }
-        if (!$can) return [false, '只能撤回 3 分钟内自己发送的消息'];
-        DB::run('UPDATE messages SET recalled=1 WHERE id=?', [$msgId]);
-        return [true, '已撤回'];
+        $isAdmin = ($actor['role'] === 'admin');
+
+        // 私聊仅双方可见，超管不得撤回他人私聊；群聊里超管/群主可撤回任何人的违规内容
+        $isModerator = $isAdmin || $isRoomOwner;
+        if (self::isDmRow($m) && $isModerator) $isModerator = $mine;
+
+        $can = $isModerator || ($mine && time() - (int)$m['created_at'] <= self::RECALL_WINDOW);
+        if (!$can) return [false, '只能撤回 ' . (int)(self::RECALL_WINDOW / 60) . ' 分钟内自己发送的消息'];
+
+        // 附件在撤回前先取出路径（recall 后 content 会被清空）
+        $fileRel = '';
+        if ((string)$m['type'] === 'file') {
+            $info = json_decode((string)$m['content'], true);
+            if (is_array($info) && !empty($info['path'])) $fileRel = (string)$info['path'];
+        }
+
+        // 群主 / 超管撤回 → 标记免清理；content 与 quote 一并清空（quote 是 NOT NULL，须写空串）
+        $sets = ['recalled' => 1, 'content' => '', 'quote' => '', 'keep_forever' => $isModerator ? 1 : 0];
+        $up = implode(',', array_map(fn($c) => "$c=?", array_keys($sets)));
+        DB::run("UPDATE messages SET $up WHERE id=?", [...array_values($sets), $msgId]);
+
+        // 撤回附件立即物理删除：撤回 = 内容不应继续留存。
+        // 只删 uploads/file/ 下、且经 fileAbs 二次校验的路径（阻断路径穿越）。
+        if ($fileRel !== '') {
+            $abs = Upload::fileAbs($fileRel);
+            if ($abs) @unlink($abs);
+        }
+
+        Sec::log('msg_recall', (string)$msgId, [
+            'room'   => (int)$m['room_id'],
+            'type'   => (string)$m['type'],
+            'by'     => (string)($actor['kind'] ?? ''),
+            'mod'    => $isModerator,          // 是否为管理动作（决定免清理）
+        ]);
+        return [true, $isModerator ? '已撤回（该记录将长期留存以备审计）' : '已撤回'];
     }
 
     /**
      * 清理 message_hides 里的孤儿行（v1.1.14）。
-     * 消息被 purgeDeleted 物理清除后，隐藏行会变成指向不存在消息的死记录。
-     * 这里只清「消息已不在库」的，语义与 purgeDeleted 严格区分。
+     * 消息被 purgeExpired 物理清除后，隐藏行会变成指向不存在消息的死记录。
+     * 这里只清「消息已不在库」的，语义与 purgeExpired 严格区分。
      */
     public static function purgeHides(): void
     {

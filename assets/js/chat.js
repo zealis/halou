@@ -2664,9 +2664,11 @@
          * 右键「消息内容」的菜单：复制 / 引用 / 删除。
          * 插件可通过 HaChat.onMsgContent 追加项（如翻译、举报、复制原文…）。
          *
-         * v1.1.14 权限收口：
-         *   - 有权（管理员 / 群主 / 消息作者）→ 「删除」，对**所有人**生效；
-         *   - 其余人 → 「隐藏」，只在**自己**这里不显示，别人的会话不受影响。
+         * v1.2.3：**两档菜单项都叫「删除」**，只靠确认框措辞区分实际效果。
+         * 原来无权限那档叫「隐藏」，暴露了实现细节，用户会困惑「我删了为什么别人还在」。
+         * 底层行为**没变**：
+         *   - 有权（管理员 / 群主 / 消息作者）→ 真删除，对**所有人**生效；
+         *   - 其余人 → 只在本机不显示，消息仍在库里、别人照常看得到（换设备不生效）。
          * 两档都必须给入口：不给就是死路（用户压根没法处理不想看的内容），
          * 给了却一律当真删则是越权（他能替别人决定别人还能不能看到）。
          */
@@ -2681,11 +2683,12 @@
                     items.push({ t: '引用', run: function () { self.quoteMsg(m); } });
                 if (m.mine || admin || this.canRemoveOthers())
                     items.push({ t: '撤回', run: function () { self.recall(m.id); } });
-                // 「隐藏」只对已登录用户有意义：游客身份不落库，隐藏了刷新就没
+                // v1.2.3：两档都叫「删除」，区分只体现在 deleteMsg 的确认框措辞里。
+                // 「仅本机」那档只对已登录用户有意义：游客身份不落库，删了刷新就没。
                 if (canRemove)
                     items.push({ t: '删除', run: function () { self.deleteMsg(m.id, false); } });
                 else if (this.cfg.actor.kind === 'user')
-                    items.push({ t: '隐藏', run: function () { self.deleteMsg(m.id, true); } });
+                    items.push({ t: '删除', run: function () { self.deleteMsg(m.id, true); } });
                 for (var i = 0; i < this._ctxExtContent.length; i++) {
                     try { this._ctxExtContent[i](items, m, { roomId: this.room, actor: this.cfg.actor }); } catch (e) {}
                 }
@@ -2831,19 +2834,22 @@
         },
 
         /**
-         * 删除 / 隐藏消息（内容右键）
+         * 删除消息（内容右键）
          *
-         * v1.1.14 两种语义共用一个接口，由服务端按权限裁决：
-         *   hideOnly=true  → 确认框明说「仅你不再看到」，成功后按隐藏提示；
-         *   hideOnly=false → 真删除（管理员 / 群主 / 作者本人）。
-         * ⚠️ 最终以服务端返回的 scope 为准：前端传参只是**期望**，
-         * 权限不足时服务端会降级为 hide，此时必须显示「已隐藏」而不是「已删除」，
-         * 否则用户会以为消息对所有人都没了（实际别人还看得到），这是误导。
+         * v1.2.3：**两种结果对外都叫「删除」**，只有确认框措辞与服务端提示语区分：
+         *   hideOnly=true  → 「仅本机不再看到，其他人不受影响」（无权真删时的降级）
+         *   hideOnly=false → 真删除，所有人都不再显示（管理员 / 群主 / 作者本人）
+         *
+         * 降级分支**行为未变**：仍只写 message_hides，消息在库里、别人照常看得到、
+         * 换设备登录不生效。改名只是因为「隐藏」暴露了实现细节、用户会困惑
+         * 「我删了为什么别人还在」；代价是提示语必须说清「仅本机」，不能骗人。
+         *
+         * ⚠️ 最终以服务端返回的 scope 为准：前端传参只是**期望**。
          */
         deleteMsg: function (id, hideOnly) {
             var self = this;
             var text = hideOnly
-                ? '确定隐藏这条消息吗？隐藏后仅你不再看到，其他人不受影响。'
+                ? '确定删除这条消息吗？删除后仅本机不再看到，其他人不受影响。'
                 : '确定删除这条消息吗？删除后所有群成员都不再显示，且不可恢复。';
             this.confirmModal(text, function () {
                 HaApi.secure('msg_delete', { id: id }, function (r) {
@@ -2851,7 +2857,7 @@
                     var el = $('haMsg' + id);
                     if (el && el.parentNode) el.parentNode.removeChild(el);
                     delete self.msgCache[id];
-                    // 隐藏只影响消息区；删除会影响会话摘要，一并重拉让侧栏同步
+                    // 仅本机删除只影响消息区；真删除会影响会话摘要，一并重拉让侧栏同步
                     toast(r.msg || '已删除');
                     if (r.scope !== 'hide') self.loadConversations();
                 });
@@ -3369,15 +3375,10 @@ logs: function (main) {
                         // 教训：公开性的中文不能叫「普通」，会与 type=public 的「普通」撞词。
                         + '仅邀请群聊只靠邀请链接传播，不出现在任何列表里。关闭后普通用户只能创建公开群聊，'
                         + '已存在的仅邀请群仍可正常改名、改简介（仅禁止把公开群改成仅邀请）；管理员始终不受此限制。</p>'
-                        // v1.2.2 消息服务器保留期：正常消息到期即物理清除（附件同步删），无法恢复
+                        // v1.2.2 消息服务器保留期：到期即物理清除（附件同步删），无法恢复
                         + '<div class="ha-form-item"><label>消息服务器保留期(天)</label><input class="ha-input" id="haS_msg_retain_days" value="' + esc(d.msg_retain_days || '90') + '"></div>'
-                        + '<p style="font-size:12px;color:#5C5C5C;margin:4px 0 12px">超过本期限的<b>正常消息</b>会被物理删除，其附件文件（uploads/file/）一并删除，'
-                        + '<b>删除后无法恢复</b>。默认 90 天（约三个月）。填 0 表示永久保留。<br>'
-                        + '与下方「已删除消息保留期」是两个独立项：那个只管<b>已被删除</b>的消息行留多久，本项管<b>未删除</b>的消息留多久。</p>'
-                        // v1.1.0 软删除：删除消息只清空正文并留行（供审计），到期才物理清除
-                        + '<div class="ha-form-item"><label>已删除消息保留期(天)</label><input class="ha-input" id="haS_msg_deleted_retain_days" value="' + esc(d.msg_deleted_retain_days || '30') + '"></div>'
-                        + '<p style="font-size:12px;color:#5C5C5C;margin:4px 0 12px">删除消息时正文立即清空（原文不可恢复），但记录行会保留到本期限满后物理清除，'
-                        + '期间仍可用于审计（谁在何时删了谁的消息）。填 0 表示永久保留、永不物理删除。</p>'
+                        + '<p style="font-size:12px;color:#5C5C5C;margin:4px 0 12px">超过本期限的消息会被<b>物理删除</b>，其附件文件（uploads/file/）一并删除，<b>删除后无法恢复</b>。默认 90 天（约三个月）。填 0 表示永久保留。<br>'
+                        + '<b>已被删除</b>的消息同样适用本期限。唯一豁免：<b>群主 / 超级管理员</b>为处理违规内容而撤回的消息会长期留存，不受本期限影响。</p>'
                         + '<div class="ha-form-item"><label>新消息提示音默认</label>' + sel('sound_default', { '1': '开', '0': '关' }) + '</div>'
                         + '<button class="ha-btn ha-btn-primary" onclick="HaAdmin.settingsSave()">保存设置</button></div>';
                 });
@@ -3730,7 +3731,6 @@ logs: function (main) {
                 guest_msg_interval: $('haS_guest_msg_interval') ? $('haS_guest_msg_interval').value : '',
                 // v1.2.2 消息服务器保留期（天），0 = 永久保留
                 msg_retain_days: $('haS_msg_retain_days') ? $('haS_msg_retain_days').value : '',
-                msg_deleted_retain_days: $('haS_msg_deleted_retain_days') ? $('haS_msg_deleted_retain_days').value : '',
                 msg_rate_window: $('haS_msg_rate_window').value,
                 msg_rate_max: $('haS_msg_rate_max').value,
                 mail_rate_limit: $('haS_mail_rate_limit').value,

@@ -63,11 +63,9 @@ class Plugin
         // 核心自身的计划任务（v1.1.13）：plugin 名为空串，与插件任务在表里天然区分。
         // 注册在 init 最前面 —— 它不依赖任何插件，且 syncCronTasks() 在 init 末尾才跑。
         self::$loading = '';
-        self::cron('purge_deleted_messages', 3600, function () {
-            if (class_exists('Chat')) Chat::purgeDeleted();
-        }, '物理清除超过保留期的软删除消息（每小时一次）');
-        // v1.2.2：清除超过服务器保留期的正常消息及其附件文件。
-        // 与 purge_deleted_messages 并列存在，两个保留期各管一个维度，互不覆盖。
+        // v1.2.2：清除超过服务器保留期的消息及其附件文件。
+        // v1.2.3 起本任务是**唯一**的消息清理入口 —— 原 purge_deleted_messages
+        // 随「已删除消息保留期」一并下线，删除消息同样由本任务按 msg_retain_days 清除。
         self::cron('purge_expired_messages', 3600, function () {
             if (class_exists('Chat')) Chat::purgeExpired();
         }, '物理清除超过服务器保留期的消息与附件（每小时一次）');
@@ -286,8 +284,8 @@ class Plugin
      *
      * ```php
      * Plugin::cron('purge_expired', 86400, function () {
-     *     Chat::purgeDeleted();
-     * }, '清理到期软删除消息');
+     *     Chat::purgeExpired();
+     * }, '清理到期消息');
      * ```
      *
      * @param string          $name        任务名（同插件内唯一，只允许字母数字下划线）

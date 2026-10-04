@@ -499,8 +499,10 @@ if ($action !== '') {
             Api::json(['ok' => $ok, 'msg' => $msg]);
 
         // ---------- 删除消息（内容右键「删除」，与「撤回」区分） ----------
-        // v1.1.14：返回第三项 scope，前端据此区分「已删除（所有人不可见）」与
-        // 「已隐藏（仅自己不可见）」。管理员/群主/作者本人 → delete；其他任何人 → hide。
+        // v1.1.14：返回第三项 scope，前端据此区分效果。管理员/群主/作者本人 → 'delete'
+        // （真删除，所有人不可见）；其他任何人 → 'hide'（只写 message_hides，仅本机不可见）。
+        // v1.2.3：两种 scope 的**对外文案统一叫「删除」**，前端只按 scope 决定
+        // 要不要重拉会话列表，提示语直接用服务端下发的 msg（已带「仅本机」说明）。
         case 'msg_delete':
             [$ok, $msg, $scope] = Chat::deleteMessage($actor, (int)$p('id'));
             Api::json(['ok' => $ok, 'msg' => $msg, 'scope' => $scope]);
