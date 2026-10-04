@@ -738,6 +738,19 @@ button { font-family: inherit; cursor: pointer; }
    与「撤回」同款虚线弱化样式——两者都表示「这里原本有内容但现在不可见」，
    文案不同（该消息已删除 / 此消息已撤回）以区分是管理删除还是用户撤回。 */
 .ha-msg.deleted .ha-msg-content { background: transparent; border: 1px dashed var(--ha-border); color: var(--ha-text-sub); font-size: 12px; }
+/* v1.2.13：图片 / 文件消息的**无气泡容器**（取代 .ha-msg-content）。
+   去掉白色底座后，靠这三点保证观感不塌：
+     1. overflow:hidden —— 图片按气泡圆角裁切，不出现方形硬角外露
+     2. line-height:0 —— 消除 inline 元素基线间隙，避免图片下方多出几像素空白
+     3. display:inline-block —— 让 overflow 裁切与圆角生效
+   背景一律 transparent：图片本身即内容，文件卡片自带白底+边框（.ha-file-card）。 */
+.ha-msg-plain {
+    display: inline-block; -webkit-inline-block;
+    max-width: 100%;
+    line-height: 0;              /* 消掉 inline 基线间隙 */
+    overflow: hidden;             /* 让 .ha-msg-img 的圆角对容器裁切生效 */
+    background: transparent;     /* 无白色底座 */
+}
 .ha-msg-img { max-width: 240px; max-height: 240px; border-radius: 6px; cursor: zoom-in; display: block; }
 .ha-msg-sticker { max-width: 120px; max-height: 120px; border-radius: 6px; cursor: zoom-in; }
 .ha-birth-row { display: flex; display: -webkit-flex; gap: 8px; }

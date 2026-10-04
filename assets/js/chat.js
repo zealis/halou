@@ -1540,8 +1540,16 @@
             var content;
             if (m.deleted) content = '<span class="ha-msg-content">该消息已删除</span>';
             else if (m.recalled) content = '<span class="ha-msg-content">此消息已撤回</span>';
-            else if (m.type === 'file') content = '<span class="ha-msg-content" style="padding:4px">' + fileCardHtml(m) + '</span>';
-            else if (m.type === 'image') content = '<span class="ha-msg-content" style="padding:4px"><img class="ha-msg-img" src="' + esc(m.content) + '" onclick="HaChat.viewImg(this.src)" alt="图片"></span>';
+            // v1.2.13：图片与文件**不再套 .ha-msg-content 气泡**。
+            // v1.2.7 把气泡底改成纯白后，这两种消息就多了一层「白底座」——
+            // 图片外一圈白、文件卡片里又一层白（.ha-file-card 自带 background+border），
+            // 呈现为白底里再套一个白框，视觉上像「双重边框」，很脏。
+            // 两者自身都已具备完整外观：.ha-msg-img 有圆角，.ha-file-card 有白底+边框。
+            // ⚠️ 不能靠「给 .ha-msg-content 加 class 再改 CSS」绕：那类节点还要参与
+            // markRecalled 的 outerHTML 替换与引用跳转的 querySelector('.ha-msg-content')，
+            // 去掉节点最干净。留空 span 反而会破坏 flex 基线对齐。
+            else if (m.type === 'file') content = '<span class="ha-msg-plain">' + fileCardHtml(m) + '</span>';
+            else if (m.type === 'image') content = '<span class="ha-msg-plain"><img class="ha-msg-img" src="' + esc(m.content) + '" onclick="HaChat.viewImg(this.src)" alt="图片"></span>';
             else content = '<span class="ha-msg-content">' + (m.quote && (m.quote.nick || m.quote.text)
                     ? '<span class="ha-msg-quote' + (m.quote.id ? ' ha-quote-link' : '') + '"'
                       + (m.quote.id ? ' title="点击查看原消息" onclick="HaChat.jumpToQuote(' + (m.quote.id | 0) + ')"' : '')
@@ -1838,7 +1846,12 @@
             var el = document.getElementById('haMsg' + id);
             if (!el || el.className.indexOf('recalled') >= 0) return;
             el.className += ' recalled';
-            var cs = el.querySelector('.ha-msg-content');
+            // v1.2.13：图片 / 文件消息已不再套 .ha-msg-content（去白色底座），
+            // 它们的承载节点是 .ha-msg-plain。两种都要查，否则撤回时
+            // 占位文案不渲染、原图/文件仍留在界面上 —— 表现为「撤回了但内容还在」。
+            // 删除/撤回占位统一回退成 .ha-msg-content，让 .ha-msg.recalled
+            // 与 .ha-msg.deleted 的虚线弱化样式正常生效。
+            var cs = el.querySelector('.ha-msg-content') || el.querySelector('.ha-msg-plain');
             if (cs) cs.outerHTML = '<span class="ha-msg-content">此消息已撤回</span>';
             this.msgCache[id] = this.msgCache[id] || {};
             this.msgCache[id].recalled = 1;

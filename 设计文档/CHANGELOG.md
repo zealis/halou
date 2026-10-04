@@ -4,6 +4,43 @@
 > 本文件由 `.tools/gen_changelog.py` 依据提交历史生成，按版本号倒序聚合，
 > 类型：**安全 / 修复 / 新增 / 改进 / 重构 / 移除**。每次发版执行该脚本即可更新。
 
+## v1.2.13（2026-10-04）：图片与附件取消白色底座
+
+- **改进**：`type=image` / `type=file` 消息不再套 `.ha-msg-content` 气泡，
+  改用新的无气泡容器 `.ha-msg-plain`。
+  v1.2.7 把气泡底改成纯白后，这两种消息就多了一层「白底座」——
+  文件卡片自身已有 `background + border`，套上白气泡后呈现为
+  **白底里再套一个白框**，视觉上像双重边框，很脏。
+  图片同理：白底托着一张图，多余的白色边框毫无意义
+- **新增**：`.ha-msg-plain` —— 透明底容器，靠三点保证观感不塌：
+  1. `overflow:hidden` —— 让 `.ha-msg-img` 的圆角对容器裁切生效，不露方形硬角
+  2. `line-height:0` —— 消除 inline 元素基线间隙，避免图片下方多出几像素空白
+  3. `display:inline-block` —— 让 `overflow` 裁切与圆角生效
+  图片与文件卡片**自身外观本就完整**（`.ha-msg-img` 有圆角、`.ha-file-card` 有白底+边框），
+  故不需要任何额外装饰
+
+- **修复**：**图片 / 文件消息撤回时占位文案不显示**。
+  `markRecalled()` 原先只查 `.ha-msg-content`，去掉气泡后 `cs` 为 null →
+  `outerHTML` 替换整段不执行，表现为「点击撤回后界面毫无变化、原图/文件仍在」。
+  现同时查 `.ha-msg-plain`，替换后统一回退为 `.ha-msg-content`，
+  使 `.ha-msg.recalled` 的虚线弱化样式正常生效
+
+⚠️ 刻意**没有**选择「给 `.ha-msg-content` 加个 class 再用 CSS 覆盖」的做法：
+该类节点还需参与 `markRecalled` 的 `outerHTML` 替换与 `jumpToQuote` 的
+`querySelector('.ha-msg-content')`，多一层节点反而更脆；直接去掉节点最干净。
+留空 span 也不行——会破坏 flex 基线对齐。
+
+文字类消息（text / mention / system / recalled / deleted）**保持原气泡不变**。
+
+验证：真实 Chrome 断言 20 项全通过。覆盖双方图片/文件均无 `.ha-msg-content`
+（`hasBubble=false`）且改用 `.ha-msg-plain`、容器背景为 `rgba(0,0,0,0)`、
+`line-height:0px`、`overflow:hidden`、图片圆角 6px 保留、
+文件卡片自身仍为 `rgb(255,255,255)` 白底（无双层白框）、文字消息未被误伤；
+**以及本次修掉的撤回 bug**：图片/文件撤回后 `recalled` 类正确添加、
+占位文案「此消息已撤回」正常渲染、原图与原文件卡片均已移除、
+占位态为透明底 + `dashed` 虚线边框 + 副文本色。
+截图确认文件卡片已变为单层白底+边框。
+
 ## v1.2.12（2026-10-04）：群聊昵称色 → #8E8EA0（首次达到 WCAG 达标）
 
 - **改进**：`.ha-msg-meta .ha-msg-nick` 由 `#CCCCCC` 改为 **`#8E8EA0`**。
