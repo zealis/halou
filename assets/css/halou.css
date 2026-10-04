@@ -779,6 +779,9 @@ button { font-family: inherit; cursor: pointer; }
     border-radius: 8px;
 }
 .ha-file-ico { flex-shrink: 0; -webkit-flex-shrink: 0; color: var(--ha-primary-strong); }
+/* 文件图标统一 block：inline SVG 的基线间隙会让卡片高度多出几像素 */
+.ha-file-ico svg { display: block; }
+/* ZIP 实心彩色图标自带 fill，不继承 .ha-file-ico 的 currentColor 描边色 */
 .ha-file-meta { flex: 1; -webkit-flex: 1; min-width: 0; line-height: 1.3; }
 .ha-file-name {
     font-size: 13px; color: var(--ha-text-title);

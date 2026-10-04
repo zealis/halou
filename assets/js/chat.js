@@ -179,7 +179,17 @@
         return h;
     }
 
-    /* 文件消息卡片：图标 + 文件名 + 大小 + 下载（下载链接带签名，服务端再校验房间权限） */
+    /* 压缩包扩展名 → 用彩色 ZIP 图标（其余类型仍走线性 file 图标）。
+       归一化：小写、去前导点，兼容 info.ext 大小写/带点两种写法。 */
+    var FILE_ICON_MAP = { 'zip': 'zip' };
+    function fileIconSvg(ext) {
+        var e = String(ext || '').toLowerCase().replace(/^\./, '');
+        if (FILE_ICON_MAP[e]) return haSvgZip(22);
+        return haSvg('file', 20);
+    }
+
+    /* 文件消息卡片：图标 + 文件名 + 大小 + 下载（下载链接带签名，服务端再校验房间权限）
+       v1.2.14：第二行去掉「ZIP · 」这类扩展名前缀（与文件图标信息重复，且挤占文件名空间）。 */
     function fileCardHtml(m) {
         var info = null;
         try { info = JSON.parse(m.content); } catch (e) { info = null; }
@@ -187,9 +197,9 @@
         var s = HaApi.sign('file_download');
         var dl = '?action=file_download&id=' + m.id + '&ts=' + s.ts + '&sign=' + s.sign;
         return '<div class="ha-file-card">'
-            + '<span class="ha-file-ico">' + haSvg('file', 20) + '</span>'
+            + '<span class="ha-file-ico">' + fileIconSvg(info.ext) + '</span>'
             + '<span class="ha-file-meta"><span class="ha-file-name">' + esc(info.name || '文件') + '</span>'
-            + '<span class="ha-file-size">' + esc(String(info.ext || '').toUpperCase()) + ' · ' + esc(sizeText(info.size)) + '</span></span>'
+            + '<span class="ha-file-size">' + esc(sizeText(info.size)) + '</span></span>'
             + '<a class="ha-file-dl" href="' + dl + '" title="下载">' + haSvg('download', 18) + '</a></div>';
     }
     function sizeText(n) {
@@ -207,6 +217,18 @@
         var p = OW_SVG_PATHS[name] || '';
         return '<svg class="ha-icon" width="' + (size || 18) + '" height="' + (size || 18) + '" viewBox="0 0 24 24" fill="none" '
             + 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>';
+    }
+
+    /* ZIP 压缩包图标：实心彩色版式（viewBox 1024），与线性 file 图标不同源，
+       故单独一个函数而不是塞进 OW_SVG_PATHS（那里是 24 网格 + currentColor 描边）。
+       颜色取自源图标 fill，不跟随主题 currentColor。 */
+    function haSvgZip(size) {
+        var s = size || 22;
+        return '<svg class="ha-icon ha-icon-zip" width="' + s + '" height="' + s + '" viewBox="0 0 1024 1024" version="1.1" '
+            + 'xmlns="http://www.w3.org/2000/svg">'
+            + '<path d="M751.870981 441.346476a76.799674 76.799674 0 0 0-47.871797-12.287947h-72.95969v102.399564h72.95969a76.799674 76.799674 0 0 0 48.383794-12.287947 48.895792 48.895792 0 0 0 15.615934-39.423833 44.79981 44.79981 0 0 0-16.127931-38.399837z" fill="#DB7035"/>'
+            + '<path d="M942.846169 216.067434l-192.255183-204.79913A38.143838 38.143838 0 0 0 722.943103 0.004352h-614.397388a40.191829 40.191829 0 0 0-38.911835 41.471824v941.052A40.191829 40.191829 0 0 0 108.545715 1024h806.90857a40.191829 40.191829 0 0 0 38.911835-41.471824V245.507309a42.751818 42.751818 0 0 0-11.519951-29.439875zM444.416287 683.521447H204.801306v-35.32785l172.031268-219.135068H216.833254v-38.143838H435.200326v35.583848l-171.77527 218.87907h181.759228z m83.711644 0H483.84012V390.914691h44.287811z m179.199239-113.919516h-76.799674v113.919516H586.239684V390.914691h121.343485c69.631704 0 104.447556 29.439875 104.447556 88.831622s-35.071851 89.855618-105.215553 89.855618z" fill="#DB7035"/>'
+            + '</svg>';
     }
 
     var HaApi = {
