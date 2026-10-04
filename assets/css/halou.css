@@ -212,6 +212,24 @@ button { font-family: inherit; cursor: pointer; }
 .ha-switch-input { position: absolute; opacity: 0; width: 0; height: 0; }
 .ha-switch-input:focus-visible + .ha-switch { outline: 2px solid var(--ha-primary-strong); outline-offset: 2px; }
 
+/* ---------- 滑块（range，v1.2.21 通用样式轮子）----------
+   全项目只有一处 range：头像裁剪弹窗的缩放滑块（chat.js 的 #haCropZoom）。
+   不给它上色时走浏览器 UA 蓝（Chrome 是 #0075FF 一类），和主按钮
+   --ha-primary-strong(#0099FF) 不是同一个蓝 —— 同一屏里出现两种蓝。
+
+   accent-color 一条属性同时管住「滑块圆钮 + 已填充轨道」，
+   Chrome 93+ / Firefox / Safari 15.4+ 均支持；旧内核无该属性时
+   退回 UA 默认蓝，只是颜色略偏，不影响拖动与取值。
+
+   ⚠️ 不要为了「更精确」去手写 ::-webkit-slider-thumb：
+   一旦给 thumb 加 -webkit-appearance: none，轨道就得自己画，
+   accent-color 的进度填充也会跟着失效，反而更丑。
+   本项目禁渐变/禁毛玻璃，滑块保持纯色圆钮即可。 */
+input[type=range] {
+    accent-color: var(--ha-primary-strong);   /* #0099FF，与 .ha-btn-primary 同色 */
+    cursor: pointer;
+}
+
 .ha-alert { padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 13px; }
 .ha-alert-error { background: #fff1f0; color: var(--ha-red); border: 1px solid #ffa39e; }
 
