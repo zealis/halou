@@ -678,14 +678,15 @@ button { font-family: inherit; cursor: pointer; }
 }
 .ha-msg-av:hover { opacity: .85; }
 .ha-msg-meta { font-size: 12px; color: var(--ha-text-sub); margin-bottom: 2px; }
-/* v1.2.8：昵称色由 --ha-text(#333333 近黑) 改为 #999999。
-   昵称只是辅助信息（谁说的），正文才是主体；原先近黑的昵称比正文还抢眼，
-   视觉重心被拉到了每条消息的上方。改浅后正文成为唯一焦点。
-   对比度：#999999 on #FFFFFF = 2.85:1 —— 低于 WCAG AA 正文 4.5:1，
-   但昵称是 12px 的**辅助标签**且仍带 font-weight:600 加粗，
-   按「非正文文本」口径（≥3:1）达标；且它不承载关键操作信息
-   （点头像/昵称均可打开资料卡），可读性不影响功能。 */
-.ha-msg-meta .ha-msg-nick { color: #999999; font-weight: 600; cursor: pointer; margin-right: 4px; }
+/* v1.2.9：昵称色 #999999 → #E4E4E4。
+   ⚠️ 可读性提示（用户已确认接受）：#E4E4E4 在白底上对比度仅 **1.27:1**
+   （在消息区底 #F5F5F5 上是 1.17:1），远低于 WCAG 非文本元素 3:1 的下限，
+   实际观感接近「隐形文字」—— 只在纯白/浅灰的平坦背景上勉强辨出轮廓。
+   之所以仍可接受：昵称是纯装饰性辅助信息，不承载任何操作或状态
+   （点头像/昵称均可打开资料卡，且群聊里消息本身已通过头像区分说话人）。
+   若日后觉得太淡，改成 #AAAAAA（2.32:1）即可，不必回到 #333333。
+   加粗（600）能在低对比度下略微补偿字重带来的辨识度。 */
+.ha-msg-meta .ha-msg-nick { color: #E4E4E4; font-weight: 600; cursor: pointer; margin-right: 4px; }
 .ha-msg-meta .ha-msg-nick:hover { color: var(--ha-primary-dark); }
 /* meta 行 flex：时间紧跟昵称之后（v1.1.0：不再推到远离头像的一端）。
    显隐由 JS 控制——悬停消息气泡满 2 秒才加 .ha-time-show，
