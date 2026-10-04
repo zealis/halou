@@ -678,17 +678,20 @@ button { font-family: inherit; cursor: pointer; }
 }
 .ha-msg-av:hover { opacity: .85; }
 .ha-msg-meta { font-size: 12px; color: var(--ha-text-sub); margin-bottom: 2px; }
-/* v1.2.11：昵称色 #D5D5D5 → #CCCCCC（实测 #D5D5D5 略深，#E8E8E8 反而更隐形，
-   经确认取「略深于上一版但仍明显退后」的 #CCCCCC）。
-   对比度：#CCCCCC 在白底上 1.61:1、消息区底 #F5F5F5 上 1.47:1，
-   仍低于 WCAG 非文本 3:1，属「刻意弱化」区间。
-   理由：昵称是纯装饰性辅助信息，不承载操作或状态
-   （点头像/昵称均可打开资料卡，群聊里消息本身已通过头像区分说话人），
-   视觉层级要的就是「能看出是谁说的，但明显退在正文之后」。
-   ⚠️ 调色收敛点：#D5D5D5=1.47、#CCCCCC=1.61、#BFBFBF≈1.76、#999999=2.85。
-     再深到 #999999 附近昵称就会重新比正文抢眼，与设计意图相反，故不建议。
-   font-weight:600 的加粗在低对比度下略微补偿辨识度。 */
-.ha-msg-meta .ha-msg-nick { color: #CCCCCC; font-weight: 600; cursor: pointer; margin-right: 4px; }
+/* v1.2.12：昵称色 #CCCCCC → #8E8EA0。**首次跨过 WCAG 非文本 3:1 门槛。**
+   对比度：#8E8EA0 在白底上 3.22:1、消息区底 #F5F5F5 上 2.95:1，
+   是本项目调色轨迹上**第一个真正达标**的昵称色（此前 #CCCCCC 只有 1.61:1）。
+
+   附带优势：该色带 11% 蓝紫饱和度，在纯灰/白背景上比同亮度的纯灰更易辨识
+   （人眼对有色相的浅色比对中性灰更敏感），视觉上「有颜色但不抢眼」。
+   品牌主色是蓝系（--ha-primary #00A0E9），此色相与整体调性一致；
+   hover 态用 --ha-primary-dark(#00558F 深蓝) 也能自然衔接。
+
+   调色轨迹（白底对比度）：
+     #E8E8E8 1.23 → #E4E4E4 1.27 → #D5D5D5 1.47 → #CCCCCC 1.61 → **#8E8EA0 3.22 ✅**
+   ⚠️ 再往深（#767686 4.46:1）会让昵称逐渐抢正文焦点，与「退后」的设计意图相反。
+     本档既达标又不抢眼，建议就此定版。 */
+.ha-msg-meta .ha-msg-nick { color: #8E8EA0; font-weight: 600; cursor: pointer; margin-right: 4px; }
 .ha-msg-meta .ha-msg-nick:hover { color: var(--ha-primary-dark); }
 /* meta 行 flex：时间紧跟昵称之后（v1.1.0：不再推到远离头像的一端）。
    显隐由 JS 控制——悬停消息气泡满 2 秒才加 .ha-time-show，
