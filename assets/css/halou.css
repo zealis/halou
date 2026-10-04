@@ -678,15 +678,16 @@ button { font-family: inherit; cursor: pointer; }
 }
 .ha-msg-av:hover { opacity: .85; }
 .ha-msg-meta { font-size: 12px; color: var(--ha-text-sub); margin-bottom: 2px; }
-/* v1.2.9：昵称色 #999999 → #E4E4E4。
-   ⚠️ 可读性提示（用户已确认接受）：#E4E4E4 在白底上对比度仅 **1.27:1**
-   （在消息区底 #F5F5F5 上是 1.17:1），远低于 WCAG 非文本元素 3:1 的下限，
-   实际观感接近「隐形文字」—— 只在纯白/浅灰的平坦背景上勉强辨出轮廓。
-   之所以仍可接受：昵称是纯装饰性辅助信息，不承载任何操作或状态
-   （点头像/昵称均可打开资料卡，且群聊里消息本身已通过头像区分说话人）。
-   若日后觉得太淡，改成 #AAAAAA（2.32:1）即可，不必回到 #333333。
-   加粗（600）能在低对比度下略微补偿字重带来的辨识度。 */
-.ha-msg-meta .ha-msg-nick { color: #E4E4E4; font-weight: 600; cursor: pointer; margin-right: 4px; }
+/* v1.2.10：昵称色 #E4E4E4 → #D5D5D5（实测 #E4E4E4 过于隐形，用户确认后加深一档）。
+   对比度：#D5D5D5 在白底上 1.47:1、消息区底 #F5F5F5 上 1.35:1，
+   仍低于 WCAG 非文本 3:1，属「刻意弱化」区间而非「可读性达标」区间。
+   之所以可接受：昵称是纯装饰性辅助信息，不承载操作或状态
+   （点头像/昵称均可打开资料卡，群聊里消息本身已通过头像区分说话人），
+   视觉层级上要的就是「能看出是谁说的，但明显退在正文之后」。
+   ⚠️ 若要真正达到 3:1 需用 #999999（2.85:1）乃至 #767676（4.17:1），
+   那会让昵称重新比正文抢眼 —— 与本设计意图相反，故不取。
+   font-weight:600 的加粗在低对比度下略微补偿辨识度。 */
+.ha-msg-meta .ha-msg-nick { color: #D5D5D5; font-weight: 600; cursor: pointer; margin-right: 4px; }
 .ha-msg-meta .ha-msg-nick:hover { color: var(--ha-primary-dark); }
 /* meta 行 flex：时间紧跟昵称之后（v1.1.0：不再推到远离头像的一端）。
    显隐由 JS 控制——悬停消息气泡满 2 秒才加 .ha-time-show，
