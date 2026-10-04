@@ -1523,7 +1523,9 @@
             var cls = 'ha-msg';
             if (m.mine) cls += ' mine';
             if (m.type === 'mention') cls += ' mention';
-            if (m.type === 'private') cls += ' private';
+            // v1.2.1：私聊标识来自服务端下发的 dm 位，不能再靠 m.type==='private'
+            //（私聊里的图片/文件消息 type 分别是 image/file）
+            if (m.dm) cls += ' private';
             if (m.type === 'system') cls += ' system';
             if (m.recalled) cls += ' recalled';
             // v1.1.0 软删除：服务端已清空 content，前台只显示占位文案
@@ -1861,8 +1863,16 @@
 
         /* ---------- 发送 ---------- */
         /**
-         * 发送消息。v1.1.0：私聊视图下自动改写为「私聊消息」——
-         * room_id=0（虚拟私聊空间）+ type=private + 对方标识（user:<id> / guest:<id>）。
+         * 发送消息。v1.1.0：私聊视图下自动改写路由——
+         * room_id=0（虚拟私聊空间）+ 对方标识（to_user_id）。
+         *
+         * v1.2.1 修复：原判断是 `if (this.dm && !opt.type)`，即「没显式指定类型才走私聊」。
+         * 而图片 / 文件 / 贴纸发送时 opt.type 分别是 'image' / 'file'，
+         * 于是这些消息绕过了私聊改写、带着上一个群的 room_id 走群聊通道，
+         * 结果私聊里发图/文件必然失败（服务端按群校验直接拒绝）。
+         * 私聊身份与消息形态本就是两个正交维度：只要处于私聊视图就一律走私聊路由，
+         * type 只描述「发的是什么」，不再决定「发给谁」。
+         *
          * 昵称仅作展示快照，不作身份；服务端以数字 ID 判定双方可见性。
          */
         send: function (opt) {
@@ -1880,13 +1890,12 @@
                 // 引用快照：JSON 字符串，服务端会再次校验截断
                 quote: this.quote ? JSON.stringify(this.quote) : ''
             };
-            // 私聊视图：未显式指定消息类型（文本/图片/文件等富类型）时，一律发往对方
-            if (this.dm && !opt.type) {
+            // 私聊视图：文本 / 图片 / 文件等所有形态一律发往对方
+            if (this.dm) {
                 // v1.1.2：跨身份私聊已下线 —— 理论上不会进入 guest 分支（入口已收口），
                 // 这里仍硬拦一道，避免任何残留状态发出必然被服务端拒绝的请求
                 if (this.dm.kind !== 'user') { toast('游客暂不支持私聊'); return; }
                 payload.room_id = 0;
-                payload.type = 'private';
                 payload.to_user_id = this.dm.id;
                 payload.to_guest_id = '';
                 payload.to_nickname = this.roomName;
@@ -1901,7 +1910,10 @@
             });
         },
 
-        /** 上传文件附件，并作为一条 file 消息发送 */
+        /**
+         * 上传文件附件，并作为一条 file 消息发送。
+         * v1.2.1：私聊可用（路由由 send() 统一处理，此处无需分支）。
+         */
         uploadFile: function (file) {
             var self = this;
             toast('文件上传中…');

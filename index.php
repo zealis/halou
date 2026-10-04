@@ -611,8 +611,14 @@ if ($action !== '') {
             // 下载走 GET 链接（带签名），这里直接读 $_GET
             $msg = DB::one('SELECT * FROM messages WHERE id=?', [(int)($_GET['id'] ?? 0)]);
             if (!$msg || $msg['type'] !== 'file') Api::json(['ok' => false, 'msg' => '文件不存在']);
-            $room = Chat::room((int)$msg['room_id']);
-            if (!$room || !Chat::roomAccessOk($room, $actor)) Api::json(['ok' => false, 'msg' => '无权访问']);
+            if (Chat::isDmRow($msg)) {
+                // 私聊附件（room_id=0）：Chat::room(0) 不存在，必须走私聊双方可见性判定，
+                // 否则私聊文件一律 403（v1.2.1 前私聊发不出文件，此处一并补齐下载通道）
+                if (!Chat::dmVisible($msg, $actor)) Api::json(['ok' => false, 'msg' => '无权访问']);
+            } else {
+                $room = Chat::room((int)$msg['room_id']);
+                if (!$room || !Chat::roomAccessOk($room, $actor)) Api::json(['ok' => false, 'msg' => '无权访问']);
+            }
             $info = json_decode((string)$msg['content'], true);
             $abs  = Upload::fileAbs((string)($info['path'] ?? ''));
             if (!$abs) Api::json(['ok' => false, 'msg' => '文件不存在']);

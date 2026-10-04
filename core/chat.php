@@ -331,11 +331,33 @@ class Chat
     // ---------- 发送消息 ----------
     public static function send(array $actor, int $roomId, string $type, string $content, array $opt = []): array
     {
-        // v1.1.0：私聊走 room_id=0 虚拟私聊空间（不隶属任何群聊，故跳过群校验与群禁言）
-        $isDm = $type === 'private' && $roomId === 0;
-        $room = $isDm ? ['id' => 0, 'type' => 'dm'] : self::room($roomId);
-        if (!$room) return [false, '群聊不存在'];
-        if (!$isDm && !self::roomAccessOk($room, $actor)) return [false, '无权进入该群聊'];
+        // ---------- 消息形态归一（必须先于私聊判定） ----------
+        // v1.1.0 起私聊用 type='private' 一列兼表两个正交维度：「这是私聊」与「消息形态是文本」。
+        // 后果：私聊里发图片/文件时 type 变成 'image'/'file'，服务端立刻认不出私聊
+        // （room_id=0 查不到群 → 报「群聊不存在」），历史/轮询 SQL 也永远漏掉这类消息。
+        // v1.2.1 起私聊身份改由「room_id=0 且指定接收方」判定，type 回归纯消息形态；
+        // 旧客户端/旧缓存页面传来的 'private' 一律降级为普通文本，不丢消息。
+        if ($type === 'private') $type = 'text';
+
+        // v1.2.1：私聊 = 虚拟私聊空间（room_id=0）+ 指定接收方，与消息形态无关。
+        $isDm = ($roomId === 0);
+        $toUserId = null; $toGuestId = null; $toNickname = null;
+        if ($isDm) {
+            $toUserId = (int)($opt['to_user_id'] ?? 0) ?: null;
+            $toGuestId = (int)($opt['to_guest_id'] ?? 0) ?: null;
+            $toNickname = mb_substr(trim((string)($opt['to_nickname'] ?? '')), 0, 40);
+            if (!$toUserId && !$toGuestId) return [false, '私信缺少接收对象'];
+            // v1.1.2：跨身份私聊已下线，服务端同步收口。
+            // 判定不能只靠 dmPeerKey —— 构造请求可以绕过前端入口直接打 send。
+            if ($toGuestId) return [false, '暂不支持与游客私聊'];
+            if ($actor['kind'] !== 'user') return [false, '请先登录后再发起私聊'];
+            if ($toUserId === (int)$actor['id']) return [false, '不能给自己发私信'];
+            $room = ['id' => 0, 'type' => 'dm'];   // 不隶属任何群聊，跳过群校验与群禁言
+        } else {
+            $room = self::room($roomId);
+            if (!$room) return [false, '群聊不存在'];
+            if (!self::roomAccessOk($room, $actor)) return [false, '无权进入该群聊'];
+        }
 
         // 游客发言权限
         if ($actor['kind'] === 'guest') {
@@ -360,19 +382,9 @@ class Chat
             return [false, '发言过于频繁，请稍后再试'];
         }
 
-        // 消息类型与内容
-        $toUserId = null; $toGuestId = null; $toNickname = null;
-        if ($type === 'private') {
-            $toUserId = isset($opt['to_user_id']) ? (int)$opt['to_user_id'] : null;
-            $toGuestId = isset($opt['to_guest_id']) ? (int)$opt['to_guest_id'] : null;
-            $toNickname = trim((string)($opt['to_nickname'] ?? ''));
-            if (!$toUserId && !$toGuestId) return [false, '私信缺少接收对象'];
-            // v1.1.2：跨身份私聊已下线，服务端同步收口。
-            // 判定不能只靠 dmPeerKey —— 构造请求可以绕过前端入口直接打 send。
-            if ($toGuestId) return [false, '暂不支持与游客私聊'];
-            if ($actor['kind'] !== 'user') return [false, '请先登录后再发起私聊'];
-            if ($toUserId === (int)$actor['id']) return [false, '不能给自己发私信'];
-        } elseif ($type === 'text' && preg_match('/(^|\s)@[^\s@]+/u', $content)) {
+        // 消息形态归一：私聊与群聊共用同一套形态（text/mention/image/file），
+        // 「发到谁」由上面 $isDm 分支的 room_id/to_* 决定，两者互不干扰。
+        if ($type === 'text' && preg_match('/(^|\s)@[^\s@]+/u', $content)) {
             $type = 'mention';
         } elseif (!in_array($type, ['text', 'image', 'file', 'system'], true)) {
             $type = 'text';
@@ -439,13 +451,29 @@ class Chat
     }
 
     // ---------- 消息序列化（含可见性过滤） ----------
+    /**
+     * 是否为私聊消息（v1.2.1：判据从 type='private' 改为 room_id=0 且有接收方）。
+     * 所有私聊相关的 SQL 条件与权限判定都必须走这里，避免各处散落一份判断而漏掉某种形态。
+     */
+    public static function isDmRow(array $m): bool
+    {
+        return (int)($m['room_id'] ?? 0) === 0
+            && ((int)($m['to_user_id'] ?? 0) > 0 || (int)($m['to_guest_id'] ?? 0) > 0);
+    }
+
     private static function visible(array $m, array $actor): bool
     {
-        if ($m['type'] !== 'private') return true;
+        if (!self::isDmRow($m)) return true;
         // v1.1.0：私聊仅双方可见（超级管理员亦不例外，后台同样不可越权查看）
         if ($actor['kind'] === 'user' && ((int)$m['user_id'] === $actor['id'] || (int)$m['to_user_id'] === $actor['id'])) return true;
         if ($actor['kind'] === 'guest' && ((int)$m['guest_id'] === $actor['id'] || (int)$m['to_guest_id'] === $actor['id'])) return true;
         return false;
+    }
+
+    /** 私聊消息对该用户是否可见（供附件下载等旁路复用，避免各处重写一遍判定） */
+    public static function dmVisible(array $m, array $actor): bool
+    {
+        return self::visible($m, $actor);
     }
 
     public static function pack(array $m, array $actor): array
@@ -468,6 +496,9 @@ class Chat
             'to_uid' => $m['to_user_id'] ? (int)$m['to_user_id'] : null,
             'to_gid' => $m['to_guest_id'] ? (int)$m['to_guest_id'] : null,
             'to_nickname' => $m['to_nickname'] ?? '',
+            // v1.2.1：私聊标识与消息形态解耦后，前端不能再靠 m.type==='private' 判断
+            // （私聊里的图片/文件消息 type 是 image/file），故单独下发 dm 布尔位。
+            'dm' => self::isDmRow($m) ? 1 : 0,
             'time' => date('H:i', (int)$m['created_at']),
             'date' => date('m-d', (int)$m['created_at']),
             'ts' => (int)$m['created_at'],
@@ -664,7 +695,7 @@ class Chat
         $conds = ['(user_id > 0 AND user_id = ?)', '(to_user_id > 0 AND to_user_id = ?)'];
         $args = [$mineUser, $mineUser];
         $rows = DB::all(
-            'SELECT * FROM messages WHERE type=\'private\' AND room_id=0
+            'SELECT * FROM messages WHERE room_id=0 AND to_user_id > 0
              AND (' . implode(' OR ', $conds) . ')
              ORDER BY id DESC LIMIT 300',
             $args
@@ -727,7 +758,7 @@ class Chat
     {
         [$pk, $pid] = $peer;
         [$cond, $args] = self::dmPairSql($actor, $pk, $pid, $beforeId > 0 ? 'id<?' : '', $beforeId > 0 ? [$beforeId] : []);
-        $sql = "SELECT * FROM messages WHERE type='private' AND room_id=0 AND $cond"
+        $sql = "SELECT * FROM messages WHERE room_id=0 AND to_user_id > 0 AND $cond"
              . ' ORDER BY id DESC LIMIT ' . max(1, min(50, $limit));
         $rows = DB::all($sql, $args);
         $rows = array_reverse($rows);           // 升序返回给前端直接追加
@@ -836,7 +867,7 @@ class Chat
     {
         [$pk, $pid] = $peer;
         [$cond, $args] = self::dmPairSql($actor, $pk, $pid, 'id>?', [$sinceId]);
-        $sql = "SELECT * FROM messages WHERE type='private' AND room_id=0 AND $cond ORDER BY id LIMIT 200";
+        $sql = "SELECT * FROM messages WHERE room_id=0 AND to_user_id > 0 AND $cond ORDER BY id LIMIT 200";
         $deadline = time() + max(5, min(30, $timeout));
         $new = [];
         $hidden = self::hiddenIds($actor);
@@ -964,6 +995,9 @@ class Chat
             $isOwner = $ownerId !== 0 && $ownerId === (int)$actor['id'];
         }
         $can = $actor['role'] === 'admin' || $mine || $isOwner;
+        // 私聊仅双方可见（v1.1.0 硬约束），超管既不能查看也不得真删除他人私聊：
+        // 私聊消息只认「作者本人」，不适用群聊的房主 / 管理员通道。
+        if (self::isDmRow($m)) $can = $mine;
 
         if (!$can) {
             // 无权真删除 → 降级为「仅自己隐藏」。这是**降级而非拒绝**：
@@ -1074,6 +1108,7 @@ class Chat
              || ($actor['kind'] === 'guest' && (int)$m['guest_id'] === $actor['id']);
         $can = false;
         if ($actor['role'] === 'admin') $can = true;
+        if ($can && self::isDmRow($m)) $can = $mine;   // 私聊：超管不得撤回他人私聊（同 deleteMessage）
         if (!$can && $mine && time() - (int)$m['created_at'] <= 180) $can = true;
         if (!$can) {
             $room = self::room((int)$m['room_id']);

@@ -305,6 +305,14 @@ class DB
         // 幂等：仅处理 room_id>0 的存量行，迁移后 WHERE 不再命中。
         self::$pdo->exec("UPDATE messages SET room_id=0 WHERE type='private' AND room_id>0");
 
+        // ---------- v1.2.1：私聊身份与消息形态解耦 ----------
+        // 此前 type='private' 一列兼表「这是私聊」与「消息形态是文本」，
+        // 私聊里发图片/文件时 type 被迫变成 image/file → 服务端认不出私聊（直接报「群聊不存在」），
+        // 历史/轮询 SQL 也永远查不出这类消息。现私聊身份改由 room_id=0 + to_user_id 承载，
+        // 故把存量 'private' 行改写为 'text'（语义不丢，只是归位到消息形态列）。
+        // 幂等：改写后 WHERE 不再命中。必须排在上面 room_id 迁移之后。
+        self::$pdo->exec("UPDATE messages SET type='text' WHERE type='private'");
+
         // 索引（跨引擎兼容语法）
         $idx = [
             'CREATE INDEX IF NOT EXISTS idx_msg_room ON messages (room_id, id)',
