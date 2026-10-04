@@ -66,6 +66,11 @@ class Plugin
         self::cron('purge_deleted_messages', 3600, function () {
             if (class_exists('Chat')) Chat::purgeDeleted();
         }, '物理清除超过保留期的软删除消息（每小时一次）');
+        // v1.2.2：清除超过服务器保留期的正常消息及其附件文件。
+        // 与 purge_deleted_messages 并列存在，两个保留期各管一个维度，互不覆盖。
+        self::cron('purge_expired_messages', 3600, function () {
+            if (class_exists('Chat')) Chat::purgeExpired();
+        }, '物理清除超过服务器保留期的消息与附件（每小时一次）');
         self::$loading = '';
 
         // 1) 轻量目录扫描（目录名 + mtime），识别插件名单变化

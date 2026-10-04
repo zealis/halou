@@ -512,6 +512,7 @@ class Chat
     public static function history(array $actor, int $roomId, int $beforeId, int $limit = 30): array
     {
         self::purgeDeleted();   // v1.1.0：顺带清理过保留期的软删除消息（内部有小时级节流）
+        self::purgeExpired();   // v1.2.2：顺带清理过服务器保留期的正常消息 + 其附件
         self::purgeHides();     // v1.1.14：顺带清理指向已消失消息的隐藏行
         $sql = 'SELECT * FROM messages WHERE room_id=?';
         $args = [$roomId];
@@ -1045,6 +1046,66 @@ class Chat
         try {
             $n = DB::run('DELETE FROM messages WHERE deleted=1 AND deleted_at > 0 AND deleted_at < ?', [$before]);
             if ($n > 0) Sec::log('msg_purge', 'system', ['count' => (int)$n, 'retain_days' => $days]);
+        } catch (Throwable $e) {
+            // 清理失败绝不能影响正常读消息，静默即可
+        }
+    }
+
+    /**
+     * 清理超过**服务器保留期**的正常消息（物理 DELETE，行与附件文件彻底消失）。
+     *
+     * v1.2.2 新增。与 purgeDeleted() 是**两个独立维度**，务必分清：
+     *   - purgeDeleted()  管「已删除消息的审计行留多久」（deleted=1 才处理）
+     *   - purgeExpired()  管「正常消息本身留多久」（deleted=0 的活消息，到期即清）
+     *
+     * 保留期由系统设置 msg_retain_days 控制，0 = 永久保留。
+     * 站点不提供聊天记录导出，故到期即物理清除——**无法恢复**，这是有意为之：
+     * 保留期是站点对「留多久」的明确承诺，留着超期数据等于承诺落空。
+     *
+     * 附件处理：消息行删除前先取出其 file 类型消息的 path，删行后同步 unlink 磁盘文件
+     * （图片/头像/贴纸不动 —— 那些可能被收藏贴纸引用，生命周期与消息不同）。
+     * 删除只对 uploads/file/ 下的路径生效，且经 fileAbs() 二次校验（阻断路径穿越）。
+     *
+     * 安全：逐条 DELETE 而非大范围 WHERE，避��一次锁表；
+     * 单条失败只跳过该条（记入日志），绝不影响读消息主流程。
+     */
+    public static function purgeExpired(): void
+    {
+        static $lastRun = 0;
+        $days = (int)DB::setting('msg_retain_days', 90);
+        if ($days <= 0) return;                       // 0 = 永久保留
+        if (time() - $lastRun < 3600) return;         // 每小时最多跑一次
+        $lastRun = time();
+        $before = time() - $days * 86400;
+        try {
+            // 只取「未被删除」的超期消息：已删除的交给 purgeDeleted() 按其自身期限处理，
+            // 这里不去抢，避免两个策略在同一批行上互相干扰（各自保留期不同）。
+            $rows = DB::all(
+                'SELECT id, type, content FROM messages WHERE deleted=0 AND created_at < ? ORDER BY id LIMIT 500',
+                [$before]
+            );
+            if (!$rows) return;
+
+            $msgs = 0; $files = 0; $paths = [];
+            foreach ($rows as $m) {
+                // 先收集附件路径：删行之后 content 就没了，必须在删除前提取。
+                if ((string)$m['type'] === 'file') {
+                    $info = json_decode((string)$m['content'], true);
+                    if (is_array($info) && !empty($info['path'])) $paths[] = (string)$info['path'];
+                }
+                if (DB::run('DELETE FROM messages WHERE id=?', [(int)$m['id']])) $msgs++;
+            }
+
+            // 附件文件同步清理：只删 uploads/file/ 下、经 fileAbs 二次校验的路径。
+            // 校验失败就跳过（宁可留垃圾文件，也不能让一条脏数据指向 uploads 外的文件）。
+            foreach (array_unique($paths) as $rel) {
+                $abs = Upload::fileAbs($rel);
+                if ($abs && @unlink($abs)) $files++;
+            }
+
+            if ($msgs > 0 || $files > 0) {
+                Sec::log('msg_expire', 'system', ['msgs' => $msgs, 'files' => $files, 'retain_days' => $days]);
+            }
         } catch (Throwable $e) {
             // 清理失败绝不能影响正常读消息，静默即可
         }

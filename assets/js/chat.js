@@ -3369,6 +3369,11 @@ logs: function (main) {
                         // 教训：公开性的中文不能叫「普通」，会与 type=public 的「普通」撞词。
                         + '仅邀请群聊只靠邀请链接传播，不出现在任何列表里。关闭后普通用户只能创建公开群聊，'
                         + '已存在的仅邀请群仍可正常改名、改简介（仅禁止把公开群改成仅邀请）；管理员始终不受此限制。</p>'
+                        // v1.2.2 消息服务器保留期：正常消息到期即物理清除（附件同步删），无法恢复
+                        + '<div class="ha-form-item"><label>消息服务器保留期(天)</label><input class="ha-input" id="haS_msg_retain_days" value="' + esc(d.msg_retain_days || '90') + '"></div>'
+                        + '<p style="font-size:12px;color:#5C5C5C;margin:4px 0 12px">超过本期限的<b>正常消息</b>会被物理删除，其附件文件（uploads/file/）一并删除，'
+                        + '<b>删除后无法恢复</b>。默认 90 天（约三个月）。填 0 表示永久保留。<br>'
+                        + '与下方「已删除消息保留期」是两个独立项：那个只管<b>已被删除</b>的消息行留多久，本项管<b>未删除</b>的消息留多久。</p>'
                         // v1.1.0 软删除：删除消息只清空正文并留行（供审计），到期才物理清除
                         + '<div class="ha-form-item"><label>已删除消息保留期(天)</label><input class="ha-input" id="haS_msg_deleted_retain_days" value="' + esc(d.msg_deleted_retain_days || '30') + '"></div>'
                         + '<p style="font-size:12px;color:#5C5C5C;margin:4px 0 12px">删除消息时正文立即清空（原文不可恢复），但记录行会保留到本期限满后物理清除，'
@@ -3723,6 +3728,8 @@ logs: function (main) {
                 guest_browse: $('haS_guest_browse').value,
                 guest_chat: $('haS_guest_chat').value,
                 guest_msg_interval: $('haS_guest_msg_interval') ? $('haS_guest_msg_interval').value : '',
+                // v1.2.2 消息服务器保留期（天），0 = 永久保留
+                msg_retain_days: $('haS_msg_retain_days') ? $('haS_msg_retain_days').value : '',
                 msg_deleted_retain_days: $('haS_msg_deleted_retain_days') ? $('haS_msg_deleted_retain_days').value : '',
                 msg_rate_window: $('haS_msg_rate_window').value,
                 msg_rate_max: $('haS_msg_rate_max').value,
