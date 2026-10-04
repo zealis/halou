@@ -276,11 +276,10 @@ class DB
         self::addColumn('messages', 'deleted', 'int', '0');
         self::addColumn('messages', 'deleted_at', 'int', '0');
         self::addColumn('messages', 'deleted_by', 'varchar(64)', "''");
-        // v1.2.3 免清理标记：keep_forever=1 的消息**永不物理删除**。
-        // 用于「群主 / 超级管理员撤回的违规内容」——这类撤回是合规动作，
-        // 记录本身有留存价值，故不受 msg_retain_days 约束。
-        // purgeExpired() 的 WHERE 里必须带 keep_forever=0，漏了这条标记就形同虚设。
-        self::addColumn('messages', 'keep_forever', 'int', '0');
+        // ⚠️ v1.2.4：keep_forever（免清理标记）已随「撤回=立即物理删除」下线。
+        // 撤回的消息根本不进库，不存在「被保留期清理」的问题，该标记失去意义。
+        // 存量列保留不删（与 rooms.min_age 同源策略）：删列有数据迁移风险，
+        // 而留着它无害 —— 应用层已不再读写。**勿在业务代码中重新启用。**
         // 已废弃字段：rooms.min_age（进入该房间的最低年龄）随 1.0.31 下线，应用层已不再读写。
         // 保留此行仅为兼容历史数据库（列仍存在且幂等），勿在业务代码中重新启用。
         self::addColumn('rooms', 'min_age', 'int', '0');

@@ -498,15 +498,16 @@ if ($action !== '') {
             [$ok, $msg] = Chat::updateRoom($actor, (int)$p('id'), (string)($_POST['name'] ?? ''), (string)($_POST['description'] ?? ''), (string)($_POST['avatar'] ?? ''), $pub);
             Api::json(['ok' => $ok, 'msg' => $msg]);
 
-        // ---------- 删除消息（内容右键「删除」，与「撤回」区分） ----------
-        // v1.1.14：返回第三项 scope，前端据此区分效果。管理员/群主/作者本人 → 'delete'
-        // （真删除，所有人不可见）；其他任何人 → 'hide'（只写 message_hides，仅本机不可见）。
-        // v1.2.3：两种 scope 的**对外文案统一叫「删除」**，前端只按 scope 决定
-        // 要不要重拉会话列表，提示语直接用服务端下发的 msg（已带「仅本机」说明）。
+        // ---------- 删除消息（内容右键「删除」） ----------
+        // v1.2.4：删除 = **一律只在本机隐藏**（写 message_hides），任何身份都是、
+        // 含超级管理员；别人照常看得到、换设备不生效。真正让内容对所有人消失的
+        // 是「撤回」（recall，物理删行 + 删附件）。
+        // 返回第三项 scope 恒为 'hide'，仅为兼容旧前端保留。
         case 'msg_delete':
             [$ok, $msg, $scope] = Chat::deleteMessage($actor, (int)$p('id'));
             Api::json(['ok' => $ok, 'msg' => $msg, 'scope' => $scope]);
 
+        // ---------- 撤回 = 真正的删除（全局生效、不可恢复） ----------
         case 'recall':
             [$ok, $msg] = Chat::recall($actor, (int)$p('id'));
             Api::json(['ok' => $ok, 'msg' => $msg]);

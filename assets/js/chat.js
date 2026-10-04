@@ -1938,12 +1938,24 @@
             });
         },
 
+        /**
+         * 撤回消息 = 真正的删除，**全局生效**（所有人都不再看到，不可恢复）。
+         * v1.2.4 起撤回是物理删除行，所以成功后直接把气泡从 DOM 移除，
+         * 不再走 markRecalled（那是软删除时代的「留个已撤回占位」）。
+         */
         recall: function (id) {
             var self = this;
-            this.confirmModal('确定撤回这条消息吗？', function () {
+            var text = '确定撤回这条消息吗？撤回后所有群成员都不再显示，且不可恢复。'
+                + '（如只想自己不看，请用「删除」）';
+            this.confirmModal(text, function () {
                 HaApi.secure('recall', { id: id }, function (r) {
-                    if (r.ok) self.markRecalled(id);
-                    else toast(r.msg);
+                    if (!r.ok) { toast(r.msg); return; }
+                    var el = $('haMsg' + id);
+                    if (el && el.parentNode) el.parentNode.removeChild(el);
+                    delete self.msgCache[id];
+                    toast(r.msg || '已撤回');
+                    // 全局生效 → 会话摘要也会变，重拉让侧栏同步
+                    self.loadConversations();
                 });
             });
         },
@@ -2661,34 +2673,33 @@
         },
 
         /**
-         * 右键「消息内容」的菜单：复制 / 引用 / 删除。
+         * 右键「消息内容」的菜单：复制 / 引用 / 撤回 / 删除。
          * 插件可通过 HaChat.onMsgContent 追加项（如翻译、举报、复制原文…）。
          *
-         * v1.2.3：**两档菜单项都叫「删除」**，只靠确认框措辞区分实际效果。
-         * 原来无权限那档叫「隐藏」，暴露了实现细节，用户会困惑「我删了为什么别人还在」。
-         * 底层行为**没变**：
-         *   - 有权（管理员 / 群主 / 消息作者）→ 真删除，对**所有人**生效；
-         *   - 其余人 → 只在本机不显示，消息仍在库里、别人照常看得到（换设备不生效）。
-         * 两档都必须给入口：不给就是死路（用户压根没法处理不想看的内容），
-         * 给了却一律当真删则是越权（他能替别人决定别人还能不能看到）。
+         * v1.2.4 语义彻底对调（勿回退）：
+         *   - **撤回** = 真正的删除，**全局生效**（所有人都不再看到），需满足撤回条件
+         *     （自己发的 5 分钟内，或群主 / 超管处理违规内容）；
+         *   - **删除** = 一律只在本机隐藏，**任何身份都是**（含超级管理员），
+         *     别人照常看得到、换设备不生效。
+         *
+         * 因此删除入口**无条件对所有已登录用户开放**（不再判 canRemove）：
+         * 它只是「我不想看这条」的私人视图行为，不涉及他人，故不存在越权问题。
+         * 需要清除内容时走「撤回」——那条才有权限与时效约束。
          */
         showContentMenu: function (x, y, m) {
             var self = this, admin = this.cfg.actor.role === 'admin', items = [];
-            var canRemove = m.mine || this.canRemoveOthers();
             if (!m.recalled && !m.deleted) {
                 items.push({ t: '复制', run: function () { self.copyMsg(m); } });
                 if (m.type === 'image' && this.cfg.actor.kind === 'user')
                     items.push({ t: '收藏为贴纸', run: function () { self.collect(m.content); } });
                 if (this.cfg.actor.kind !== 'none')
                     items.push({ t: '引用', run: function () { self.quoteMsg(m); } });
+                // 撤回 = 全局真删除，仅在满足条件时给入口（服务端还会再判一次）
                 if (m.mine || admin || this.canRemoveOthers())
                     items.push({ t: '撤回', run: function () { self.recall(m.id); } });
-                // v1.2.3：两档都叫「删除」，区分只体现在 deleteMsg 的确认框措辞里。
-                // 「仅本机」那档只对已登录用户有意义：游客身份不落库，删了刷新就没。
-                if (canRemove)
-                    items.push({ t: '删除', run: function () { self.deleteMsg(m.id, false); } });
-                else if (this.cfg.actor.kind === 'user')
-                    items.push({ t: '删除', run: function () { self.deleteMsg(m.id, true); } });
+                // 删除 = 本机隐藏，仅对已登录用户有意义：游客身份不落库，删了刷新就没
+                if (this.cfg.actor.kind === 'user')
+                    items.push({ t: '删除', run: function () { self.deleteMsg(m.id); } });
                 for (var i = 0; i < this._ctxExtContent.length; i++) {
                     try { this._ctxExtContent[i](items, m, { roomId: this.room, actor: this.cfg.actor }); } catch (e) {}
                 }
@@ -2836,30 +2847,24 @@
         /**
          * 删除消息（内容右键）
          *
-         * v1.2.3：**两种结果对外都叫「删除」**，只有确认框措辞与服务端提示语区分：
-         *   hideOnly=true  → 「仅本机不再看到，其他人不受影响」（无权真删时的降级）
-         *   hideOnly=false → 真删除，所有人都不再显示（管理员 / 群主 / 作者本人）
+         * v1.2.4：**删除 = 一律只在本机隐藏**，任何身份都是（含超级管理员）。
+         * 别人照常看得到、消息仍在库里、换设备登录也不生效。
+         * 真的删除走「撤回」（全局生效），见 recall()。
          *
-         * 降级分支**行为未变**：仍只写 message_hides，消息在库里、别人照常看得到、
-         * 换设备登录不生效。改名只是因为「隐藏」暴露了实现细节、用户会困惑
-         * 「我删了为什么别人还在」；代价是提示语必须说清「仅本机」，不能骗人。
-         *
-         * ⚠️ 最终以服务端返回的 scope 为准：前端传参只是**期望**。
+         * 确认框必须写明「仅本机」：否则用户会以为所有人都看不到了，那是欺骗。
+         * 移除 hideOnly 参数——已无权限分档，无需前端传期望值。
          */
-        deleteMsg: function (id, hideOnly) {
+        deleteMsg: function (id) {
             var self = this;
-            var text = hideOnly
-                ? '确定删除这条消息吗？删除后仅本机不再看到，其他人不受影响。'
-                : '确定删除这条消息吗？删除后所有群成员都不再显示，且不可恢复。';
+            var text = '确定删除这条消息吗？删除后仅本机不再看到，其他人不受影响。';
             this.confirmModal(text, function () {
                 HaApi.secure('msg_delete', { id: id }, function (r) {
                     if (!r.ok) { toast(r.msg); return; }
                     var el = $('haMsg' + id);
                     if (el && el.parentNode) el.parentNode.removeChild(el);
                     delete self.msgCache[id];
-                    // 仅本机删除只影响消息区；真删除会影响会话摘要，一并重拉让侧栏同步
-                    toast(r.msg || '已删除');
-                    if (r.scope !== 'hide') self.loadConversations();
+                    // 本机隐藏只影响消息区，不影响会话摘要，无需重拉
+                    toast(r.msg || '已删除（仅本机不再看到）');
                 });
             });
         },
@@ -3378,7 +3383,7 @@ logs: function (main) {
                         // v1.2.2 消息服务器保留期：到期即物理清除（附件同步删），无法恢复
                         + '<div class="ha-form-item"><label>消息服务器保留期(天)</label><input class="ha-input" id="haS_msg_retain_days" value="' + esc(d.msg_retain_days || '90') + '"></div>'
                         + '<p style="font-size:12px;color:#5C5C5C;margin:4px 0 12px">超过本期限的消息会被<b>物理删除</b>，其附件文件（uploads/file/）一并删除，<b>删除后无法恢复</b>。默认 90 天（约三个月）。填 0 表示永久保留。<br>'
-                        + '<b>已被删除</b>的消息同样适用本期限。唯一豁免：<b>群主 / 超级管理员</b>为处理违规内容而撤回的消息会长期留存，不受本期限影响。</p>'
+                        + '「<b>删除</b>」只在本机生效（仅你看不到，别人照常看得到）；「<b>撤回</b>」才是全局删除，所有人都不再显示且不可恢复。</p>'
                         + '<div class="ha-form-item"><label>新消息提示音默认</label>' + sel('sound_default', { '1': '开', '0': '关' }) + '</div>'
                         + '<button class="ha-btn ha-btn-primary" onclick="HaAdmin.settingsSave()">保存设置</button></div>';
                 });

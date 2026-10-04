@@ -558,19 +558,21 @@ class Chat
     }
 
     /**
-     * 把一条消息加入「仅本机不再看到」（幂等）。
+     * 把一条消息加入「仅本机不再看到」（幂等）。这就是「删除」的全部实现。
      * 只允许注册用户调用；不校验房间权限 —— 这是**纯个人视图**行为，
      * 看不见的消息自然也不会出现在自己的列表里，拦不拦没有实际区别。
      *
-     * v1.2.3：对外文案统一叫「删除」（见 deleteMessage 的说明），
-     * 但表名与函数名仍沿用 hide / message_hides —— 它们准确描述了内部机制，
+     * v1.2.4：删除**一律**走这里，超管与群主也不例外（谁都不能用删除让别人看不到）。
+     * 真要全局生效只有撤回（recall()，物理删行）。
+     *
+     * 表名与函数名仍沿用 hide / message_hides —— 它们准确描述内部机制，
      * 不为了对齐用户文案去改表名（那是无谓的迁移风险）。
      * 返回文案刻意带上「仅本机」：否则用户会以为所有人都看不到了，那是欺骗。
      */
     public static function hideMessage(array $actor, int $msgId): array
     {
         if (($actor['kind'] ?? '') !== 'user') return [false, '请先登录后再使用该功能'];
-        $m = DB::one('SELECT id FROM messages WHERE id=?', [$msgId]);
+        $m = DB::one('SELECT id, room_id FROM messages WHERE id=?', [$msgId]);
         if (!$m) return [false, '消息不存在'];
         $tip = '已删除（仅本机不再看到这条消息，其他人不受影响）';
         if ((int)DB::val('SELECT 1 FROM message_hides WHERE user_id=? AND message_id=?',
@@ -579,6 +581,10 @@ class Chat
         }
         DB::insert('message_hides', [
             'user_id' => (int)$actor['id'], 'message_id' => $msgId, 'created_at' => time(),
+        ]);
+        Sec::log('msg_hide', (string)$msgId, [
+            'room' => (int)$m['room_id'],
+            'by'   => (string)($actor['kind'] ?? ''),
         ]);
         return [true, $tip];
     }
@@ -980,21 +986,17 @@ class Chat
 
     // ---------- 撤回 ----------
     /**
-     * 删除消息（内容右键「删除」）：v1.1.14 起**按权限分两种结果**，前端据返回的 scope 提示用户。
+     * 删除消息 = **一律只在本机隐藏**，不做任何权限区分。
      *
-     * 权限矩阵（唯一口径，前端只按下发的 scope 显示文案，不自行判身份）：
-     *   管理员 / 该群群主 / 消息作者本人 → scope='delete'：真删除，**所有人**都不再看到
-     *     （软删除，清空正文 + 留行审计；行与附件到保留期后由 purgeExpired() 物理清除）；
-     *   其他任何人（含游客）              → scope='hide'：只写 message_hides，
-     *     **仅本机**不再看到这条，别人照常能看到、消息也仍在库里（换设备不生效）。
+     * v1.2.4 彻底改了语义（与 v1.1.x 相反，勿回退）：
+     *   删除：仅写 message_hides，**只对当前账号/设备生效**。消息在库里、
+     *         别人照常看得到、换设备登录也不生效。
+     *         **包括超级管理员与群主** —— 谁都不能用「删除」让内容对别人消失。
+     *   撤回：才是真正的删除，**全局生效**（见 recall()）。
      *
-     * ⚠️ v1.2.3：两种结果的**对外文案都叫「删除」**（原 hide 分支叫「已隐藏」）。
-     * 行为没变，只是措辞统一到用户心智；hide 分支的提示语必须带
-     * 「仅本机不再看到」以免误导 —— 否则用户会以为所有人都看不到了。
-     *
-     * 「删除他人的消息只是自己眼不见」是需求明确要求的产品行为：
-     * 聊天是公共空间，任何人都有权屏蔽自己不想看的发言；但把「我不看」升格成
-     * 「别人也看不到」就越权了，那只留给管理员与群主。
+     * 为什么这样切分：聊天是公共空间。「删除」是**个人视图**行为 —— 任何人都有权
+     * 屏蔽自己不想看的发言；但把「我不看」升格成「别人也看不到」就越权了。
+     * 真要清除内容只有一条路：撤回，且撤回受时间窗口约束（见 recall）。
      *
      * @return array [bool, string, string] [是否成功, 提示文案, 'delete'|'hide']
      */
@@ -1002,65 +1004,22 @@ class Chat
     {
         $m = DB::one('SELECT * FROM messages WHERE id=?', [$msgId]);
         if (!$m) return [false, '消息不存在', 'hide'];
-        if ((int)($m['deleted'] ?? 0) === 1) return [false, '消息已删除', 'delete'];
-        $mine = ($actor['kind'] === 'user' && (int)$m['user_id'] === $actor['id'])
-             || ($actor['kind'] === 'guest' && (int)$m['guest_id'] === $actor['id']);
-        // 严格比较统一用 int：$actor['id'] 在不同入口可能是字符串
-        $isOwner = false;
-        if (!$mine && $actor['kind'] === 'user' && (int)$m['room_id'] > 0) {
-            $ownerId = (int)(DB::val('SELECT owner_id FROM rooms WHERE id=?', [(int)$m['room_id']]) ?: 0);
-            $isOwner = $ownerId !== 0 && $ownerId === (int)$actor['id'];
-        }
-        $can = $actor['role'] === 'admin' || $mine || $isOwner;
-        // 私聊仅双方可见（v1.1.0 硬约束），超管既不能查看也不得真删除他人私聊：
-        // 私聊消息只认「作者本人」，不适用群聊的房主 / 管理员通道。
-        if (self::isDmRow($m)) $can = $mine;
 
-        if (!$can) {
-            // 无权真删除 → 降级为「仅本机生效」。这是**降级而非拒绝**：
-            // 前端对任何消息都提供「删除」入口，若服务端直接报错就是死按钮。
-            //
-            // v1.2.3：文案统一叫「删除」了，但**行为不变** —— 仍只写 message_hides，
-            // 仅当前设备/账号不再看到，库里消息还在、别人照常看得到（换设备不生效）。
-            // 之所以要改名：产品上「删除」是用户唯一的心智模型，
-            // 而「隐藏」这个词暴露了实现细节，用户会困惑「我删了为什么别人还在」。
-            // 代价是提示语必须说清「仅你不再看到」，否则就是欺骗。
-            [$ok, $msg] = self::hideMessage($actor, $msgId);
-            return [$ok, $ok ? '已删除（仅本机不再看到这条消息，其他人不受影响）' : $msg, 'hide'];
-        }
-
-        // 钩子：可放行或拦截（$allow 置 false 即拒绝，$reason 为展示给用户的理由）
+        // 钩子：可拦截（如插件阻止处理某类内容）。语义是「阻止本机隐藏」，不是权限判定。
         $allow = true; $reason = '';
         Plugin::fire('msg.before_delete', [&$allow, &$reason, $m, $actor]);
-        if (!$allow) return [false, $reason !== '' ? $reason : '无权删除该消息', 'delete'];
+        if (!$allow) return [false, $reason !== '' ? $reason : '无法删除该消息', 'hide'];
 
-        // 软删除：清空正文与引用（原文不留存），行本身保留到保留期结束。
-        // quote 列是 NOT NULL（历史建表约束），必须写空串而不是 NULL。
-        $st = DB::run('UPDATE messages SET deleted=1, content=?, quote=?, deleted_at=?, deleted_by=? WHERE id=?',
-            ['', '', time(), mb_substr((string)($actor['nickname'] ?? ''), 0, 64), $msgId]);
-        // 与「公告删不掉」同源的教训：DELETE/UPDATE 也必须查 rowCount。
-        // 目标已不存在时若无条件报成功，用户只会看到「提示删了、刷新又回来」。
-        if (is_object($st) && method_exists($st, 'rowCount') && $st->rowCount() === 0) {
-            return [false, '消息不存在或已被删除', 'delete'];
-        }
-        Sec::log('msg_delete', (string)$msgId, [
-            'room' => (int)$m['room_id'],
-            'type' => (string)$m['type'],
-            'by' => (string)($actor['kind'] ?? ''),
-        ]);
-        Plugin::fire('msg.after_delete', [$msgId, $m, $actor]);
-        return [true, '已删除', 'delete'];
+        [$ok, $msg] = self::hideMessage($actor, $msgId);
+        return [$ok, $msg, 'hide'];
     }
 
     /**
      * 清理超过**服务器保留期**的消息（物理 DELETE，行与附件文件彻底消失）。
      *
-     * v1.2.3 起**统一由 msg_retain_days 一个设置项控制**，不再区分正常消息与已删除消息：
-     *   - 正常消息（deleted=0）：到期清除
-     *   - 已删除消息（deleted=1）：同样到期清除（「已删除消息保留期」已下线并对齐本项）
-     *
-     * 唯一豁免：keep_forever=1 —— 群主 / 超管撤回的违规内容，标记后永不清除。
-     * 原因：这类撤回是合规动作，「处理过违规内容」这件事本身需要留痕。
+     * v1.2.3 起**统一由 msg_retain_days 一个设置项控制**（正常消息与已删除消息同一期限）。
+     * v1.2.4：撤回改为**立即物理删除**，`keep_forever` 豁免标记随之失去意义、
+     * 从 SQL 中移除（撤回的消息根本不进库，不存在「被清理」的问题）。
      *
      * 保留期由系统设置 msg_retain_days 控制，0 = 永久保留。
      * 站点不提供聊天记录导出，故到期即物理清除——**无法恢复**，这是有意为之：
@@ -1082,12 +1041,11 @@ class Chat
         $lastRun = time();
         $before = time() - $days * 86400;
         try {
-            // keep_forever=0 是硬性条件：群主/超管撤回的消息靠它豁免，漏掉这条等于标记失效。
             // 时间基准统一用 created_at（消息本身的年龄），不用 deleted_at ——
             // 否则「刚删掉一条很旧的消息」会因 deleted_at 很新而多留一轮，语义不统一。
             $rows = DB::all(
                 'SELECT id, type, content FROM messages
-                 WHERE keep_forever=0 AND created_at < ? ORDER BY id LIMIT 500',
+                 WHERE created_at < ? ORDER BY id LIMIT 500',
                 [$before]
             );
             if (!$rows) return;
@@ -1168,26 +1126,29 @@ class Chat
     }
 
     /**
-     * 撤回消息。v1.2.3 起的完整规则：
+     * 撤回消息 = **真正的删除**，**全局生效**（所有人都不再看到），行与附件立即物理消失。
+     *
+     * v1.2.4 彻底改了语义（与 v1.1.x 相反，勿回退）：
+     *   删除：一律只在本机隐藏（见 deleteMessage）
+     *   撤回：唯一能让内容对所有人消失的操作，**立即物理删除，不可恢复**
      *
      * 撤回窗口（谁能在多长时间内撤回）：
-     *   - 消息作者本人：5 分钟内（v1.2.3 由 3 分钟放宽）
+     *   - 消息作者本人：5 分钟内（Chat::RECALL_WINDOW）
      *   - 该群群主 / 超级管理员：任何时间（处理违规内容用）
      *   - 私聊：超管不得撤回他人私聊，仅双方 5 分钟内可撤回自己发的
      *
-     * 免清理（v1.2.3 新增）：
-     *   群主 / 超级管理员撤回的消息标记 keep_forever=1，**永不被 purgeExpired 清除**。
-     *   原因：这类撤回是合规动作（处理违反规则的内容），记录本身有留存价值，
-     *   不能因为过了保留期就消失，否则违规内容「处理过」这件事也无据可查。
-     *   普通用户自己撤回的**不享受**此豁免，仍受 msg_retain_days 约束。
+     * 为什么撤回能改别人、删除不能：撤回是**有节制**的 —— 有时间窗、有角色限制、
+     * 双方内容对称（你也撤不了我的）；删除是**无节制**的，任何人都能点。
+     * 若让「删除」也全局生效，等于把「清空整个群聊」的决定权交给每个用户。
      *
-     * 附件：撤回 file 消息时，其附件文件**立即物理删除**（撤回即视为内容不应留存）。
-     * 图片/头像/贴纸不动 —— 贴纸可能被收藏引用，生命周期与消息不同。
+     * ⚠️ 立即物理 DELETE 意味着**没有审计留痕**（谁撤的、何时都查不到）。
+     * 这是刻意的取舍：撤回语义就是「这段话不该存在过」，留行反而是负担。
+     * 关键操作（删除/撤回）在 security_logs 里留一条记录，供事后追溯。
      */
     public static function recall(array $actor, int $msgId): array
     {
         $m = DB::one('SELECT * FROM messages WHERE id=?', [$msgId]);
-        if (!$m || $m['recalled']) return [false, '消息不存在或已撤回'];
+        if (!$m) return [false, '消息不存在或已撤回'];
         $mine = ($actor['kind'] === 'user' && (int)$m['user_id'] === $actor['id'])
              || ($actor['kind'] === 'guest' && (int)$m['guest_id'] === $actor['id']);
 
@@ -1206,19 +1167,21 @@ class Chat
         $can = $isModerator || ($mine && time() - (int)$m['created_at'] <= self::RECALL_WINDOW);
         if (!$can) return [false, '只能撤回 ' . (int)(self::RECALL_WINDOW / 60) . ' 分钟内自己发送的消息'];
 
-        // 附件在撤回前先取出路径（recall 后 content 会被清空）
+        // 附件在删行**之前**先取出路径（删行后 content 就没了）
         $fileRel = '';
         if ((string)$m['type'] === 'file') {
             $info = json_decode((string)$m['content'], true);
             if (is_array($info) && !empty($info['path'])) $fileRel = (string)$info['path'];
         }
 
-        // 群主 / 超管撤回 → 标记免清理；content 与 quote 一并清空（quote 是 NOT NULL，须写空串）
-        $sets = ['recalled' => 1, 'content' => '', 'quote' => '', 'keep_forever' => $isModerator ? 1 : 0];
-        $up = implode(',', array_map(fn($c) => "$c=?", array_keys($sets)));
-        DB::run("UPDATE messages SET $up WHERE id=?", [...array_values($sets), $msgId]);
+        // 真正删除：行彻底消失（不是软删除）。
+        // message_hides 里的隐藏行会变成孤儿，由 purgeHides() 顺带清理。
+        $st = DB::run('DELETE FROM messages WHERE id=?', [$msgId]);
+        if (is_object($st) && method_exists($st, 'rowCount') && $st->rowCount() === 0) {
+            return [false, '消息不存在或已撤回'];
+        }
 
-        // 撤回附件立即物理删除：撤回 = 内容不应继续留存。
+        // 附件立即物理删除：撤回 = 内容不应继续留存。
         // 只删 uploads/file/ 下、且经 fileAbs 二次校验的路径（阻断路径穿越）。
         if ($fileRel !== '') {
             $abs = Upload::fileAbs($fileRel);
@@ -1226,12 +1189,13 @@ class Chat
         }
 
         Sec::log('msg_recall', (string)$msgId, [
-            'room'   => (int)$m['room_id'],
-            'type'   => (string)$m['type'],
-            'by'     => (string)($actor['kind'] ?? ''),
-            'mod'    => $isModerator,          // 是否为管理动作（决定免清理）
+            'room' => (int)$m['room_id'],
+            'type' => (string)$m['type'],
+            'by'   => (string)($actor['kind'] ?? ''),
+            'mod'  => $isModerator,   // 是否为管理动作（撤他人违规内容）
         ]);
-        return [true, $isModerator ? '已撤回（该记录将长期留存以备审计）' : '已撤回'];
+        Plugin::fire('msg.after_recall', [$msgId, $m, $actor]);
+        return [true, '已撤回'];
     }
 
     /**
