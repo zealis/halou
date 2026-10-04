@@ -262,13 +262,16 @@ input[type=range] {
     color: var(--ha-text-sub);
 }
 
-/* ---------- 通用 Tabs 组件（v1.2.20） ----------
-   外观参考「分段控件 / Segmented Control」：整条浅灰底槽，
-   选中项为白色胶囊 + 轻投影 —— 用「底色深浅 + 悬浮白块」表达选中，
-   而不是下划线或实色填充。
-   为什么不用实色填充：本应用主色 #00A0E9 已经在发送按钮、可点图标上
-   密集出现，标签页再用实色会把侧栏顶部的视觉重心整个拉走；
-   白胶囊既明确又安静，且与消息气泡（白底 + 圆角）同一套语言。
+/* ---------- 通用 Tabs 组件（v1.2.20，选中态配色 v1.2.21） ----------
+   外观参考「分段控件 / Segmented Control」：整条浅灰底槽 + 胶囊选中项。
+   胶囊几何沿用 v1.2.20（圆角 6px、字号 13px、padding 6px 10px）。
+
+   选中态配色历史：
+   - v1.2.20 白胶囊 + 黑字 + 轻投影，理由是「主色已在发送按钮等处密集出现，
+     标签页再上色会拉走侧栏视觉重心」；
+   - v1.2.21 用户要求「和按钮一样 #0099FF」→ 改为**主色实心 + 白字**，
+     与 .ha-btn-primary / .ha-switch.is-on 统一为「选中 = 主色」。
+   实测观感：实色胶囊在 240px 侧栏里更像「当前所在的位置」，而不是一块待点的白块。
 
    ⚠️ 结构约定（插件扩展必须遵守）：
    <div class="ha-tabs" id="haSideTabs">
@@ -312,14 +315,22 @@ input[type=range] {
 }
 .ha-tab:hover { color: var(--ha-text-title); }
 .ha-tab.is-active {
-    background: #FFFFFF;
-    color: var(--ha-text-title);
-    font-weight: 600;
-    /* 投影极轻：分段控件靠「白块浮起」而非靠重阴影表达选中 */
-    box-shadow: 0 1px 2px rgba(0, 0, 0, .08);
+    /* v1.2.21：选中态由「白底黑字」改为**主色实心**，与 .ha-btn-primary /
+       .ha-switch.is-on 同色 #0099FF（--ha-primary-strong），
+       对齐项目里「选中 / 激活 = 主色」的既定语言。
+       几何完全不动：字号 13px、内边距 6px 10px、圆角 6px 全部保持，
+       所以只剩颜色差异，切换时不会出现胶囊宽度跳动。
+       ⚠️ 不要再叠 font-weight:600：中文字体在 13px 下加粗会引起字形撑宽，
+       两颗标签会重排（用户选定的分段控件观感被破坏）。 */
+    background: var(--ha-primary-strong);
+    color: #FFFFFF;
+    box-shadow: none;   /* 白胶囊靠轻阴影浮起；实色胶囊不需要 */
     cursor: default;
 }
-.ha-tab.is-active:hover { color: var(--ha-text-title); }
+/* 显式锁白：.ha-tab:hover（0,0,2,0）与 .ha-tab.is-active（0,0,2,0）同特异性，
+   靠源码顺序定胜负；这里仍显式写一条锁死，避免日后有人把 :hover 挪到后面，
+   选中项文字被 :hover 的深色吞掉（.ha-btn-primary 踩过一次完全同型的坑）。 */
+.ha-tab.is-active:hover { background: var(--ha-primary-strong); color: #FFFFFF; }
 /* 插件新增的标签允许带角标（如未读数），用 .ha-tab-badge 套在 .ha-tab-lb 之后 */
 .ha-tab .ha-tab-badge {
     display: inline-block;
