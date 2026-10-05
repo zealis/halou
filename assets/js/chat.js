@@ -2539,14 +2539,18 @@
                 // 此时整个 .ha-modal-actions 都不输出（否则卡片底部留一道空边框）。
                 // 自己的卡片就只能靠 ✕ / 点遮罩 / Esc 关闭 —— 这是有意的。
                 // v1.1.24 联系人：加为联系人。
-                // ⚠️ 加/删是**互斥**的：已是联系人时只给「删除联系人」，避免出现两个都能点的按钮
-                //   （服务端也会拒，但前端不该留下必然报错的入口）。
+                // v1.2.24 文案：按钮写「加好友 / 删除好友」（用户要求）。
+                //   ⚠️ 两个按钮是**互斥**的（已是好友只给「删除好友」），位置相同，
+                //   只改其中一个会出现「加好友 / 删除联系人」的错位说法，所以成对改。
+                //   ⚠️ 只改**界面文案**：后端 action 名仍是 friend_add / friend_remove、
+                //   表名仍是 user_friends，服务端提示语仍是「为联系人」——
+                //   术语统一是另一件事（涉及侧栏标签「联系人」与服务端文案），未一并动。
                 // 删除走 HaApi.secure —— friend_remove 在 $SENSITIVE 内，需一次性票据。
                 var acts = '';
                 if (canPm) {
                     acts += (u.is_friend
-                        ? '<button class="ha-btn ha-btn-ghost" onclick="HaChat.removeFriend(' + (u.id) + ')">删除联系人</button>'
-                        : '<button class="ha-btn ha-btn-ghost" onclick="HaChat.addFriend(' + (u.id) + ')">加为联系人</button>')
+                        ? '<button class="ha-btn ha-btn-ghost" onclick="HaChat.removeFriend(' + (u.id) + ')">删除好友</button>'
+                        : '<button class="ha-btn ha-btn-ghost" onclick="HaChat.addFriend(' + (u.id) + ')">加好友</button>')
                         + '<button class="ha-btn ha-btn-primary" onclick="HaChat.closeModal();HaChat.openDm(\'user:' + (u.id) + '\',' + JSON.stringify(u.nickname).replace(/"/g, '&quot;') + ')">发私信</button>';
                 }
                 HaChat.openModal(

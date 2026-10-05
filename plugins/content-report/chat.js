@@ -1,11 +1,12 @@
 /**
  * 内容举报插件 · 前台能力
  *
- * 入口：
- *   1. 群聊消息右键「头像」菜单追加「举报」（通过 HaChat.onMsgCtx 扩展点）
- *   2. 用户资料卡「举报」按钮（包装核心暴露的 HaChat.userCard + HaChat.openModal 实现，
- *      未修改核心源码）
- * 两者共用同一个举报弹窗：选择理由 + 补充说明，提交到 plugin_content_report_submit。
+ * 入口（v1.2.24 起只有这一个）：
+ *   群聊消息右键「头像」菜单追加「举报」（通过 HaChat.onMsgCtx 扩展点），
+ *   走同一个举报弹窗：选择理由 + 补充说明，提交到 plugin_content_report_submit。
+ *
+ * ⚠️ 用户资料卡的「举报」按钮 v1.2.24 已按要求移除（见文件内「资料卡『举报』按钮」一节）。
+ *    举报入口现在**只有消息右键菜单这一条** —— 举报针对的是具体内容，不是某个人。
  *
  * 开关（后台配置）：
  *   - require_desc：必须填写补充说明
@@ -56,36 +57,17 @@
         w.location.href = '?page=login';
     }
 
-    /* ---------- 记录最近一次打开资料卡的目标用户（供 openModal 注入举报按钮时取用） ---------- */
-    var lastCardTarget = { uid: 0, nick: '' };
+    /* ---------- 资料卡「举报」按钮：v1.2.24 移除 ----------
+       原实现：包装 HaChat.userCard 记下目标用户 → 再包装 HaChat.openModal，
+       往资料卡的 <div class="ha-modal-actions"> 里塞一个 ha-btn-danger 按钮。
+       移除理由：资料卡是「看这个人是谁」的地方，底部摆一个红色「举报」把气氛
+       搞得很对立；而举报真正的场景是「看到一条具体的违规内容」，那里走
+       HaChat.onMsgCtx（右键头像菜单）能精确定位到被举报对象，也更顺手。
 
-    /* ---------- 包装 HaChat.userCard：记录目标用户，原行为不变 ---------- */
-    var origUserCard = HaChat.userCard;
-    HaChat.userCard = function (uid, nick) {
-        lastCardTarget = { uid: uid || 0, nick: nick || '' };
-        return origUserCard.call(this, uid, nick);
-    };
-
-    /* ---------- 包装 HaChat.openModal：资料卡弹窗内注入「举报」按钮 ---------- */
-    var origOpenModal = HaChat.openModal;
-    HaChat.openModal = function (html, width) {
-        // 仅对资料卡弹窗（标题含「用户资料」）注入按钮；举报弹窗自身标题为「举报用户」不受影响
-        if (typeof html === 'string' && html.indexOf('用户资料') >= 0 && lastCardTarget.uid > 0) {
-            var uid = lastCardTarget.uid;
-            var nick = lastCardTarget.nick;
-            var me = (HaChat.cfg || {}).me || null;
-            // 允许举报自己关闭时，自己的资料卡不显示举报按钮
-            if (me && me.id && uid === me.id && !cfgCache.allow_self) {
-                // 不注入按钮
-            } else {
-                var nickJson = JSON.stringify(nick).replace(/"/g, '&quot;');
-                var btn = '<button class="ha-btn ha-btn-danger" style="margin-right:auto" '
-                    + 'onclick="HaCR.openReport(' + uid + ',' + nickJson + ',0,0,0)">举报</button>';
-                html = html.replace('<div class="ha-modal-actions">', '<div class="ha-modal-actions">' + btn);
-            }
-        }
-        return origOpenModal.call(this, html, width);
-    };
+       ⚠️ 删除时必须连**三件套**一起删：lastCardTarget 变量、userCard 包装、
+       openModal 包装 —— 它们只服务于这一个按钮，留下任何一个都是死代码，
+       而且 openModal 包装是全站弹窗的公共路径，留着等于给所有弹窗加一道
+       字符串匹配，纯负担。openReport 本身保留（右键菜单还在用）。 */
 
     /* ---------- 举报弹窗：理由下拉 + 补充说明 ---------- */
     CR.openReport = function (targetUid, targetNick, roomId, msgId, msgTime) {
