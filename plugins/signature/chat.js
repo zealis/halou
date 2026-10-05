@@ -4,7 +4,7 @@
  * 功能：
  *   1. 个人设置弹窗：在昵称下方注入「个性签名」文本框（上限 200 字）
  *   2. 保存设置时一并保存个性签名
- *   3. 用户资料卡：展示该用户的个性签名
+ *   3. 用户资料卡：展示该用户的个性签名（注入点：核心的 #haCardExtras，见 findCardAnchor）
  * ========================================================================== */
 (function (w) {
     'use strict';
@@ -80,6 +80,24 @@
         origUserCard.call(self, uid, nick);
     };
 
+    /**
+     * 找资料卡里的注入锚点（按优先级）。
+     *
+     * ⚠️ 历史坑（本函数曾让签名彻底消失）：原来只写 `modal.querySelector('p')`。
+     * 核心 v1.1.9 重做资料卡布局后，信息段从 <p> 换成 <div class="ha-card-meta">，
+     * <p> 在资料卡里再也不存在 → 拿到 null → 直接 return。
+     * 症状极其隐蔽：不报错、控制台干净、界面只是「没有签名这一行」，
+     * 看起来像「用户没填过签名」，实际是插件找不到地方插。
+     *
+     * 现在核心（v1.2.23）在资料卡末尾预留了稳定的空容器 `<div id="haCardExtras">`，
+     * 插件一律优先用它；后两级是给旧版核心的兜底，不留就会又哑一次。
+     */
+    function findCardAnchor(modal) {
+        return modal.querySelector('#haCardExtras')
+            || modal.querySelector('.ha-card-meta')
+            || modal.querySelector('p');
+    }
+
     function injectSignatureIntoCard(uid) {
         HaApi.post('plugin_signature_get', { id: uid }, function (r) {
             if (!r.ok) return;
@@ -89,17 +107,19 @@
             if (!modal) return;
             // 避免重复注入
             if (modal.querySelector('.ha-sig-text')) return;
-            // 资料卡结构：<h3> → <div>头像区 → <p>用户ID/积分/注册</p>
-            // 在 <p>（用户信息段）之前插入签名
-            var p = modal.querySelector('p');
-            if (!p) return;
+            var anchor = findCardAnchor(modal);
+            if (!anchor) return;
             var div = document.createElement('div');
             div.className = 'ha-sig-text';
-            div.style.cssText = 'font-size:13px;color:#333;background:var(--ha-bg-sub,#f5f5f5);'
-                + 'border-radius:4px;padding:8px 12px;margin:0 0 12px;word-break:break-word;'
+            div.style.cssText = 'font-size:13px;color:var(--ha-text,#333);'
+                + 'background:var(--ha-bg-sub,#f5f5f5);'
+                + 'border-radius:4px;padding:8px 12px;margin:10px 0 12px;word-break:break-word;'
                 + 'white-space:pre-wrap;line-height:1.5';
             div.textContent = sig;
-            p.parentNode.insertBefore(div, p);
+            // #haCardExtras 是核心预留的空容器 → 直接塞进去（落在积分/注册之后）；
+            // 旧结构没有它，退回「插在信息段之前」的老位置。
+            if (anchor.id === 'haCardExtras') anchor.appendChild(div);
+            else anchor.parentNode.insertBefore(div, anchor);
         });
     }
 })(window);

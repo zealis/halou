@@ -2510,7 +2510,8 @@
          *    **与原图实际像素无关**，不会被大图撑破。
          *  - 自己的卡片：头像可点直接换头像（标题提示 + hover 反馈），
          *    与设置页的点击上传走同一条链；上传后两处预览同时回填。
-         *  - 「关闭」按钮对所有身份都显示。
+         *  - v1.2.23：**不再有底部「关闭」按钮**（右上角 ✕ 已够）；
+         *    自己的卡片因此没有按钮 → 不输出 actions 容器。
          * 用户名已取消：资料卡以用户 ID 作为唯一标识，昵称可重名只作展示。
          */
         userCard: function (uid, nick) {
@@ -2531,35 +2532,49 @@
                         + '<input type="file" id="haCardAvatarFile" accept="image/*" style="display:none">';
                 }
                 var regDate = u.created_at ? new Date(u.created_at * 1000).toLocaleDateString() : '-';
+                var badges = roleTag(u.role, u.title, u.id);
+                // v1.2.23：底部不再放「关闭」—— openModal 自带右上角 ✕（见 openModal），
+                // 两个关闭入口纯冗余。
+                // ⚠️ 连带影响：自己的卡片 canPm=false，删掉「关闭」后**一个按钮都不剩**，
+                // 此时整个 .ha-modal-actions 都不输出（否则卡片底部留一道空边框）。
+                // 自己的卡片就只能靠 ✕ / 点遮罩 / Esc 关闭 —— 这是有意的。
+                // v1.1.24 联系人：加为联系人。
+                // ⚠️ 加/删是**互斥**的：已是联系人时只给「删除联系人」，避免出现两个都能点的按钮
+                //   （服务端也会拒，但前端不该留下必然报错的入口）。
+                // 删除走 HaApi.secure —— friend_remove 在 $SENSITIVE 内，需一次性票据。
+                var acts = '';
+                if (canPm) {
+                    acts += (u.is_friend
+                        ? '<button class="ha-btn ha-btn-ghost" onclick="HaChat.removeFriend(' + (u.id) + ')">删除联系人</button>'
+                        : '<button class="ha-btn ha-btn-ghost" onclick="HaChat.addFriend(' + (u.id) + ')">加为联系人</button>')
+                        + '<button class="ha-btn ha-btn-primary" onclick="HaChat.closeModal();HaChat.openDm(\'user:' + (u.id) + '\',' + JSON.stringify(u.nickname).replace(/"/g, '&quot;') + ')">发私信</button>';
+                }
                 HaChat.openModal(
                     '<h3>用户资料</h3>'
                     + '<div class="ha-card-head">'
                     + avHtml
                     + '<div class="ha-card-id">'
-                    + '<div class="ha-card-name">' + esc(u.nickname) + '</div>'
-                    + '<div class="ha-card-badges">' + roleTag(u.role, u.title, u.id) + '</div>'
+                    // v1.2.23：昵称与身份标签**同一行**（标签在昵称右侧）；
+                    // 昵称下方显示「ID xxxxx」—— 原「用户 ID」在下方 meta 行里，已上移，不再重复。
+                    // ⚠️ badges 为空时不输出该 span：空 flex item 仍会吃掉一个 gap。
+                    + '<div class="ha-card-name-row">'
+                    + '<span class="ha-card-name">' + esc(u.nickname) + '</span>'
+                    + (badges ? '<span class="ha-card-badges ha-card-badges-inline">' + badges + '</span>' : '')
+                    + '</div>'
+                    + '<div class="ha-card-sub">ID ' + esc(fmtUid(u.id)) + '</div>'
                     + '</div></div>'
                     + '<div class="ha-card-meta">'
-                    + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">用户 ID</span>'
-                    + '<span class="ha-card-meta-v">' + esc(fmtUid(u.id)) + '</span></div>'
                     + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">积分</span>'
                     + '<span class="ha-card-meta-v">' + esc(u.points || 0) + '</span></div>'
                     + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">注册</span>'
                     + '<span class="ha-card-meta-v">' + esc(regDate) + '</span></div>'
                     + '</div>'
-                    + '<div class="ha-modal-actions">'
-                    + '<button class="ha-btn ha-btn-ghost" onclick="HaChat.closeModal()">关闭</button>'
-                    // v1.1.24 联系人：加为联系人。
-                    // ⚠️ 加/删是**互斥**的：已是联系人时只给「删除联系人」，避免出现两个都能点的按钮
-                    //   （服务端也会拒，但前端不该留下必然报错的入口）。
-                    // 删除走 HaApi.secure —— friend_remove 在 $SENSITIVE 内，需一次性票据。
-                    + (canPm
-                        ? (u.is_friend
-                            ? '<button class="ha-btn ha-btn-ghost" onclick="HaChat.removeFriend(' + (u.id) + ')">删除联系人</button>'
-                            : '<button class="ha-btn ha-btn-ghost" onclick="HaChat.addFriend(' + (u.id) + ')">加为联系人</button>')
-                        : '')
-                    + (canPm ? '<button class="ha-btn ha-btn-primary" onclick="HaChat.closeModal();HaChat.openDm(\'user:' + (u.id) + '\',' + JSON.stringify(u.nickname).replace(/"/g, '&quot;') + ')">发私信</button>' : '')
-                    + '</div>'
+                    // v1.2.23：插件内容锚点（个性签名等）。
+                    // 由来：signature 插件原先靠 `modal.querySelector('p')` 定位，
+                    // v1.1.9 资料卡重做布局后 <p> 被 .ha-card-meta 取代 → 拿到 null
+                    // → 静默 return，签名从此不再显示。给个稳定 id 让插件不再猜结构。
+                    + '<div id="haCardExtras"></div>'
+                    + (acts ? '<div class="ha-modal-actions">' + acts + '</div>' : '')
                 );
                 // 绑定隐藏 file input：选图后走**与设置页完全相同**的裁剪轮子
                 if (isMe) {

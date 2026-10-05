@@ -413,7 +413,28 @@ input[type=range] {
     font-size: 17px; font-weight: 600; color: var(--ha-text-title);
     word-break: break-all; line-height: 1.4;
 }
+/* v1.2.23：昵称 + 身份标签同一行（标签在昵称右侧）。
+   只用于**用户资料卡** —— 群资料卡仍是「群名一行 + 类型标签一行」，
+   没有 .ha-card-name-row，不受影响。
+   ⚠️ min-width:0 必写：flex item 默认 min-width:auto，长昵称不会换行而是把行撑出去。
+   ⚠️ .ha-card-badges 自带 margin-top:6px（给「独立一行」用的），
+   进到同一行里必须清掉，否则标签比昵称低 6px 看着是歪的。 */
+.ha-card-name-row {
+    display: flex; display: -webkit-flex;
+    align-items: center; -webkit-align-items: center;
+    flex-wrap: wrap; -webkit-flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+}
+.ha-card-name-row .ha-card-name { min-width: 0; }
+/* 昵称下方的 ID 行：比昵称小一档、用次要文字色，避免和昵称抢权重 */
+.ha-card-sub { margin-top: 4px; font-size: 12px; color: var(--ha-text-sub); }
 .ha-card-badges { margin-top: 6px; display: flex; display: -webkit-flex; flex-wrap: wrap; -webkit-flex-wrap: wrap; gap: 6px; align-items: center; -webkit-align-items: center; }
+/* ⚠️ 必须写在 .ha-card-badges **之后**：两者同为单类选择器（特异性 0,0,1,0），
+   靠源码顺序定胜负。写在前面会被 .ha-card-badges 的 margin-top:6px 盖掉，
+   表现为「标签比昵称中心低 3px」（align-items:center 下 margin 只体现为半个偏移），
+   肉眼是歪的但断言 top 差 <8px 却会通过 —— 判这类问题要直接读 marginTop。 */
+.ha-card-badges-inline { margin-top: 0; }
 /* 资料明细：改竖排文本为「标签 : 值」两列，视觉上与头部区分层 */
 .ha-card-meta {
     border-top: 1px solid var(--ha-border);
