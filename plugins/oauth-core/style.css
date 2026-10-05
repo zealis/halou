@@ -1,0 +1,72 @@
+/* 第三方应用授权 · 样式（oauth-core 插件）
+ *
+ * ⚠️ 插件 CSS 在核心 halou.css **之后**加载，同特异性时插件胜出；
+ *    但仍必须用 oa- 前缀限定作用域，**不要写裸 ha- 类**去覆盖核心组件
+ *    （比如这里刻意不复用 .ha-sr-tag，改用 .ha-oa-badge）。
+ *    弹窗内容挂在 body 下（不在任何插件容器里），所以作用域靠**类名前缀**保证。
+ */
+
+/* ---------- 应用行 ---------- */
+.ha-oa-row {
+    display: flex; display: -webkit-flex;
+    align-items: flex-start; -webkit-align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--ha-border);
+}
+.ha-oa-row:last-child { border-bottom: none; }
+.ha-oa-icon {
+    flex-shrink: 0; -webkit-flex-shrink: 0;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--ha-bg-sub);
+    color: var(--ha-text-sub);
+    font-size: 15px;
+    line-height: 32px;
+    text-align: center;
+}
+.ha-oa-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ha-oa-main { flex: 1; -webkit-flex: 1; min-width: 0; }
+.ha-oa-name {
+    font-size: 14px;
+    color: var(--ha-text-title);
+    display: flex; display: -webkit-flex;
+    align-items: center; -webkit-align-items: center;
+    gap: 6px;
+}
+/* 「已授权」徽标：用插件自己的类，不借用搜索结果的 .ha-sr-tag */
+.ha-oa-name .ha-oa-badge {
+    flex-shrink: 0; -webkit-flex-shrink: 0;
+    padding: 0 5px;
+    font-size: 11px;
+    line-height: 17px;
+    border-radius: 3px;
+    color: #237804;
+    background: rgba(35, 120, 4, .10);
+}
+.ha-oa-desc { font-size: 12px; color: var(--ha-text-sub); margin-top: 2px; }
+.ha-oa-scopes { font-size: 11px; color: var(--ha-text-sub); margin-top: 3px; word-break: break-all; }
+.ha-oa-ops { flex-shrink: 0; -webkit-flex-shrink: 0; }
+
+/* ---------- 权限勾选 ---------- */
+.ha-oa-scopes-box {
+    border: 1px solid var(--ha-border);
+    border-radius: 6px;
+    max-height: 260px;
+    overflow-y: auto;
+    margin-bottom: 14px;
+}
+.ha-oa-scope {
+    display: flex; display: -webkit-flex;
+    align-items: flex-start; -webkit-align-items: flex-start;
+    gap: 8px;
+    padding: 9px 11px;
+    border-bottom: 1px solid var(--ha-border);
+    margin: 0;              /* 覆盖 .ha-form-item label 的 margin-bottom */
+    cursor: pointer;
+}
+.ha-oa-scope:last-child { border-bottom: none; }
+.ha-oa-scope input { margin: 2px 0 0; flex-shrink: 0; -webkit-flex-shrink: 0; }
+.ha-oa-scope-t { font-size: 13px; color: var(--ha-text); }
+.ha-oa-scope-d { display: block; font-size: 12px; color: var(--ha-text-sub); margin-top: 1px; }

@@ -1202,53 +1202,8 @@ input[type=range] {
    这里删除旧的 haMsgJump 动画 —— 引用跳转与搜索跳转已合并为同一个轮子
    （HaChat.locateMsg），两处高亮样式必须一致，不能各留一套。 */
 
-/* ---------- 第三方应用授权（v1.2.36） ---------- */
-.ha-oa-row {
-    display: flex; display: -webkit-flex;
-    align-items: flex-start; -webkit-align-items: flex-start;
-    gap: 10px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--ha-border);
-}
-.ha-oa-row:last-child { border-bottom: none; }
-.ha-oa-icon {
-    flex-shrink: 0; -webkit-flex-shrink: 0;
-    width: 32px; height: 32px;
-    border-radius: 8px;
-    overflow: hidden;
-    background: var(--ha-bg-sub);
-    color: var(--ha-text-sub);
-    font-size: 15px;
-    line-height: 32px;
-    text-align: center;
-}
-.ha-oa-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.ha-oa-main { flex: 1; -webkit-flex: 1; min-width: 0; }
-.ha-oa-name { font-size: 14px; color: var(--ha-text-title); display: flex; align-items: center; gap: 6px; }
-.ha-oa-desc { font-size: 12px; color: var(--ha-text-sub); margin-top: 2px; }
-.ha-oa-scopes { font-size: 11px; color: var(--ha-text-sub); margin-top: 3px; word-break: break-all; }
-.ha-oa-ops { flex-shrink: 0; -webkit-flex-shrink: 0; }
-/* 权限勾选框：.ha-form-item label 的 display:block 会破坏同行排版，这里显式 flex */
-.ha-oa-scopes-box {
-    border: 1px solid var(--ha-border);
-    border-radius: 6px;
-    max-height: 260px;
-    overflow-y: auto;
-    margin-bottom: 14px;
-}
-.ha-oa-scope {
-    display: flex; -webkit-flex;
-    align-items: flex-start; -webkit-align-items: flex-start;
-    gap: 8px;
-    padding: 9px 11px;
-    border-bottom: 1px solid var(--ha-border);
-    margin: 0;
-    cursor: pointer;
-}
-.ha-oa-scope:last-child { border-bottom: none; }
-.ha-oa-scope input { margin: 2px 0 0; flex-shrink: 0; }
-.ha-oa-scope-t { font-size: 13px; color: var(--ha-text); }
-.ha-oa-scope-d { display: block; font-size: 12px; color: var(--ha-text-sub); margin-top: 1px; }
+/* v1.2.37：第三方应用授权的样式已随该功能一起移入插件 oauth-core/style.css
+   （作用域靠 ha-oa- 前缀限定，插件未启用时根本不加载） */
 
 .ha-input-resize {
     position: absolute;

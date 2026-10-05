@@ -1055,9 +1055,10 @@ class Chat
                          FROM messages WHERE room_id IN ($in) AND type IN ('text','mention')
                          AND content LIKE ? ORDER BY id DESC LIMIT 40", $args);
                     $hidden = self::hiddenIds($actor);
+                    $avs = self::avatarMap($rows);
                     foreach ($rows as $m) {
                         if (isset($hidden[(int)$m['id']])) continue;   // 我隐藏过的，别再搜出来
-                        $out[] = self::srMsg($m, 0, '');
+                        $out[] = self::srMsg($m, 0, '', $avs);
                     }
                 }
                 // 私聊消息：只搜涉及我的
@@ -1069,12 +1070,13 @@ class Chat
                          AND (user_id=? OR to_user_id=?) AND content LIKE ?
                          ORDER BY id DESC LIMIT 40", [$me, $me, $like]);
                     $hidden = self::hiddenIds($actor);
+                    $avs2 = self::avatarMap($rows);
                     foreach ($rows as $m) {
                         if (isset($hidden[(int)$m['id']])) continue;
                         $sentByMe = (int)($m['user_id'] ?? 0) === $me;
                         $pId = $sentByMe ? (int)($m['to_user_id'] ?? 0) : (int)($m['user_id'] ?? 0);
                         if ($pId <= 0) continue;
-                        $out[] = self::srMsg($m, 0, 'user:' . $pId);
+                        $out[] = self::srMsg($m, 0, 'user:' . $pId, $avs2);
                     }
                 }
                 return $out;
@@ -1108,27 +1110,55 @@ class Chat
                 $out = [];
                 foreach ($rows as $m) {
                     if (isset($hidden[(int)$m['id']])) continue;
-                    $out[] = self::srMsg($m, $roomId, $peer);
+                    $out[] = self::srMsg($m, $roomId, $peer, self::avatarMap($rows));
                 }
                 return $out;
         }
     }
 
     /** 搜索结果里的消息项（统一形状） */
-    private static function srMsg(array $m, int $roomId, string $peer): array
+    private static function srMsg(array $m, int $roomId, string $peer, array $avatars = []): array
     {
         $text = (string)($m['content'] ?? '');
         // 文件/图片类不进搜索（type 已限定 text/mention，这里只是兜底）
         $snippet = mb_strlen($text) > 80 ? mb_substr($text, 0, 80) . '…' : $text;
+        $uid = (int)($m['user_id'] ?? 0);
         return [
             'type' => 'msg',
             'msg_id' => (int)$m['id'],
             'room_id' => (int)($m['room_id'] ?? 0),
             'peer' => $peer,
             'from' => (string)($m['nickname'] ?? ''),
+            // v1.2.37：带发送者头像（一次性批量查表传入，避免每行一次查询）。
+            // 游客消息没有用户身份，$avatars 里查不到 → 前端回退字母头像。
+            'avatar' => $uid > 0 ? (string)($avatars[$uid] ?? '') : '',
+            'user_id' => $uid,
             'text' => $snippet,
             'created_at' => (int)($m['created_at'] ?? 0),
         ];
+    }
+
+    /**
+     * 批量取一组用户 id 的头像（user_id => avatar 相对路径）。
+     * 供搜索结果的消息行显示真实头像；查不到的不进数组。
+     */
+    private static function avatarMap(array $rows): array
+    {
+        $uids = [];
+        foreach ($rows as $m) {
+            $u = (int)($m['user_id'] ?? 0);
+            if ($u > 0) $uids[$u] = true;
+        }
+        if (!$uids) return [];
+        $ids = array_keys($uids);
+        $q = implode(',', array_fill(0, count($ids), '?'));
+        $out = [];
+        try {
+            foreach (DB::all("SELECT id, avatar FROM users WHERE id IN ($q)", $ids) as $u) {
+                if ((string)($u['avatar'] ?? '') !== '') $out[(int)$u['id']] = (string)$u['avatar'];
+            }
+        } catch (Throwable $e) { /* 查询失败就退回字母头像 */ }
+        return $out;
     }
 
     /** 会话排序：**置顶优先**，组内按最后活跃时间倒序；无消息（at=0）的沉底，其内按 id 升序 */

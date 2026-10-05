@@ -255,23 +255,6 @@ class DB
             // 放业务表上会让「A 置顶」影响 B 的列表。
             "CREATE TABLE IF NOT EXISTS conversation_pins (
                 id $id, user_id $int NOT NULL, peer_key $str NOT NULL, created_at $ts NOT NULL)",
-            // 第三方应用授权（v1.2.36）：**只记录「谁把什么权限授予了哪个应用」**，
-            // 令牌与授权码流程由插件自己实现（核心不持有任何 token）。
-            // 设计要点：
-            //  - 一人 + 一应用 = 一条记录，重复授权走 upsert（幂等）。
-            //  - 撤销用 revoked_at 标记而非删行：留审计（谁在什么时候撤的），
-            //    再次授权会清空 revoked_at。
-            //  - scopes 存**已勾选的**权限键（逗号分隔），不是应用声明的全部 ——
-            //    同一个应用两次授权可以给不同范围。
-            //  - app_name/app_desc/icon 冗余快照：插件被停用后，用户的授权记录
-            //    仍要能显示「当年授权了叫什么」，不能变成空白行。
-            "CREATE TABLE IF NOT EXISTS oauth_grants (
-                id $id, user_id $int NOT NULL, plugin_name $str NOT NULL,
-                app_id $str NOT NULL, app_name $str NOT NULL,
-                app_desc $text, icon $text,
-                scopes $text NOT NULL DEFAULT '',
-                created_at $ts NOT NULL, updated_at $ts NOT NULL DEFAULT 0,
-                revoked_at $ts)",
         ];
         foreach ($tables as $sql) self::$pdo->exec($sql);
 
@@ -287,8 +270,6 @@ class DB
             'CREATE UNIQUE INDEX IF NOT EXISTS idx_friends_pair ON friends (user_id, friend_id)',
             // 同一用户对同一会话只能置顶一次，重复点由代码先查后写，这里兜底防重行
             'CREATE UNIQUE INDEX IF NOT EXISTS idx_conv_pins_key ON conversation_pins (user_id, peer_key)',
-            // 授权记录按「用户 + 应用」唯一：配合 upsert 保证重复授权是幂等更新而非插重行
-            'CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_grants_key ON oauth_grants (user_id, plugin_name, app_id)',
         ] as $sql) {
             try { self::$pdo->exec($sql); } catch (Throwable $e) { /* MySQL 8 不支持 IF NOT EXISTS，忽略 */ }
         }

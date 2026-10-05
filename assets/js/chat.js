@@ -3428,12 +3428,42 @@
         /**
          * 执行搜索（竞态保护：只认最后一次请求的结果，先回来的旧请求直接丢弃）
          *
-         * v1.2.32 新增三道限制：
-         *  ① **10 秒一次**：`_srLastAt` 记录上次发起时间，间隔不足直接提示并返回。
-         *     服务端还有一层 10 秒 3 次的限流（防绕过前端直接打接口）。
-         *  ② **输入长度**：输入框 maxlength=50（与服务端一致，服务端再截一次）。
-         *  ③ **字符清洗**：去掉控制字符与 SQL/HTML 符号后再发（后端还会再洗一次）。
+         * v1.2.37 节流改成**递增退避**，不再是「一律 10 秒」：
+         *   第 1、2 次  ��制（正常打字就该能搜）
+         *   第 3 次起   1 秒 → 5 秒 → 25 秒 → 60 秒封顶（×5 递增）
+         * 理由：用户连续改关键词是常态，一律 10 秒会把正常输入全挡掉。
+         * 输入过程另有 300ms 防抖（见 openSearch 的 oninput），所以「停止输入才搜索」
+         * 已经由防抖保证，节流只负责压住「连续回车/连续点」这种高频行为。
+         *
+         * 冷却期间提示**每秒倒计时**，不是干巴巴一句「请 10 秒后再试」。
          */
+        _srCount: 0,          // 已发起过的搜索次数
+        _srCoolUntil: 0,      // 冷却截止时间戳
+        _srCoolTimer: null,   // 倒计时定时器
+
+        /** 递增退避：第 3 次 1s，第 4 次 5s，第 5 次 25s，之后封顶 60s */
+        _srCoolMs: function (n) {
+            if (n < 3) return 0;
+            return Math.min(1000 * Math.pow(5, n - 3), 60000);
+        },
+
+        /** 冷却中的倒计时提示（每秒刷新，到点自动放行） */
+        _srShowCooldown: function (list) {
+            var self = this;
+            if (this._srCoolTimer) { clearInterval(this._srCoolTimer); this._srCoolTimer = null; }
+            var tick = function () {
+                var wait = Math.ceil((self._srCoolUntil - new Date().getTime()) / 1000);
+                if (wait <= 0) {
+                    if (self._srCoolTimer) { clearInterval(self._srCoolTimer); self._srCoolTimer = null; }
+                    if (list) list.innerHTML = '<div class="ha-sr-empty">可以搜索了，回车或继续输入关键词</div>';
+                    return;
+                }
+                if (list) list.innerHTML = '<div class="ha-sr-empty">搜索太频繁，' + wait + ' 秒后可再次搜索</div>';
+            };
+            tick();
+            this._srCoolTimer = setInterval(tick, 1000);
+        },
+
         doSearch: function (kw) {
             var self = this;
             kw = String(kw == null ? '' : kw)
@@ -3448,14 +3478,13 @@
                 if (list) list.innerHTML = '<div class="ha-sr-empty">当前没有打开的聊天，请先点开一个会话，或切换上面的搜索范围</div>';
                 return;
             }
-            // ① 10 秒节流
-            var now = new Date().getTime();
-            if (this._srLastAt && now - this._srLastAt < 10000) {
-                var wait = Math.ceil((10000 - (now - this._srLastAt)) / 1000);
-                if (list) list.innerHTML = '<div class="ha-sr-empty">搜索太频繁，请 ' + wait + ' 秒后再试</div>';
-                return;
-            }
-            this._srLastAt = now;
+            // ① 递增退避冷却
+            if (new Date().getTime() < this._srCoolUntil) { this._srShowCooldown(list); return; }
+            this._srCount++;
+            var cool = this._srCoolMs(this._srCount);
+            if (cool > 0) this._srCoolUntil = new Date().getTime() + cool;
+            else this._srCoolUntil = 0;
+
             var ctx = this.searchContext() || { roomId: 0, peer: '' };
             var mySeq = ++this._srSeq;
             if (list) list.innerHTML = '<div class="ha-sr-empty">搜索中…</div>';
@@ -3525,8 +3554,10 @@
             for (i = from; i < to; i++) {
                 d = this._srData[i];
                 if (d.type === 'msg') {
+                    // v1.2.37：用发送者的真实头像（后端按 user_id 批量带出）；
+                    // 游客消息没有用户身份 → 退回字母头像
                     html += '<div class="ha-sr-item is-msg" data-i="' + i + '">'
-                        + this.srAvatar('', d.from, true, 'guest')
+                        + this.srAvatar(d.avatar || '', d.from, true, d.user_id ? 'user' : 'guest')
                         + '<span class="ha-sr-main">'
                         + '<span class="ha-sr-title">' + esc(d.from) + '<span class="ha-sr-tag">' + (d.room_id ? '群聊' : '私聊') + '</span></span>'
                         + '<span class="ha-sr-sub">' + esc(d.text) + '</span>'
@@ -3722,125 +3753,6 @@
             menu.style.top = Math.max(4, r.top - mh - 8) + 'px';
         },
 
-        /* ---------- 第三方应用授权（v1.2.36） ----------
-           核心只管「授权关系」，令牌与授权码由插件自己实现（见 core/oauth.php 头注释）。
-           这里两屏：
-             ① 应用列表（已授权的显示「已授权」+ 取消按钮，未授权的显示「授权」）
-             ② 授权弹窗：勾选该应用声明的权限项，确认后 POST oauth_grant
-           权限项是**白名单过滤后的子集** —— 服务端只接受应用自己声明过的 key，
-           前端传了别的也存不进去（OAuth::grant 里过滤）。 */
-
-        /** 应用列表 */
-        openOauthApps: function () {
-            var self = this;
-            HaApi.post('oauth_apps', {}, function (r) {
-                if (!r.ok) { toast(r.msg); return; }
-                // ⚠️ 必须缓存：授权/取消都要按 data-i 索引回这里取应用信息
-                self._oaApps = r.data || [];
-                self.renderOauthApps(self._oaApps);
-            });
-        },
-
-        renderOauthApps: function (list) {
-            var self = this;
-            if (!list.length) {
-                this.openModal('<h3>第三方授权</h3>'
-                    + '<div class="ha-panel-empty">还没有可授权的应用。装了带「应用授权」能力的插件后，这里会出现条目。</div>', 420);
-                return;
-            }
-            var html = '<h3>第三方授权</h3>', i, a;
-            for (i = 0; i < list.length; i++) {
-                a = list[i];
-                html += '<div class="ha-oa-row' + (a.granted ? ' is-granted' : '') + '">'
-                    + '<div class="ha-oa-icon">' + (a.icon
-                        ? '<img src="' + esc(a.icon) + '" alt="">'
-                        : '<span>' + esc((a.name || '?').charAt(0)) + '</span>') + '</div>'
-                    + '<div class="ha-oa-main">'
-                    + '<div class="ha-oa-name">' + esc(a.name) + (a.granted ? '<span class="ha-sr-tag">已授权</span>' : '') + '</div>'
-                    + (a.desc ? '<div class="ha-oa-desc">' + esc(a.desc) + '</div>' : '')
-                    + (a.granted && a.granted_scopes ? '<div class="ha-oa-scopes">已授予：' + esc(a.granted_scopes) + '</div>' : '')
-                    + '</div>'
-                    + '<div class="ha-oa-ops">'
-                    + (a.granted
-                        ? '<button class="ha-btn ha-btn-ghost ha-btn-mini" data-op="revoke" data-i="' + i + '">取消授权</button>'
-                        : '<button class="ha-btn ha-btn-primary ha-btn-mini" data-op="grant" data-i="' + i + '">授权</button>')
-                    + '</div></div>';
-            }
-            this.openModal(html, 420);
-            var box = $('haModal');
-            box.onclick = function (e) {
-                var t = e.target;
-                while (t && t !== box && !(t.getAttribute && t.getAttribute('data-op'))) t = t.parentNode;
-                if (!t || t === box) return;
-                var idx = parseInt(t.getAttribute('data-i'), 10);
-                if (!self._oaApps || !self._oaApps[idx]) return;
-                if (t.getAttribute('data-op') === 'revoke') self.revokeOauth(self._oaApps[idx]);
-                else self.openOauthGrant(self._oaApps[idx]);
-            };
-        },
-
-        /** 授权弹窗：勾选权限 */
-        openOauthGrant: function (app) {
-            var self = this;
-            if (!app.scopes || !app.scopes.length) {
-                toast('该应用没有声明任何权限');
-                return;
-            }
-            var granted = String(app.granted_scopes || '').split(',');
-            var html = '<h3>授权「' + esc(app.name) + '」</h3>', i, s;
-            if (app.desc) html += '<p class="ha-modal-desc">' + esc(app.desc) + '</p>';
-            html += '<div class="ha-oa-scopes-box">';
-            for (i = 0; i < app.scopes.length; i++) {
-                s = app.scopes[i];
-                // 之前授权过就预勾上，方便「改权限」而不是每次从零勾
-                var on = app.granted ? (granted.indexOf(s.key) >= 0) : true;
-                html += '<label class="ha-oa-scope"><input type="checkbox" value="' + esc(s.key) + '"'
-                    + (on ? ' checked' : '') + '>'
-                    + '<span class="ha-oa-scope-t">' + esc(s.name) + '</span>'
-                    + (s.desc ? '<span class="ha-oa-scope-d">' + esc(s.desc) + '</span>' : '')
-                    + '</label>';
-            }
-            html += '</div>'
-                + '<div class="ha-modal-actions">'
-                + '<button class="ha-btn ha-btn-ghost" onclick="HaChat.closeModal()">取消</button>'
-                + '<button class="ha-btn ha-btn-primary" onclick="HaChat.submitOauthGrant(\'' + app.id + '\')">确认授权</button>'
-                + '</div>';
-            this.openModal(html, 400);
-        },
-
-        submitOauthGrant: function (appId) {
-            var self = this;
-            var list = this._oaApps || [], app = null, i;
-            for (i = 0; i < list.length; i++) { if (list[i].id === appId) { app = list[i]; break; } }
-            if (!app) { toast('应用不存在'); return; }
-            var boxes = document.getElementsByClassName('ha-oa-scope'), scopes = [];
-            for (i = 0; i < boxes.length; i++) {
-                var cb = boxes[i].querySelector('input[type=checkbox]');
-                if (cb && cb.checked) scopes.push(cb.value);
-            }
-            if (!scopes.length) { toast('请至少勾选一项权限'); return; }
-            HaApi.post('oauth_grant', {
-                plugin: app.plugin || '', app_id: app.id, scopes: scopes
-            }, function (r) {
-                if (!r.ok) { toast(r.msg); return; }
-                toast(r.msg || '已授权');
-                self.openOauthApps();      // 回到列表刷新状态
-            });
-        },
-
-        /** 取消授权（二次确认） */
-        revokeOauth: function (app) {
-            var self = this;
-            this.confirm('确定取消对「' + (app.name || '该应用') + '」的授权？\n'
-                + '取消后该应用将无法访问你的数据。', function () {
-                HaApi.post('oauth_revoke', { plugin: app.plugin || '', app_id: app.id }, function (r) {
-                    if (!r.ok) { toast(r.msg); return; }
-                    toast(r.msg || '已取消授权');
-                    self.openOauthApps();
-                });
-            });
-        },
-
         openSettings: function () {
             var me = this.cfg.me;
             if (!me) return;
@@ -3854,12 +3766,13 @@
                 + '</div>'
                 + '<div class="ha-form-item"><label>昵称</label><input class="ha-input" id="haSetNick" value="' + esc(me.nickname) + '">'
                 + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">2-20 个字符，支持中英文、数字、下划线与短横线，不含空格或 @；允许重名。</p></div>'
-                // v1.2.36：第三方应用授权入口（放昵称之后、保存之前 —— 它是「账号」类设置，
-                // 不属于资料编辑本身；真正的授权管理在独立弹窗里做）
-                + '<div class="ha-form-item"><label>第三方授权</label>'
-                + '<button class="ha-btn ha-btn-ghost ha-btn-block" onclick="HaChat.openOauthApps()">管理应用授权</button>'
-                + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">'
-                + '把资料、聊天记录等权限授予你安装的插件应用；随时可在此取消。</p></div>'
+                // v1.2.37：第三方应用授权已剥离为插件 oauth-core，**按需加载**。
+                // 入口按钮按 window.HaOauth 是否存在来渲染 —— 插件停用时它的 chat.js
+                // 不加载，这里自然什么都不显示，核心不需要任何开关判断。
+                + ((w.HaOauth) ? '<div class="ha-form-item"><label>第三方授权</label>'
+                    + '<button class="ha-btn ha-btn-ghost ha-btn-block" onclick="HaOauth.open()">管理应用授权</button>'
+                    + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">'
+                    + '把资料、聊天记录等权限授予你安装的插件应用；随时可在此取消。</p></div>' : '')
                 + '<button class="ha-btn ha-btn-primary ha-btn-block" onclick="HaChat.saveSettings()">保存</button>'
             );
             var self = this;
@@ -4477,12 +4390,15 @@
             }
             if (!group) return;   // 没有任何插件声明后台页面 → 插件管理是普通菜单项
             var willOpen = forceOpen ? true : group.className.indexOf('ha-group-open') < 0;
-            group.className = trimCls((group.className.replace(/\bow-group-open\b/g, ''))
+            // ⚠️ 正则里的类名必须与上面 if 判断、以及 CSS 里的**完全一致**：
+            //   写错一个字母（曾写成 \bow-group-open，实际是 ha-group-open）会导致
+            //   类名只增不减 → 点标题收起无效、越点越开，且不报任何错。
+            group.className = trimCls((group.className.replace(/\bha-group-open\b/g, ''))
                 + (willOpen ? ' ha-group-open' : ''));
             for (i = 0; i < all.length; i++) {
                 el = all[i];
                 if (el.className.indexOf('ha-admin-sub') < 0) continue;
-                el.className = trimCls((el.className.replace(/\bow-sub-open\b/g, ''))
+                el.className = trimCls((el.className.replace(/\bha-sub-open\b/g, ''))
                     + (willOpen ? ' ha-sub-open' : ''));
             }
             // 记录展开状态：刷新后恢复
