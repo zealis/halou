@@ -98,6 +98,14 @@ if ($installed && $dbOk && !$user) {
 $actor = Auth::actor($user, $guest);
 if ($installed && $dbOk) Plugin::init($CFG['plugin_dir'], $CFG['data_dir'] . '/cache');
 
+// v1.2.42：用户活跃钩子 —— 等级信任插件据此把「今日已登录」计入每日任务。
+// 为什么放在这里而不是只挂 login.after_verify：登录态是**会话**，用户开着页面
+// 第二天继续用不会再走一次「登录」，只挂登录钩子会漏掉绝大多数活跃日。
+// 每请求触发一次，插件内部按自然日去重；游客没有等级，不触发。
+if ($installed && $dbOk && ($actor['kind'] ?? '') === 'user') {
+    Plugin::fire('user.active', [$actor]);
+}
+
 $action = $_GET['action'] ?? '';
 $page = $_GET['page'] ?? 'chat';
 
@@ -579,6 +587,10 @@ if ($action !== '') {
             }
             if ($actor['kind'] !== 'user') Api::json(['ok' => false, 'msg' => '请先登录']);
             if (empty($_FILES['file'])) Api::json(['ok' => false, 'msg' => '未接收到文件']);
+            // v1.2.42：上传闸门（等级信任插件按等级限制头像/贴纸 —— 见设计文档「五次功能解锁」）
+            $allowUpload = true; $uploadReason = '';
+            Plugin::fire('upload.guard', [&$allowUpload, &$uploadReason, $kind, $actor]);
+            if (!$allowUpload) Api::json(['ok' => false, 'msg' => $uploadReason !== '' ? $uploadReason : '当前等级无法使用该上传功能']);
             [$ok, $urlOrMsg] = Upload::handle($_FILES['file'], $kind);
             Api::json($ok ? ['ok' => true, 'url' => $urlOrMsg] : ['ok' => false, 'msg' => $urlOrMsg]);
 
@@ -588,6 +600,10 @@ if ($action !== '') {
             if ($actor['role'] !== 'admin' && DB::setting('room_create_allow', '1') !== '1') {
                 Api::json(['ok' => false, 'msg' => '站点未开放用户创建群聊']);
             }
+            // v1.2.42：建群闸门（等级信任插件按等级限制可建群数量 —— 见设计文档「五次功能解锁」）
+            $allowCreate = true; $createReason = '';
+            Plugin::fire('room.create.guard', [&$allowCreate, &$createReason, $actor]);
+            if (!$allowCreate) Api::json(['ok' => false, 'msg' => $createReason !== '' ? $createReason : '当前等级无法创建更多群聊']);
             $name = trim($p('name'));
             /* v1.2.19：群名称改为**可选**。留空时自动命名为「<昵称>的群聊」。
                原先强制 2-30 字符，等于逼用户先想好名字才能建群 ——
@@ -693,6 +709,12 @@ if ($action !== '') {
             $info = json_decode((string)$msg['content'], true);
             $abs  = Upload::fileAbs((string)($info['path'] ?? ''));
             if (!$abs) Api::json(['ok' => false, 'msg' => '文件不存在']);
+            // v1.2.42：下载完成钩子（等级信任插件据此记「今日下载文件」任务）。
+            // 放在权限与文件存在性校验**之后** —— 失败的下载不该算完成任务。
+            // 上传者下载自己的文件由插件自行排除（设计文档：禁止刷任务）。
+            if (($actor['kind'] ?? '') === 'user') {
+                Plugin::fire('file.downloaded', [(int)$actor['id'], (int)$msg['id'], (int)($msg['user_id'] ?? 0)]);
+            }
             $name = preg_replace('/[\r\n"]/', '', (string)($info['name'] ?? 'file'));
             header('Content-Type: application/octet-stream');
             header('Content-Length: ' . filesize($abs));
@@ -733,6 +755,10 @@ if ($action !== '') {
                     $u['is_friend'] = (int)$has > 0;
                 }
             }
+            // v1.2.42：插件可向资料卡补充字段（等级信任插件在这里挂上等级 Lv.N）。
+            // 用 fire + 引用参数：$u 是**按引用**传的，插件改写它即可随 user_card 一起下发，
+            // 前端无需再打一次接口。游客的 user_card 请求不会走到这里（本 case 要求用户存在）。
+            Plugin::fire('user.card', [&$u, $actor]);
             Api::json(['ok' => true, 'data' => $u]);
 
         // ---------- IP 归属地：核心不再内置实现（原依赖第三方 ip-api.com），
@@ -1162,6 +1188,10 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
         'version' => HALOU_VERSION,
     ];
     // 插件资源必须在 HaChat.init 之后引入：插件脚本依赖 HaChat.cfg 判断场景
+    // ⚠️ 打标记：插件（如 twofa）会用 page.footer 再补一份合并资源给「登录页」用，
+    //    不标记的话聊天页会**加载两遍**合并包 —— 插件 JS 跑两次，
+    //    凡「往数组里注册」的扩展点（onCardMetaTop 等）都会重复注册一行。
+    define('HALOU_ASSETS_JS_EMITTED', true);
     echo '<script src="assets/js/chat.js?v=' . HALOU_VERSION . '"></script>'
        . '<script>HaChat.init(' . json_encode($boot, JSON_UNESCAPED_UNICODE) . ');</script>'
        . '<script src="?action=assets&type=js"></script>';
@@ -1196,6 +1226,9 @@ function renderAdmin(array $actor): void
             . '<span class="ha-admin-ico">' . ow_icon('puzzle', 14) . '</span>'
             . '<span class="ha-admin-label">' . Sec::e($offName) . '（未启用）</span></li>';
     }
+    // ⚠️ 同 renderChat()：标记「合并资源已输出」，阻止插件在 page.footer 里再补一份
+    //    （否则后台页也会把插件 JS 跑两遍）。用 if 包裹避免同请求内重复 define 报警告。
+    if (!defined('HALOU_ASSETS_JS_EMITTED')) define('HALOU_ASSETS_JS_EMITTED', true);
     echo '<body class="ha-admin-body">'
        // 移动端顶栏：汉堡开关 + 标题 + 返回前台（桌面端隐藏，侧栏常驻）
        . '<div class="ha-admin-bar">'

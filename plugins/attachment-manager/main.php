@@ -146,10 +146,21 @@ function haATEnabled(): bool
     return haATConfig()['enabled'] === '1';
 }
 
-/** 单文件体积上限（字节） */
-function haATMaxBytes(): int
+/**
+ * 单文件体积上限（字节）。
+ * v1.2.42：$actor 非空时先过 `upload.maxsize` 钩子 —— 等级信任插件会按等级
+ * **下调**上限（设计文档「五次功能解锁」：3 级起 1/4 全局上限、10 级起 1/2）。
+ * 只接受「比全局更小」的值：插件放行不了比站点配置更大的文件，避免越权。
+ */
+function haATMaxBytes(?array $actor = null): int
 {
-    return haATConfig()['max_mb'] * 1048576;
+    $max = (int)haATConfig()['max_mb'] * 1048576;
+    if ($actor !== null) {
+        $tmp = $max;
+        Plugin::fire('upload.maxsize', [&$tmp, $actor]);
+        if ($tmp > 0 && $tmp < $max) $max = $tmp;
+    }
+    return $max;
 }
 
 /** 当前允许的扩展名（后台配置 ∩ 安全表） */
@@ -179,14 +190,15 @@ function haATRealMime(string $path): string
  * 存图片消息：复用核心 Upload（头像/贴纸同一条本地存储通道），
  * 这里额外先卡一次体积上限（配置项在插件里，不能指望核心再读）。
  */
-function haATStoreImage(array $f): array
+function haATStoreImage(array $f, ?array $actor = null): array
 {
     if (!haATEnabled()) return [false, '站点已关闭附件上传'];
     $err = (int)($f['error'] ?? UPLOAD_ERR_NO_FILE);
     if ($err !== UPLOAD_ERR_OK) return [false, '上传失败（错误码 ' . $err . '）'];
     $tmp = (string)($f['tmp_name'] ?? '');
-    if ($tmp !== '' && is_file($tmp) && (int)@filesize($tmp) > haATMaxBytes()) {
-        return [false, '图片超过 ' . haATConfig()['max_mb'] . ' MB 限制'];   // 这里用配置值（已是 MB）
+    $max = haATMaxBytes($actor);
+    if ($tmp !== '' && is_file($tmp) && (int)@filesize($tmp) > $max) {
+        return [false, '图片超过 ' . round($max / 1048576, 1) . ' MB 限制'];
     }
     return Upload::handle($f, 'image');   // 核心内部还会做「仅 jpg/png/gif/webp」校验
 }
@@ -197,7 +209,7 @@ function haATStoreImage(array $f): array
  *          ③ 双重白名单（后台配置 ∩ 内置安全表）④ 随机重命名 + 年月目录
  *          ⑤ 目录写 index.html 防列举
  */
-function haATStoreFile(array $f): array
+function haATStoreFile(array $f, ?array $actor = null): array
 {
     if (!haATEnabled()) return [false, '站点已关闭附件上传'];
     $err = (int)($f['error'] ?? UPLOAD_ERR_NO_FILE);
@@ -206,7 +218,7 @@ function haATStoreFile(array $f): array
     $orig = (string)($f['name'] ?? 'file');
     if ($tmp === '' || !is_file($tmp)) return [false, '临时文件不可读'];
 
-    $max  = haATMaxBytes();
+    $max  = haATMaxBytes($actor);
     $size = (int)@filesize($tmp);
     if ($size <= 0) return [false, '文件内容为空'];
     if ($size > $max) return [false, '文件超过 ' . round($max / 1048576) . ' MB 限制'];   // ⚠️ $max 是字节，别直接当 MB 显示
@@ -255,7 +267,10 @@ $atGuard = function (array $ctx): bool {
 Plugin::route('plugin_attachment_manager_upload', function (array $ctx) use ($atGuard) {
     if (!$atGuard($ctx)) Api::json(['ok' => false, 'msg' => '请先登录'], 403);
     if (empty($ctx['files']['file'])) Api::json(['ok' => false, 'msg' => '未接收到文件'], 400);
-    [$ok, $urlOrMsg] = haATStoreImage($ctx['files']['file']);
+    $allowAtt = true; $attReason = '';
+    Plugin::fire('attachment.guard', [&$allowAtt, &$attReason, $ctx['actor']]);
+    if (!$allowAtt) Api::json(['ok' => false, 'msg' => $attReason !== '' ? $attReason : '当前等级无法上传图片'], 403);
+    [$ok, $urlOrMsg] = haATStoreImage($ctx['files']['file'], $ctx['actor']);
     if (!$ok) Api::json(['ok' => false, 'msg' => $urlOrMsg], 400);
     Api::json(['ok' => true, 'url' => $urlOrMsg]);
 });
@@ -266,9 +281,19 @@ Plugin::route('plugin_attachment_manager_upload_file', function (array $ctx) use
     if (!Sec::rateLimit('upload_file', $ctx['actor']['kind'] . ($ctx['actor']['id'] ?? '') . '|' . Sec::ip(), 60, 20)) {
         Api::json(['ok' => false, 'msg' => '上传过于频繁，请稍后再试'], 429);
     }
-    [$ok, $res] = haATStoreFile($ctx['files']['file']);
+    // v1.2.42：附件闸门（等级信任插件按等级限制文件上传）。
+    //   单独给「能否上传」一个钩子，而不是只靠 upload.maxsize 把上限压到 0 ——
+    //   后者用户看到的会是「文件超过 0 MB 限制」这种莫名其妙的提示。
+    $allowAtt = true; $attReason = '';
+    Plugin::fire('attachment.guard', [&$allowAtt, &$attReason, $ctx['actor']]);
+    if (!$allowAtt) Api::json(['ok' => false, 'msg' => $attReason !== '' ? $attReason : '当前等级无法上传文件'], 403);
+    [$ok, $res] = haATStoreFile($ctx['files']['file'], $ctx['actor']);
     if (!$ok) Api::json(['ok' => false, 'msg' => $res], 400);
     Sec::log('upload_file', $ctx['actor']['nickname'], ['size' => $res['size'], 'ext' => $res['ext']]);
+    // v1.2.42：上传成功事件（等级信任插件据此外挂「今日上传文件」任务）
+    if (($ctx['actor']['kind'] ?? '') === 'user') {
+        Plugin::fire('file.uploaded', [(int)$ctx['actor']['id'], 'file', (int)$res['size']]);
+    }
     Api::json(['ok' => true, 'file' => $res]);
 });
 

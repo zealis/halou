@@ -61,6 +61,10 @@ class Chat
         $u = DB::one('SELECT id, nickname, status FROM users WHERE id=?', [$friendId]);
         if (!$u) return [false, '该用户不存在'];
         if ((int)$u['status'] !== 1) return [false, '该用户已被封禁，无法添加'];
+        // v1.2.42：加好友闸门（等级信任插件按等级限制 —— 见设计文档「第 2 次解锁：10 级起可加好友」）
+        $allowFriend = true; $friendReason = '';
+        Plugin::fire('friend.guard', [&$allowFriend, &$friendReason, $actor, $friendId]);
+        if (!$allowFriend) return [false, $friendReason !== '' ? $friendReason : '当前等级暂不能添加好友'];
         $has = DB::val('SELECT id FROM friends WHERE user_id=? AND friend_id=?', [$me, $friendId]);
         if ((int)$has > 0) return [false, '已经是联系人了'];   // 幂等：不重复插
         DB::run('INSERT INTO friends (user_id, friend_id, created_at) VALUES (?,?,?)',
@@ -571,7 +575,10 @@ class Chat
         ]);
         // v1.1.0：游客每日计数（daily_count）已随「每日限额」下线而废弃，
         // 改为在 Sec::rateLimit('guest_gap', …) 里按间隔限流，无需再更新 guests 表。
-        Plugin::fire('message.after_send', [$id, $actor, $roomId]);
+        // v1.2.42：追加 $content / $type / $toUserId —— 等级信任插件要做「有效发言判定」
+        // （长度、纯表情、纯链接、内容去重），只有 id 就得回查一次 messages，
+        // 每条消息多一发 SQL 不划算。参数是**追加**，老插件的多余形参不受影响。
+        Plugin::fire('message.after_send', [$id, $actor, $roomId, $content, $type, $toUserId]);
         return [true, 'ok', $id];
     }
 

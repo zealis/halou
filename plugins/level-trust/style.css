@@ -1,0 +1,41 @@
+/* ---------- 等级信任（level-trust） ----------
+   作用域：全部类名以 ha-lt- 前缀限定。资料卡的行由核心「扩展点」插到
+   .ha-card-meta 的第一行，所以这里不需要依赖任何核心容器 id —— 弹窗挂在
+   body 下，靠容器限定作用域是做不到的。
+   阶段配色按「阶段号」走：1 新手灰蓝 / 2 日常主色 / 3 活跃青 / 4 核心紫 / 5 荣誉金。 */
+
+.ha-lt-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-size: 12px;
+    line-height: 18px;
+    font-weight: 600;
+    color: #FFFFFF;
+    background: #8E8EA0;                 /* 兜底（未知阶段） */
+    vertical-align: 1px;                 /* 与右侧「阶段名」文字基线对齐 */
+}
+
+.ha-lt-s1 { background: #9AA5B1; }       /* 新手阶段 1-5   */
+.ha-lt-s2 { background: #0099FF; }       /* 日常阶段 6-15  —— 主色 --ha-primary-strong */
+.ha-lt-s3 { background: #13A8A8; }       /* 活跃阶段 16-30 */
+.ha-lt-s4 { background: #7A5AF8; }       /* 核心阶段 31-45 */
+.ha-lt-s5 { background: #D4A017; }       /* 荣誉阶段 46+   */
+
+/* 60 级荣誉标识：金底 + 描边，与普通荣誉阶段区分 */
+.ha-lt-badge.ha-lt-honor {
+    background: linear-gradient(180deg, #E8B923, #C98A00);
+    box-shadow: 0 0 0 1px rgba(180, 120, 0, .35);
+}
+
+.ha-lt-stage { font-size: 12px; color: #5C5C5C; margin-left: 6px; }
+
+/* 后台：任务进度条 */
+.ha-lt-tasks { margin-top: 8px; }
+.ha-lt-task {
+    display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center;
+    gap: 8px; font-size: 13px; padding: 3px 0;
+}
+.ha-lt-task-k { min-width: 132px; color: var(--ha-text-sub); }
+.ha-lt-task-v { font-weight: 600; }
+.ha-lt-task-v.done { color: #237804; }

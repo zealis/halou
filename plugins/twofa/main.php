@@ -325,9 +325,13 @@ Plugin::adminPage('twofa', '两步验证', function () {
 
 /* ===================== 注册资源 ===================== */
 
-// 登录页（renderAuth）不经过主程序的合并资源引入，用 page.footer 钩子补上；
-// 聊天页会因此重复加载一次，chat.js 内有幂等标记（__haTwoFALoaded）兜底
+// 登录页（renderAuth）不经过主程序的合并资源引入，用 page.footer 钩子补上。
+// ⚠️ 必须判 HALOU_ASSETS_JS_EMITTED：聊天页 / 后台页核心已经输出过一份，
+//    这里再补就变成**加载两遍合并包** —— 插件 JS 整体执行两次，
+//    凡「往数组里注册」的扩展点都会重复注册（曾导致资料卡出现两行等级）。
+//    （原先靠 chat.js 内的 __haTwoFALoaded 兜底，那只救得了本插件，救不了别人。）
 Plugin::on('page.footer', function () {
+    if (defined('HALOU_ASSETS_JS_EMITTED')) return;
     echo '<script src="?action=assets&type=js"></script>';
 });
 

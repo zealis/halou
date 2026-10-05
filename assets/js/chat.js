@@ -1218,6 +1218,37 @@
             this._tabsExt.push(opt);
         },
 
+        /* ---------- 资料卡 meta 顶部扩展点（v1.2.42） ----------
+           需求：等级要**固定在 .ha-card-meta 的最上面**，不能被其它插件的行挤下去。
+           做法：核心在渲染 meta 时把本扩展点的输出**前置**到既有行之前，
+           而不是给插件一个空 div 让它们自己 append（那样谁先注册谁在上面，
+           且插件一旦改用 prepend 就会互相覆盖）。
+           @example
+           HaChat.onCardMetaTop(function (u) {
+               return u.level ? '<div class="ha-card-meta-row">…</div>' : '';
+           }, 1);   // prio 小者在前，默认 10
+        */
+        _cardMetaTop: [],
+        /**
+         * 注册资料卡 meta 顶部行。
+         * @param {Function} fn   fn(userCardData) → HTML 字符串；返回空串表示不插入
+         * @param {number} [prio] 排序优先级，小者在前（默认 10）
+         */
+        onCardMetaTop: function (fn, prio) {
+            if (typeof fn !== 'function') return;
+            this._cardMetaTop.push({ fn: fn, prio: typeof prio === 'number' ? prio : 10 });
+        },
+
+        /** 按 prio 升序拼出顶部行 HTML（单个插件抛错只丢弃它那一段） */
+        cardMetaTopHtml: function (u) {
+            var list = this._cardMetaTop.slice().sort(function (a, b) { return a.prio - b.prio; });
+            var out = '', i;
+            for (i = 0; i < list.length; i++) {
+                try { var h = list[i].fn(u); if (typeof h === 'string') out += h; } catch (e) {}
+            }
+            return out;
+        },
+
         /** 绑定标签条点击（委托，只绑一次；插件后加的标签也自动生效） */
         bindSideTabs: function () {
             if (this._tabsInited) return;
@@ -2639,7 +2670,10 @@
                     + '</div>'
                     + '<div class="ha-card-sub">ID ' + esc(fmtUid(u.id)) + '</div>'
                     + '</div></div>'
+                    // v1.2.42：扩展点输出**前置** —— 等级等插件行固定在 meta 最上面，
+                    // 排在「积分 / 注册」之前，且不随插件注册顺序漂移。
                     + '<div class="ha-card-meta">'
+                    + self.cardMetaTopHtml(u)
                     + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">积分</span>'
                     + '<span class="ha-card-meta-v">' + esc(u.points || 0) + '</span></div>'
                     + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">注册</span>'
