@@ -587,11 +587,30 @@ input[type=range] {
     line-height: 1;
     flex-shrink: 0; -webkit-flex-shrink: 0;
 }
-.ha-brand .ha-brand-search .ha-ico { display: block; }   /* 消掉 svg 的基线间隙 */
+/* v1.2.34：图标再下沉 1.5px，与 logo 的光学补偿后中心（29.5）齐平。
+   实测：logo 中心 29.5 / 站点名文字墨迹中心 28 / 品牌条中心 28.5。
+   原先图标与文字严格齐平（28），但 logo 是这一行最显眼的参照物，
+   图标比它高 1.5px 就会显得「飘在上面」。 */
+.ha-brand .ha-brand-search .ha-ico {
+    display: block;            /* 消掉 svg 的基线间隙 */
+    transform: translateY(1.5px); -webkit-transform: translateY(1.5px);
+}
 /* ---------- 搜索窗（v1.2.31） ---------- */
 .ha-sr-scope { margin-bottom: 10px; }        /* 范围切换复用 .ha-tabs 组件外观 */
 .ha-sr-scope .ha-tab { font-size: 13px; padding: 6px 8px; }
-.ha-sr-list { margin-top: 10px; max-height: 380px; overflow-y: auto; }
+/* v1.2.34：结果区高度改为「固定上限 + 随视口收缩」双保险。
+   实测灌 200 条：列表锁定 380px、scrollHeight 11516、弹窗总高 563/900 —— 不会撑爆。
+   45vh 是给小屏的：固定 380px 在 500px 高的窗口里，弹窗会顶出屏幕。 */
+.ha-sr-list { margin-top: 10px; max-height: min(380px, 45vh); overflow-y: auto; }
+/* 结果被条数上限截断时的说明（后端每个范围都有 LIMIT） */
+.ha-sr-tip {
+    padding: 8px 6px 2px;
+    font-size: 12px;
+    color: var(--ha-text-sub);
+    text-align: center;
+    border-top: 1px solid var(--ha-border);
+    margin-top: 4px;
+}
 .ha-sr-item {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;

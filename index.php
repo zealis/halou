@@ -384,13 +384,20 @@ if ($action !== '') {
             if (!Sec::rateLimit('search', 'u' . (int)$actor['id'] . '|' . $scope, 10, 3)) {
                 Api::json(['ok' => false, 'msg' => '搜索太频繁，请 10 秒后再试']);
             }
+            // v1.2.34：把该范围的条数上限一并下发，前端据此提示「仅显示前 N 条」，
+            // 免得用户以为搜全了（真被截断时不会有任何提示，是最容易引起误会的地方）
+            $limits = ['current' => 50, 'people' => 30, 'messages' => 80, 'friends' => 30];
+            $limit = $limits[$scope];
+            $data = Chat::search($actor, $scope, (string)$p('q', ''), [
+                'room_id' => (int)$p('room_id', '0'),
+                'peer' => (string)$p('peer', ''),
+            ]);
             Api::json([
                 'ok' => true,
                 'scope' => $scope,
-                'data' => Chat::search($actor, $scope, (string)$p('q', ''), [
-                    'room_id' => (int)$p('room_id', '0'),
-                    'peer' => (string)$p('peer', ''),
-                ]),
+                'limit' => $limit,
+                'truncated' => count($data) >= $limit,
+                'data' => $data,
             ]);
 
         case 'dm_history':      // 私聊历史（仅双方可见）

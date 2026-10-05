@@ -3466,6 +3466,8 @@
                 if (mySeq !== self._srSeq) return;
                 if (!r.ok) { if (list) list.innerHTML = '<div class="ha-sr-empty">' + esc(r.msg || '搜索失败') + '</div>'; return; }
                 self._srData = r.data || [];
+                self._srTruncated = !!r.truncated;
+                self._srLimit = r.limit || 0;
                 self.renderSearchResults(self._srData);
             });
         },
@@ -3513,6 +3515,11 @@
                         + '<span class="ha-sr-sub">' + esc(d.signature || ('用户 ID ' + fmtUid(d.user_id))) + '</span>'
                         + '</span></div>';
                 }
+            }
+            // v1.2.34：结果条数触到该范围上限时补一句「仅显示前 N 条」。
+            // 不提示的话用户会以为搜全了 —— 这是搜索最容易被误会的地方。
+            if (this._srTruncated && this._srLimit) {
+                html += '<div class="ha-sr-tip">结果较多，仅显示前 ' + this._srLimit + ' 条，试试更精确的关键词</div>';
             }
             box.innerHTML = html;
             box.onclick = function (e) {
