@@ -109,47 +109,8 @@
     text-decoration: none; color: inherit;
     display: flex; align-items: baseline; cursor: pointer;
     border-radius: 3px; padding: 0 4px; margin: 0 -4px;   /* hover 背景不越出内容区 */
-    /* v1.2.47：气泡的定位上下文 */
-    position: relative;
 }
 .ha-lt-row-link:hover { background: var(--ha-bg-sub); }
-
-/* v1.2.47：等级行的自研悬浮气泡（替代浏览器原生 title）
-   原生 title 的外观完全由系统控制 —— 又扁又窄、无法加高，各平台还不一致，
-   所以这里用插件自己的 DOM 重做。
-
-   · **向下弹**：等级行在资料卡 meta 区顶部，向上会盖住头像与昵称；
-     meta 区下面还有「积分 / 注册」等行和签名，空间足够往下展开。
-   · **加高**：padding 10px 14px + line-height 1.7，内含标题行 + 说明行两行，
-     高度约 64px（原生 title 通常只有 22px 左右）。
-   · 纯 CSS :hover 显示，不靠 JS 算位置 —— 跟随滚动/缩放不会错位。 */
-.ha-lt-tip {
-    display: none;
-    position: absolute; left: 0; top: calc(100% + 8px);
-    -webkit-transform: none; transform: none;
-    z-index: 40;
-    width: max-content; max-width: 240px; min-width: 168px;
-    padding: 10px 14px;
-    background: #2C2C2E; color: #FFFFFF;
-    text-align: left; white-space: normal; word-break: break-word;
-    border-radius: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, .22);
-    pointer-events: none;          /* 不挡点击：整行仍是跳转链接 */
-}
-/* 小箭头：指向等级行 */
-.ha-lt-tip::after {
-    content: ''; position: absolute; left: 24px; top: -5px;
-    width: 0; height: 0;
-    border-left: 5px solid transparent; border-right: 5px solid transparent;
-    border-bottom: 5px solid #2C2C2E;
-}
-.ha-lt-tip > b {
-    display: block; font-size: 13px; font-weight: 600; line-height: 1.7;
-}
-.ha-lt-tip > span {
-    display: block; font-size: 12px; font-weight: 400; line-height: 1.7;
-    color: rgba(255, 255, 255, .78);
-}
-.ha-lt-row-link:hover > .ha-lt-tip { display: block; }
 
 /* ---------- 后台：参数分组标题 + 活跃趋势柱状图（v1.2.44） ---------- */
 .ha-lt-cap {
@@ -183,26 +144,4 @@
     font-size: 11px; line-height: 15px; padding: 0 5px; border-radius: 3px;
     margin-left: 0; flex-shrink: 0; -webkit-flex-shrink: 0;
     vertical-align: middle; cursor: default;
-    position: relative;               /* v1.2.47：气泡的定位上下文 */
-    overflow: visible;                /* 别让气泡被徽章自身裁掉 */
 }
-
-/* v1.2.47：侧栏徽章的气泡 —— 向上弹。
-   侧栏资料区在窗口底部，下面没有空间，只能往上展开。
-   ⚠️ 水平方向用「以徽章中心对齐」而不是靠右/靠左：
-   侧栏只有 ~175px 宽，徽章右缘在 x≈131，气泡宽 160 ——
-   靠右对齐会算出 left=-19（跑出视口左边），靠左对齐则顶到侧栏外，
-   只有居中能同时避开两侧。 */
-.ha-lt-tip-sm {
-    left: 50%; right: auto; top: auto; bottom: calc(100% + 8px);
-    -webkit-transform: translateX(-50%); transform: translateX(-50%);
-    min-width: 150px; max-width: 200px;
-}
-/* 箭头改指向上方，居中于徽章 */
-.ha-lt-tip-sm::after {
-    left: 50%; right: auto; top: auto; bottom: -5px;
-    margin-left: -5px;
-    border-left: 5px solid transparent; border-right: 5px solid transparent;
-    border-top: 5px solid #2C2C2E; border-bottom: 0;
-}
-.ha-me-line .ha-lt-badge.ha-lt-badge-sm:hover > .ha-lt-tip-sm { display: block; }

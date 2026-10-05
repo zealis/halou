@@ -43,26 +43,16 @@
     //   用 <a> 而不是 onclick：右键「新标签打开」和 Ctrl+点击才可用。
     // v1.2.45：去掉了行尾的「详情 ›」文字（用户要求）—— 整行已经可点，
     //   再放指引文字属于冗余，且会把 meta 行撑宽。可点性用 hover 背景 + 手型光标表达。
-    // v1.2.47：等级行的悬浮条由**浏览器原生 title** 改为自研气泡（.ha-lt-tip）。
-    //   原生 title 的外观/尺寸完全由系统控制，又扁又窄、无法加高，且各平台不一致。
-    //   改成插件自己的 DOM 后：高度、内边距、圆角、阴影都能定，还能多放一行说明。
-    //   ⚠️ 必须**移除 title**，否则原生提示与自研气泡会同时出现（双层提示）。
-    //   改用 aria-label 保留无障碍语义（不影响视觉）。
-    //   气泡挂在 <a> 内部 → display:none 不占布局，flex + gap 也不受它影响。
     HaChat.onCardMetaTop(function (u) {
         if (!u || !u.level) return '';      // 无等级（游客 / 数据缺失）→ 不渲染整行
         var title = u.level_honor ? '荣誉等级' : '等级';
         // v1.2.46：**不显示阶段名**（用户要求）。阶段信息在 ?page=level 页面里有完整说明，
         //   资料卡只留等级数字 —— 一行塞三个信息（数字 + 阶段 + 徽章）反而挤。
         return '<a class="ha-card-meta-row ha-lt-row ha-lt-row-link" href="?page=level"'
-            + ' aria-label="' + title + ' Lv.' + esc(u.level) + '，查看等级规则与今日任务">'
+            + ' title="查看等级规则与今日任务">'
             + '<span class="ha-card-meta-k">' + title + '</span>'
             + '<span class="ha-card-meta-v">'
             + badge(u.level, u.level_stage_no, u.level_honor)
-            + '</span>'
-            + '<span class="ha-lt-tip" aria-hidden="true">'
-            + '<b>等级 Lv.' + esc(u.level) + '</b>'
-            + '<span>查看等级规则与今日任务</span>'
             + '</span></a>';
     }, 1);
 
@@ -90,15 +80,7 @@
         var b = box2.firstChild;
         if (!b) return;
         b.className += ' ha-lt-badge-sm';
-        // v1.2.47：原生 title → 自研气泡（与资料卡同一套 .ha-lt-tip）。
-        //   气泡挂在徽章**内部**：徽章自己是 position:relative（见 style.css），
-        //   定位上下文就是徽章，不依赖任何外部容器 —— 也就不受昵称换行影响。
-        //   去掉 title，否则原生提示与自研气泡会同时出现（双层提示）。
-        b.insertAdjacentHTML('beforeend',
-            '<span class="ha-lt-tip ha-lt-tip-sm" aria-hidden="true">'
-            + '<b>等级 Lv.' + esc(lv.level) + '</b>'
-            + '<span>查看等级规则与今日任务</span></span>');
-        b.setAttribute('aria-label', '等级 Lv.' + lv.level + '，查看等级规则与今日任务');
+        b.setAttribute('title', '等级 Lv.' + lv.level);
         // 插在昵称**后面**、头衔标签**前面**：头衔是用户自己设的，优先级高于等级
         if (name.nextSibling) line.insertBefore(b, name.nextSibling);
         else line.appendChild(b);
