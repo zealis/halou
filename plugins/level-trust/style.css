@@ -110,6 +110,16 @@
     display: flex; align-items: baseline; cursor: pointer;
     border-radius: 3px; padding: 0 4px; margin: 0 -4px;   /* hover 背景不越出内容区 */
 }
+/* v1.2.47：hover 高亮条加高。
+   上面那条 `padding: 0 4px` 把核心 .ha-card-meta-row 的 `padding: 3px 0` 整个覆盖了
+   （横向要 4px 是为了 hover 背景不越出内容区，纵向纯属被误伤），
+   于是等级行只有 21.8px 高，而相邻的「积分 / 注册 / 签名」行都是 26.8px ——
+   鼠标扫过去时那条灰色高亮条明显比别的行矮一截，贴着上下文字，像一根扁扁的灰杠。
+
+   这里把纵向补回 3px，高亮条高度就和其它 meta 行完全一致（26.8px）。
+   ⚠️ 别顺手改成 margin 方案：meta 区首行加margin 会把整块往下推，
+   破坏 meta 顶部的 border-top 分隔线与内容的位置关系。 */
+.ha-lt-row-link { padding-top: 3px; padding-bottom: 3px; }
 .ha-lt-row-link:hover { background: var(--ha-bg-sub); }
 
 /* ---------- 后台：参数分组标题 + 活跃趋势柱状图（v1.2.44） ---------- */
