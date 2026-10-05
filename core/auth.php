@@ -71,6 +71,9 @@ class Auth
      * 禁止空格：@提及在服务端按 (^|\s)@[^\s@]+ 切词，含空格会导致无法被提及。
      * 禁止 @：避免与 @提及 前缀冲突。
      * 允许重名：昵称不再承担唯一性职责，区分用户一律使用 id。
+     * 例外（v1.2.40）：**超级管理员的昵称是保留名**，别人不能用 ——
+     *   因为聊天里 admin 的身份标签刻意显示为「会员」（见前端 roleTag），
+     *   两个同名用户里哪个是超管从昵称分辨不出来。改资料时传 $ctx['uid'] 以排除自己。
      *
      * 插件钩子（v1.0.46）：内置规则通过后触发 nickname.before_save，
      * 回调签名 function (&$nick, &$err, $ctx)——插件可改写 $nick，
@@ -85,6 +88,19 @@ class Auth
         if ($s === '') return [false, '请填写昵称'];
         if (!preg_match('/^[\p{L}\p{N}_\-]{2,20}$/u', $s)) {
             return [false, '昵称需 2-20 个字符，支持中英文、数字、下划线与短横线，不含空格或 @'];
+        }
+        // v1.2.40：**超级管理员的昵称是保留名**，别人不能用。
+        // 为什么要这一条：昵称本身允许重名（区分用户一律用 id），但聊天里 admin 的
+        // 身份标签刻意显示为「会员」（见前端 roleTag），于是两个同名用户里
+        // 到底哪个是超管，从昵称上分辨不出来 —— 容易引发误解与冒名。
+        // 所以只保留「超管这一侧」的唯一性：超管自己改名不受影响（改的是自己那条），
+        // 但别人不能用这个名字。
+        $uid = (int)($ctx['uid'] ?? 0);          // 改名场景传入本人 id，改名时排除自己
+        $q = 'SELECT COUNT(*) FROM users WHERE nickname=? AND role=? AND status=1';
+        $args = [$s, 'admin'];
+        if ($uid > 0) { $q .= ' AND id<>?'; $args[] = $uid; }
+        if ((int)DB::val($q, $args) > 0) {
+            return [false, '该昵称已被超级管理员使用，请换一个'];
         }
         // 插件校验：可改写昵称（引用）或通过 $err 拦截
         $err = null;
@@ -284,7 +300,8 @@ class Auth
      */
     public static function updateProfile(array $user, string $nickname, string $avatar): array
     {
-        [$ok, $nick] = self::checkNickname($nickname, ['scene' => 'profile']);
+        // 传 uid：超管改自己的昵称时要排除自己那行，否则会撞上「昵称已被超管使用」
+        [$ok, $nick] = self::checkNickname($nickname, ['scene' => 'profile', 'uid' => (int)$user['id']]);
         if (!$ok) return [false, $nick];
         Chat::filterText($nick, 'nickname');   // 敏感词过滤（sensitive-words 插件经 text.filter 钩子处理）
         $uid = (int)$user['id'];

@@ -248,6 +248,10 @@ input[type=range] {
 .ha-tag-vip { background: #fff7e6; color: var(--ha-orange); border: 1px solid #ffd591; }
 /* 会员（v1.0.89）：灰底 + 中灰字（同群主思路：文字用标签色的深一档，不用黑） */
 .ha-tag-member { background: #E4E4E4; color: #8C8C8C; border: 1px solid #D5D5D5; }
+/* v1.2.40：超级管理员（仅管理场景出现：用户资料卡 / 群成员管理）。
+   用主色系（蓝）以便一眼认出；**刻意区别于 .ha-tag-owner**（群主是米金），
+   两者含义不同不能同色。 */
+.ha-tag-admin { background: #E6F4FF; color: var(--ha-primary-dark); border: 1px solid #91CAFF; }
 .ha-tag-guest { background: var(--ha-bg-sub); color: var(--ha-text-sub); border: 1px solid var(--ha-border); }
 .ha-tag-title { background: #fffbe6; color: var(--ha-yellow); border: 1px solid #ffe58f; }
 .ha-badge-num {
@@ -409,24 +413,34 @@ input[type=range] {
     border-radius: 50%;
 }
 .ha-card-id { min-width: 0; -webkit-flex: 1; flex: 1; -webkit-flex: 1; }
+/* v1.2.40：昵称强制**单行**，超出省略号。
+   原先 `.ha-card-name` 是 `word-break: break-all`，长昵称会把资料卡撑成两三行，
+   身份标签被顶到第二行，卡片高度也跟着变 —— 和侧栏资料区同一个毛病。 */
 .ha-card-name {
     font-size: 17px; font-weight: 600; color: var(--ha-text-title);
-    word-break: break-all; line-height: 1.4;
+    line-height: 1.4;
+    min-width: 0; -webkit-min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 /* v1.2.23：昵称 + 身份标签同一行（标签在昵称右侧）。
    只用于**用户资料卡** —— 群资料卡仍是「群名一行 + 类型标签一行」，
    没有 .ha-card-name-row，不受影响。
    ⚠️ min-width:0 必写：flex item 默认 min-width:auto，长昵称不会换行而是把行撑出去。
    ⚠️ .ha-card-badges 自带 margin-top:6px（给「独立一行」用的），
-   进到同一行里必须清掉，否则标签比昵称低 6px 看着是歪的。 */
+   进到同一行里必须清掉，否则标签比昵称低 6px 看着是歪的。
+   v1.2.40：wrap 改 nowrap —— 长昵称不再把标签挤到第二行（由昵称自己省略号让位）。 */
 .ha-card-name-row {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
-    flex-wrap: wrap; -webkit-flex-wrap: wrap;
+    flex-wrap: nowrap; -webkit-flex-wrap: nowrap;
     gap: 6px;
     min-width: 0;
 }
-.ha-card-name-row .ha-card-name { min-width: 0; }
+.ha-card-name-row .ha-card-name { flex: 0 1 auto; -webkit-flex: 0 1 auto; min-width: 0; }
+/* 身份标签不参与收缩：昵称被截断时标签仍要完整可读 */
+.ha-card-name-row .ha-card-badges { flex-shrink: 0; -webkit-flex-shrink: 0; }
 /* 昵称下方的 ID 行：比昵称小一档、用次要文字色，避免和昵称抢权重 */
 .ha-card-sub { margin-top: 4px; font-size: 12px; color: var(--ha-text-sub); }
 .ha-card-badges { margin-top: 6px; display: flex; display: -webkit-flex; flex-wrap: wrap; -webkit-flex-wrap: wrap; gap: 6px; align-items: center; -webkit-align-items: center; }
@@ -470,6 +484,8 @@ input[type=range] {
 }
 .ha-mem-row:first-child { border-top: none; }
 .ha-mem-name { flex: 1; -webkit-flex: 1; min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* v1.2.40：成员行的身份标签（超管/群主）。不参与收缩，昵称让位给它 */
+.ha-mem-role { flex-shrink: 0; -webkit-flex-shrink: 0; }
 .ha-mem-id { flex-shrink: 0; -webkit-flex-shrink: 0; font-size: 12px; color: var(--ha-text-sub); font-variant-numeric: tabular-nums; }
 .ha-mem-del { flex-shrink: 0; -webkit-flex-shrink: 0; color: var(--ha-red); }
 .ha-mem-del:hover { background: #fff1f0; color: #cf1322; }

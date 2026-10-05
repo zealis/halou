@@ -515,9 +515,23 @@
        群主=当前群聊 owner（橙色），VIP=会员（保留 VIP 配色），普通用户与超级管理员=会员（灰色），
        游客与其它角色不再展示身份标签。超级管理员在别人创建的群聊里同样显示「会员」。 */
     var CUR_OWNER = 0;   // 当前群聊的 owner 用户 ID（HaChat 切换群聊时同步）
-    function roleTag(role, title, uid) {
+    /**
+     * 身份标签。
+     *
+     * v1.2.40 起**分场景**（这是有意的口径差异，不是 bug）：
+     *   · 聊天场景（消息气泡、会话列表、成员名单…）：admin 一律显示「会员」。
+     *     聊天是日常场景，没必要把特权身份挂在每个人眼前。
+     *   · 管理场景（**用户资料卡**、**群成员管理列表**）：admin 显示「超级管理员」。
+     *     这两处是判断「这个人能不能管这个群」的依据，隐藏身份会让人做错决定。
+     * @param {string} role
+     * @param {string} title 头衔
+     * @param {number} uid   用于判「群主」
+     * @param {boolean} real  true=管理场景（显示真实身份）；缺省/false=聊天场景
+     */
+    function roleTag(role, title, uid, real) {
         var h = '';
         if (uid && uid === CUR_OWNER) h = '<span class="ha-tag ha-tag-owner">群主</span>';
+        else if (real && role === 'admin') h = '<span class="ha-tag ha-tag-admin">超级管理员</span>';
         else if (role === 'vip') h = '<span class="ha-tag ha-tag-vip">会员</span>';
         else if (role === 'member' || role === 'admin') h = '<span class="ha-tag ha-tag-member">会员</span>';
         if (title) h += (h ? ' ' : '') + '<span class="ha-tag ha-tag-title">' + esc(title) + '</span>';
@@ -2619,26 +2633,27 @@
                         + '<input type="file" id="haCardAvatarFile" accept="image/*" style="display:none">';
                 }
                 var regDate = u.created_at ? new Date(u.created_at * 1000).toLocaleDateString() : '-';
-                var badges = roleTag(u.role, u.title, u.id);
+                var badges = roleTag(u.role, u.title, u.id, true);   // 资料卡=管理场景，显示真实身份
                 // v1.2.23：底部不再放「关闭」—— openModal 自带右上角 ✕（见 openModal），
                 // 两个关闭入口纯冗余。
                 // ⚠️ 连带影响：自己的卡片 canPm=false，删掉「关闭」后**一个按钮都不剩**，
                 // 此时整个 .ha-modal-actions 都不输出（否则卡片底部留一道空边框）。
                 // 自己的卡片就只能靠 ✕ / 点遮罩 / Esc 关闭 —— 这是有意的。
-                // v1.1.24 联系人：加为联系人。
-                // v1.2.24 文案：按钮写「加好友 / 删除好友」（用户要求）。
-                //   ⚠️ 两个按钮是**互斥**的（已是好友只给「删除好友」），位置相同，
-                //   只改其中一个会出现「加好友 / 删除联系人」的错位说法，所以成对改。
-                //   ⚠️ 只改**界面文案**：后端 action 名仍是 friend_add / friend_remove、
-                //   表名仍是 user_friends，服务端提示语仍是「为联系人」——
-                //   术语统一是另一件事（涉及侧栏标签「联系人」与服务端文案），未一并动。
-                // 删除走 HaApi.secure —— friend_remove 在 $SENSITIVE 内，需一次性票据。
+                // v1.2.40 按钮改造：
+                //   ① **取消「删除好友」**（用户要求）。删除入口已迁到「私聊右侧栏」，
+                //      资料卡只负责「加」—— 避免在同一处既加又删、误点。
+                //      已是好友时不再显示任何好友按钮（不是禁用，是不出现）。
+                //   ② **自己的资料卡给「编辑资料」**（之前一个按钮都不剩，只能 ✕ 关闭，
+                //      想改昵称头像还得先去侧栏底部资料区绕一圈）。
+                //   ③ 「发私信」维持原样：对方才能私聊；自己的卡不显示。
                 var acts = '';
                 if (canPm) {
-                    acts += (u.is_friend
-                        ? '<button class="ha-btn ha-btn-ghost" onclick="HaChat.removeFriend(' + (u.id) + ')">删除好友</button>'
-                        : '<button class="ha-btn ha-btn-ghost" onclick="HaChat.addFriend(' + (u.id) + ')">加好友</button>')
-                        + '<button class="ha-btn ha-btn-primary" onclick="HaChat.closeModal();HaChat.openDm(\'user:' + (u.id) + '\',' + JSON.stringify(u.nickname).replace(/"/g, '&quot;') + ')">发私信</button>';
+                    if (!u.is_friend) {
+                        acts += '<button class="ha-btn ha-btn-ghost" onclick="HaChat.addFriend(' + (u.id) + ')">加好友</button>';
+                    }
+                    acts += '<button class="ha-btn ha-btn-primary" onclick="HaChat.closeModal();HaChat.openDm(\'user:' + (u.id) + '\',' + JSON.stringify(u.nickname).replace(/"/g, '&quot;') + ')">发私信</button>';
+                } else {
+                    acts += '<button class="ha-btn ha-btn-primary" onclick="HaChat.closeModal();HaChat.openSettings()">编辑资料</button>';
                 }
                 HaChat.openModal(
                     '<h3>用户资料</h3>'
@@ -3133,9 +3148,13 @@
                 if (!list.length) cards = '<div class="ha-mem-empty">还没有其他成员，可按用户 ID 邀请</div>';
                 for (var i = 0; i < list.length; i++) {
                     var m = list[i];
+                    // v1.2.40：成员管理是**管理场景**，超管要显示「超级管理员」
+                    //（判断谁能管这个群靠的就是这个标签，隐藏身份会让人做错决定）
+                    var mTag = roleTag(m.role, '', 0, true);
                     cards += '<div class="ha-mem-row">'
                         + avatarHtml(m.avatar, m.nickname, 'sm', m.role)
                         + '<span class="ha-mem-name">' + esc(m.nickname || 'ID' + m.user_id) + '</span>'
+                        + (mTag ? '<span class="ha-mem-role">' + mTag + '</span>' : '')
                         + '<span class="ha-mem-id">ID ' + esc(fmtUid(m.user_id)) + '</span>'
                         + (isOwnerOrAdmin
                             ? '<button class="ha-btn ha-btn-ghost ha-btn-mini ha-mem-del" data-id="' + m.user_id + '">移出</button>'
