@@ -594,16 +594,17 @@ if ($action !== '') {
             [$ok, $urlOrMsg] = Upload::handle($_FILES['file'], $kind);
             Api::json($ok ? ['ok' => true, 'url' => $urlOrMsg] : ['ok' => false, 'msg' => $urlOrMsg]);
 
-        // 用户创建群聊（管理员始终可创建；普通用户受后台开关与积分限制）
+        // 用户创建群聊（管理员始终可创建；普通用户受后台开关限制）
+        // ⚠️ v1.2.43 定案：建群**不再消耗积分**，也**不受任何插件规则约束**
+        //   （等级插件的「10 级才能建群 / 建群数量上限」已取消），
+        //   唯一约束就是后台「允许用户创建群聊」开关 room_create_allow。
+        //   原 v1.2.42 的 room.create.guard 钩子随之移除 —— 留着它等于
+        //   给「插件再次限制建群」留了口子，与定案冲突。
         case 'room_create':
             if ($actor['kind'] !== 'user') Api::json(['ok' => false, 'msg' => '请登录后再创建群聊']);
             if ($actor['role'] !== 'admin' && DB::setting('room_create_allow', '1') !== '1') {
                 Api::json(['ok' => false, 'msg' => '站点未开放用户创建群聊']);
             }
-            // v1.2.42：建群闸门（等级信任插件按等级限制可建群数量 —— 见设计文档「五次功能解锁」）
-            $allowCreate = true; $createReason = '';
-            Plugin::fire('room.create.guard', [&$allowCreate, &$createReason, $actor]);
-            if (!$allowCreate) Api::json(['ok' => false, 'msg' => $createReason !== '' ? $createReason : '当前等级无法创建更多群聊']);
             $name = trim($p('name'));
             /* v1.2.19：群名称改为**可选**。留空时自动命名为「<昵称>的群聊」。
                原先强制 2-30 字符，等于逼用户先想好名字才能建群 ——
@@ -639,29 +640,12 @@ if ($action !== '') {
             // 兼容旧前端/旧客户端；非法值一律归一为 1，不接受「不明确的真」。
             $isPublic = ($p('is_public') === '0') ? 0 : 1;
             // v1.1.14 全局总闸：是否允许普通用户创建**不公开**群聊（管理员始终可）。
-            // ⚠️ 必须校验在扣积分**之前**：放后面会出现「校验失败 → 积分已扣 → 用户白扣分」，
-            // 且前端拿到的是余额不足之外的报错，排查时极易误判成价格配置问题。
             if ($isPublic === 0 && $actor['role'] !== 'admin'
                 && DB::setting('room_private_create_allow', '1') !== '1') {
                 Api::json(['ok' => false, 'msg' => '站点已关闭「创建仅邀请群聊」，请创建公开群聊']);
             }
-            // 积分：管理员免费；普通用户先原子扣款，再创建房间（失败退还）
-            // cost 归一化：负数 / 小数 / 脏数据一律按 0 处理，避免 (int) 转换后
-            // 跳过整段校验（"-5" 会被当成免费）——这是此前可被绕过的一个口子。
-            $cost    = max(0, (int)DB::setting('room_create_cost', '0'));
-            $charged = 0;   // 实际扣除的积分（管理员为 0，用于返回给前端准确提示）
-            $uid     = (int)$actor['id'];
-            if ($cost > 0 && $actor['role'] !== 'admin') {
-                // 条件更新：points 不足时影响 0 行，同时杜绝并发下扣成负数
-                $st = DB::run('UPDATE users SET points=points-? WHERE id=? AND points>=?', [$cost, $uid, $cost]);
-                if ($st->rowCount() === 0) {
-                    $pts = (int)DB::val('SELECT points FROM users WHERE id=?', [$uid]);
-                    Api::json(['ok' => false, 'msg' => '积分不足，创建群聊需要 ' . $cost . ' 积分（当前 ' . $pts . '）']);
-                }
-                $charged = $cost;
-            }
-            // 随机位段 ID（同用户 ID 规则）：插入失败（含并发撞主键）重新分配重试，
-            // 最多 5 次；仍失败则退还已扣积分后抛出，不让用户白扣分
+            $uid = (int)$actor['id'];
+            // 随机位段 ID（同用户 ID 规则）：插入失败（含并发撞主键）重新分配重试，最多 5 次
             $roomAttempts = 0;
             while (true) {
                 try {
@@ -684,15 +668,11 @@ if ($action !== '') {
                     ]);
                     break;
                 } catch (Throwable $e) {
-                    if (++$roomAttempts >= 5) {
-                        if ($charged > 0) DB::run('UPDATE users SET points=points+? WHERE id=?', [$charged, $uid]);
-                        throw $e;
-                    }
+                    if (++$roomAttempts >= 5) throw $e;
                 }
             }
-            Sec::log('room_create', $actor['nickname'], ['id' => $id, 'name' => $name, 'cost' => $charged]);
-            // 返回实际扣除额（管理员免费时为 0），前端提示才与真实扣费一致
-            Api::json(['ok' => true, 'msg' => '群聊已创建', 'id' => $id, 'name' => $name, 'cost' => $charged]);
+            Sec::log('room_create', $actor['nickname'], ['id' => $id, 'name' => $name]);
+            Api::json(['ok' => true, 'msg' => '群聊已创建', 'id' => $id, 'name' => $name]);
         // 且强制 attachment，避免 html/svg 之类被浏览器内联解析导致 XSS
         case 'file_download':
             // 下载走 GET 链接（带签名），这里直接读 $_GET
@@ -1053,7 +1033,6 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
     $settings = [
         'guest_chat' => DB::setting('guest_chat', '1'),
         'sound' => DB::setting('sound_default', '1'),
-        'room_create_cost' => DB::setting('room_create_cost', '0'),   // 创建群聊扣分（前端提示用）
         // v1.1.14：普通用户能否创建不公开群聊。**按当前身份算好后下发**，
         // 前端据此把「公开群聊」开关置灰——不这样做就会留下「点得动、必报错」的死开关。
         'room_private_create' => (

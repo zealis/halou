@@ -236,13 +236,7 @@ class Admin
                 Api::json(['ok' => true, 'data' => array_column($rows, 'v', 'k')]);
 
             case 'admin_settings_save':
-                // 创建群聊扣分必须是 0-999999 的整数：填负数或小数会被 (int) 转成一个
-                // 「看起来设了、实际不生效」的值（如 -5 → 整个校验被跳过），这里直接拒绝
-                if (isset($_POST['room_create_cost']) && trim((string)$_POST['room_create_cost']) !== '') {
-                    if (!preg_match('/^\d{1,6}$/', trim((string)$_POST['room_create_cost']))) {
-                        Api::json(['ok' => false, 'msg' => '创建群聊扣除积分需填 0-999999 的整数（0 表示免费）']);
-                    }
-                }
+                // v1.2.43：原「创建群聊扣除积分」的校验随该设置一并下线（建群不再消耗积分）
                 // 固定网站地址：允许留空（自动识别）；填写时必须是 http(s) 开头的合法地址
                 if (isset($_POST['site_url']) && trim((string)$_POST['site_url']) !== '') {
                     $u = trim((string)$_POST['site_url']);
@@ -260,7 +254,7 @@ class Admin
                           'msg_rate_window', 'msg_rate_max', 'mail_rate_limit',
                           'sound_default', 'room_pass_ttl',
                           'login_fail_captcha', 'login_fail_lock', 'login_lock_minutes', 'min_register_age',
-                          'room_create_allow', 'room_create_cost',
+                          'room_create_allow',
                           // v1.1.14：普通用户能否创建不公开群聊（管理员始终可）
                           'room_private_create_allow'];
                 // 数值型设置统一收敛为非负整数：负数会让间隔/保留期这类

@@ -2098,25 +2098,11 @@
             };
             typeSel.onchange = refreshTip;
             refreshTip();
-            // 积分提示（创建成本由后台配置，管理员免费）
-            var me = this.cfg.me || {};
-            var cost = parseInt(this.cfg.settings.room_create_cost, 10) || 0;
-            var pts = parseInt(me.points, 10) || 0;
-            var notEnough = cost > 0 && me.role !== 'admin' && pts < cost;   // 管理员免费
-            if (notEnough) {
-                tip.innerHTML = '<span style="color:#C41D1F">积分不足：创建需要 <b>' + cost + '</b> 积分，当前 <b>' + pts + '</b>。</span>';
-                $('haRCCreate').disabled = true;
-                $('haRCCreate').style.opacity = '.5';
-                $('haRCCreate').style.cursor = 'not-allowed';
-            } else if (cost > 0) {
-                tip.innerHTML = (me.role === 'admin')
-                    ? '管理员创建免费（普通用户需 <b>' + cost + '</b> 积分，当前 ' + pts + '）。'
-                    : '创建将扣除 <b>' + cost + '</b> 积分（当前 ' + pts + '）。';
-            } else {
-                tip.innerHTML = '创建免费。';
-            }
+            // v1.2.43：建群**不再消耗积分**（原先这里会按 room_create_cost 提示并禁用按钮）。
+            //   现在唯一约束是后台「允许用户创建群聊」开关，服务端校验；
+            //   前端不再做任何积分判断，避免出现「前端说能建、服务端却拒绝」的错位。
+            tip.innerHTML = '';
             var submit = function () {
-                if (notEnough) { msg.innerHTML = '<span style="color:#C41D1F">积分不足，无法创建</span>'; return; }
                 var name = $('haRCName').value.replace(/^\s+|\s+$/g, '');
                 /* v1.2.19：空 = 合法（走默认名）；填了才校验长度。
                    ⚠️ 不能写成 `name.length < 2` —— 那会把「留空」也判成非法，
@@ -4595,7 +4581,6 @@ logs: function (main) {
                         + '<p style="font-size:12px;color:#5C5C5C;margin-bottom:12px">登录保护：验证码填错也计入失败次数（保证锁定可达），锁定按「账号+IP」记录，成功后清零。全部填 0 表示关闭对应保护。</p>'
                         + '<div class="ha-form-row">'
                         + '<div class="ha-form-item"><label>允许用户创建群聊</label>' + sel('room_create_allow', { '1': '允许', '0': '仅管理员' }) + '</div>'
-                        + '<div class="ha-form-item"><label>创建群聊扣除积分</label><input class="ha-input" id="haS_room_create_cost" value="' + esc(d.room_create_cost || '0') + '"></div>'
                         + '</div>'
                         // v1.1.14 仅邀请群总闸：与「允许用户创建群聊」正交 ——
                         // 那个管能不能建群，这个管建出来的群能不能藏起来。
@@ -4969,7 +4954,6 @@ logs: function (main) {
                 room_pass_ttl: $('haS_room_pass_ttl') ? $('haS_room_pass_ttl').value : '',
                 min_register_age: $('haS_min_register_age') ? $('haS_min_register_age').value : '',
                 room_create_allow: $('haS_room_create_allow') ? $('haS_room_create_allow').value : '',
-                room_create_cost: $('haS_room_create_cost') ? $('haS_room_create_cost').value : '',
                 room_private_create_allow: $('haS_room_private_create_allow') ? $('haS_room_private_create_allow').value : '',
                 login_fail_captcha: $('haS_login_fail_captcha') ? $('haS_login_fail_captcha').value : '',
                 login_fail_lock: $('haS_login_fail_lock') ? $('haS_login_fail_lock').value : '',

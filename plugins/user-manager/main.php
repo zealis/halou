@@ -32,6 +32,15 @@ Plugin::route('plugin_user_manager_search', function (array $ctx) use ($umGuard)
     if (!preg_match('/^\d{1,19}$/', $q)) Api::json(['ok' => false, 'msg' => '用户搜索仅支持数字用户 ID']);
     $rows = DB::all("SELECT id,nickname,email,role,title,points,status,created_at,last_login FROM users
         WHERE id=? LIMIT 1", [(int)$q]);
+    // v1.2.43：带出等级（若安装了「等级信任」插件）。
+    // 用钩子而不是直接查 plugin_level_trust 表 —— 本插件不该知道别的插件的表结构，
+    // 也不该在对方未安装时报「表不存在」。哨兵值 -1 = 无等级体系，前端据此隐藏该列。
+    foreach ($rows as &$u) {
+        $lv = -1;
+        Plugin::fire('user.level.get', [&$lv, (int)$u['id']]);
+        $u['level'] = $lv;
+    }
+    unset($u);
     Api::json(['ok' => true, 'data' => $rows]);
 });
 
@@ -58,6 +67,20 @@ Plugin::route('plugin_user_manager_save', function (array $ctx) use ($umGuard) {
         $pts = (int)$post['points'];
         DB::run('UPDATE users SET points=? WHERE id=?', [$pts, $id]);
         Sec::log('admin_user_points', $actor['nickname'], ['id' => $id, 'points' => $pts]);
+    }
+    // v1.2.43：等级编辑（依赖「等级信任」插件；未安装时钩子无人响应，$ok 保持 null）。
+    // ⚠️ 必须区分「未安装」与「设置失败」：前者提示去装插件，后者才是真失败。
+    //    一律返回「已更新」会让管理员以为等级改成功了，实际没动。
+    if (isset($post['level']) && $post['level'] !== '') {
+        $lv = (int)$post['level'];
+        if ($lv < 1) Api::json(['ok' => false, 'msg' => '等级需为 ≥1 的整数']);
+        $lok = null; $lmsg = '';
+        Plugin::fire('user.level.set', [$id, $lv, &$lok, &$lmsg]);
+        if ($lok === null) {
+            Api::json(['ok' => false, 'msg' => '未安装或未启用「等级信任」插件，无法编辑等级']);
+        }
+        if ($lok !== true) Api::json(['ok' => false, 'msg' => $lmsg !== '' ? $lmsg : '等级设置失败']);
+        Sec::log('admin_user_level', $actor['nickname'], ['id' => $id, 'level' => $lv]);
     }
     Sec::log('admin_user_set', $actor['nickname'], ['id' => $id, 'role' => $role]);
     Api::json(['ok' => true, 'msg' => '已更新']);

@@ -423,7 +423,8 @@ function haLTUnlocks(int $level): array
         'avatar'   => $level >= 3,
         'sticker'  => $level >= 20,
         'friend'   => $level >= 10,
-        'rooms'    => $level >= 50 ? 8 : ($level >= 20 ? 5 : ($level >= 10 ? 3 : 0)),
+        // v1.2.43：'rooms'（建群数量上限）已移除 —— 建群不再受等级限制。
+        //          保留注释而非字段，避免别处再看懂成「还可以按等级卡建群」。
         'ratio'    => $level >= 50 ? 1.0 : ($level >= 10 ? 0.5 : ($level >= 3 ? 0.25 : 0.0)),
         'mod_cand' => $level >= 35,          // 管理权限候选资格（标记，本插件不授予权限）
         'honor'    => $level >= 60,          // 荣誉标识（不解锁新功能，只显示）
@@ -501,20 +502,12 @@ Plugin::on('friend.guard', function (bool &$allow, string &$reason, array $actor
     }
 });
 
-/** 建群数量闸门：10 级 3 个 / 20 级 5 个 / 50 级 8 个 */
-Plugin::on('room.create.guard', function (bool &$allow, string &$reason, array $actor) {
-    if (haLTCfg('gating') !== '1') return;
-    if (($actor['role'] ?? '') === 'admin') return;
-    $lv = haLTLevelOf((int)$actor['id']);
-    $max = haLTUnlocks($lv)['rooms'];
-    $n = (int)DB::val('SELECT COUNT(*) FROM rooms WHERE owner_id=?', [(int)$actor['id']]);
-    if ($n >= $max) {
-        $allow = false;
-        $reason = $max <= 0
-            ? '创建群聊需 10 级解锁（当前 Lv.' . $lv . '）'
-            : '当前等级最多创建 ' . $max . ' 个群聊（Lv.' . $lv . '，已创建 ' . $n . ' 个）';
-    }
-});
+/**
+ * v1.2.43：**建群不再受等级限制**（用户定案）。
+ * 原 room.create.guard 处理器已删除，核心侧的该钩子也一并移除 ——
+ * 建群现在只受后台「允许用户创建群聊」开关约束。
+ * 等级仍会在资料卡展示、仍影响头像 / 贴纸 / 好友 / 单文件大小，只是不卡建群。
+ */
 
 /** 单文件大小上限：按等级取全局上限的比例 */
 Plugin::on('upload.maxsize', function (int &$maxBytes, array $actor) {
@@ -533,6 +526,46 @@ Plugin::on('attachment.guard', function (bool &$allow, string &$reason, array $a
     if (haLTUnlocks($lv)['ratio'] <= 0) {
         $allow = false; $reason = '上传文件需 3 级解锁（当前 Lv.' . $lv . '）';
     }
+});
+
+/* ============================ 对外钩子（供其它插件读写等级） ============================ */
+
+/**
+ * `user.level.get` —— 取某用户等级。
+ * 调用方把 $level 初始化为**哨兵值 -1**：没插件响应时它仍是 -1，
+ * 调用方据此判断「等级插件未安装 / 未启用」并隐藏相关 UI。
+ *
+ * ```php
+ * $lv = -1;
+ * Plugin::fire('user.level.get', [&$lv, $uid]);
+ * if ($lv < 0) { /* 无等级体系 *\/ }
+ * ```
+ */
+Plugin::on('user.level.get', function (int &$level, int $uid) {
+    if ($uid <= 0) return;
+    $level = haLTLevelOf($uid);
+});
+
+/**
+ * `user.level.set` —— 设置某用户等级（后台「用户管理」用）。
+ * $ok 传入 **null**：没有插件响应时它保持 null，调用方据此提示「未安装等级插件」，
+ * 而不是误报成功。等级只改数值，不重算加权（与插件后台的「直接设置」同口径）。
+ *
+ * ```php
+ * $ok = null; $msg = '';
+ * Plugin::fire('user.level.set', [$uid, $lv, &$ok, &$msg]);
+ * ```
+ */
+Plugin::on('user.level.set', function (int $uid, int $level, ?bool &$ok, string &$msg) {
+    if ($uid <= 0) { $ok = false; $msg = '非法用户'; return; }
+    if ($level < 1) { $ok = false; $msg = '等级需为 ≥1 的整数'; return; }
+    $row = haLTRow($uid);
+    if (!$row) { $ok = false; $msg = '用户不存在'; return; }
+    $t = haLTDecode((string)$row['today']);
+    $row['level'] = max(1, $level);
+    haLTSave($uid, $row, $t);
+    $ok = true;
+    $msg = '等级已设为 Lv.' . (int)$row['level'];
 });
 
 /* ============================ 前台路由 ============================ */
