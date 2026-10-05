@@ -3362,7 +3362,8 @@
             this.openModal(
                 '<h3>搜索</h3>'
                 + '<div class="ha-tabs ha-sr-scope" id="haSrScope">' + scopeHtml + '</div>'
-                + '<input class="ha-input" id="haSrQ" placeholder="' + esc(hint) + '" autocomplete="off">'
+                // v1.2.32：maxlength=50（与服务端 cleanSearchKey 一致）
+                + '<input class="ha-input" id="haSrQ" maxlength="50" placeholder="' + esc(hint) + '" autocomplete="off">'
                 + '<div class="ha-sr-list" id="haSrList"></div>'
             , 460);
             var q = $('haSrQ');
@@ -3400,7 +3401,19 @@
                         return;
                     }
                 }
-                self.doSearch($('haSrQ') ? $('haSrQ').value : '');
+                // v1.2.32：「在「群名」里搜索」这种**带上下文的提示只属于「当前聊天」**，
+                // 切到其它范围必须换回普通提示（否则「在『综合闲聊』里搜索」下面
+                // 列出全站消息，自相矛盾还误导用户）；切回来也要**恢复**上下文提示。
+                var qi = $('haSrQ');
+                if (qi) {
+                    if (sc === 'current') {
+                        var c2 = self.searchContext();
+                        qi.placeholder = c2 ? ('在「' + c2.name + '」里搜索') : '当前没有打开的会话';
+                    } else {
+                        qi.placeholder = '输入关键词';
+                    }
+                }
+                self.doSearch(qi ? qi.value : '');
             };
             setTimeout(function () { try { q.focus(); } catch (e) {} }, 30);
         },
@@ -3412,10 +3425,22 @@
             return null;
         },
 
-        /** 执行搜索（竞态保护：只认最后一次请求的结果，先回来的旧请求直接丢弃） */
+        /**
+         * 执行搜索（竞态保护：只认最后一次请求的结果，先回来的旧请求直接丢弃）
+         *
+         * v1.2.32 新增三道限制：
+         *  ① **10 秒一次**：`_srLastAt` 记录上次发起时间，间隔不足直接提示并返回。
+         *     服务端还有一层 10 秒 3 次的限流（防绕过前端直接打接口）。
+         *  ② **输入长度**：输入框 maxlength=50（与服务端一致，服务端再截一次）。
+         *  ③ **字符清洗**：去掉控制字符与 SQL/HTML 符号后再发（后端还会再洗一次）。
+         */
         doSearch: function (kw) {
             var self = this;
-            kw = (kw || '').replace(/^\s+|\s+$/g, '');
+            kw = String(kw == null ? '' : kw)
+                .replace(/[\x00-\x1F\x7F<>"'`\\\/%&|;=$()[\]{}*?!#~^,]/g, '')   // 异常字符
+                .replace(/\s+/g, ' ')
+                .replace(/^\s+|\s+$/g, '');
+            if (kw.length > 50) kw = kw.slice(0, 50);
             var list = $('haSrList');
             if (!kw) { this.renderSearchResults([]); return; }
             if (this._srScope === 'current' && !this.searchContext()) {
@@ -3423,6 +3448,14 @@
                 if (list) list.innerHTML = '<div class="ha-sr-empty">当前没有打开的聊天，请先点开一个会话，或切换上面的搜索范围</div>';
                 return;
             }
+            // ① 10 秒节流
+            var now = new Date().getTime();
+            if (this._srLastAt && now - this._srLastAt < 10000) {
+                var wait = Math.ceil((10000 - (now - this._srLastAt)) / 1000);
+                if (list) list.innerHTML = '<div class="ha-sr-empty">搜索太频繁，请 ' + wait + ' 秒后再试</div>';
+                return;
+            }
+            this._srLastAt = now;
             var ctx = this.searchContext() || { roomId: 0, peer: '' };
             var mySeq = ++this._srSeq;
             if (list) list.innerHTML = '<div class="ha-sr-empty">搜索中…</div>';
@@ -3457,10 +3490,14 @@
                         + '<span class="ha-sr-sub">' + esc(d.text) + '</span>'
                         + '</span></div>';
                 } else if (d.type === 'room') {
+                    // v1.2.32：群也显示 ID（可按 ID 直接搜到群）
                     html += '<div class="ha-sr-item" data-i="' + i + '">'
                         + roomAvatarHtml(d.avatar, true, 'ha-cl-icon')
                         + '<span class="ha-sr-main">'
-                        + '<span class="ha-sr-title">' + esc(d.name) + '<span class="ha-sr-tag">' + (d.need_password ? '密码房' : '群聊') + '</span></span>'
+                        + '<span class="ha-sr-title">' + esc(d.name)
+                        + '<span class="ha-sr-tag">ID ' + esc(fmtUid(d.room_id)) + '</span>'
+                        + (d.need_password ? '<span class="ha-sr-tag">密码房</span>' : '')
+                        + '</span>'
                         + '<span class="ha-sr-sub">' + (d.need_password ? '需要密码才能进入' : '点击进入群聊') + '</span>'
                         + '</span></div>';
                 } else {

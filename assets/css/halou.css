@@ -1365,7 +1365,13 @@ input[type=range] {
 /* ---------- 弹层 ---------- */
 .ha-modal-mask {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, .45);
+    /* v1.2.32：灰色遮蔽层 → 半透明 + 背景模糊。
+       遮罩色降到 .32（模糊本身会削弱对比，再深就看不见弹窗了）。
+       ⚠️ 老内核不支持 backdrop-filter：仍能正常显示（只是没有模糊），
+          加 -webkit- 前缀覆盖 Safari；两者都无效时回落到纯半透明，不影响可用。 */
+    background: rgba(0, 0, 0, .32);
+    -webkit-backdrop-filter: blur(6px) saturate(120%);
+    backdrop-filter: blur(6px) saturate(120%);
     z-index: 100;
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;

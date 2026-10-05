@@ -374,9 +374,16 @@ if ($action !== '') {
 
         // ---------- 搜索（v1.2.31）：品牌区搜索图标弹窗 ----------
         // scope: current 当前会话 / people 找人·群 / messages 全站消息 / friends 联系人
+        // v1.2.32：① 游客不可搜；② 服务端 10 秒 3 次限流（前端也有节流，这里是防绕过的第二道）
         case 'search':
+            if (($actor['kind'] ?? '') !== 'user') Api::json(['ok' => false, 'msg' => '游客不支持搜索'], 403);
+            // scope 白名单：动态参数只认这四个值，其余一律回落 current
             $scope = (string)$p('scope', 'current');
             if (!in_array($scope, ['current', 'people', 'messages', 'friends'], true)) $scope = 'current';
+            // 限流桶按「用户 + 范围」分桶：换范围点不会互相挤占
+            if (!Sec::rateLimit('search', 'u' . (int)$actor['id'] . '|' . $scope, 10, 3)) {
+                Api::json(['ok' => false, 'msg' => '搜索太频繁，请 10 秒后再试']);
+            }
             Api::json([
                 'ok' => true,
                 'scope' => $scope,
@@ -900,9 +907,13 @@ function pageHead(string $title): void
     // 动态页禁止缓存：页面内含会话密钥，缓存旧页会导致提交时签名对不上
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
+    // v1.2.32：全站 noindex —— 聊天内容/昵称/私聊页面一律不进搜索引擎索引。
+    // meta 与响应头同时给：meta 覆盖主流爬虫，X-Robots-Tag 对会忽略 meta 的爬虫也有效。
+    header('X-Robots-Tag: noindex, nofollow, noarchive', true);
     $site = Sec::e(DB::setting('site_name', 'Halou-Chat'));
     echo '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'
        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
+       . '<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">'
        . '<title>' . Sec::e($title) . ' - ' . $site . '</title>'
        . '<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">'
        . '<link rel="stylesheet" href="assets/css/halou.css?v=' . HALOU_VERSION . '">';

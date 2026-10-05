@@ -956,11 +956,29 @@ class Chat
     // ---------- 搜索（v1.2.31） ----------
 
     /**
+     * 清洗搜索关键词（v1.2.32）。
+     *  ① 去掉控制字符与 SQL/HTML 危险符号（参数已用占位符绑定，这里是第二道防线，
+     *     防止 LIKE 通配符被用户滥用成全表扫）；
+     *  ② 连续空白压成一个空格；
+     *  ③ 长度上限 50（与 UI 输入框 maxlength 一致）。
+     * @return array [清洗后的词, 是否为纯数字ID]
+     */
+    public static function cleanSearchKey(string $q): array
+    {
+        $q = (string)$q;
+        // 去掉控制字符、HTML/SQL 符号、反斜杠；保留中文、字母、数字、空格与 @ . - _
+        $q = preg_replace('/[\x00-\x1F\x7F<>"\x27`\\\\\/%&|;=$()\[\]{}*?!#~^,]/u', '', $q);
+        $q = trim(preg_replace('/\s+/u', ' ', (string)$q));
+        if (mb_strlen($q) > 50) $q = mb_substr($q, 0, 50);
+        return [$q, (bool)preg_match('/^\d{1,10}$/', $q)];
+    }
+
+    /**
      * 统一搜索入口，四个范围：
      *   current  当前会话内的消息（群聊传 room_id，私聊传 peer）
-     *   people   按昵称找人 + 按名称找群
+     *   people   按昵称/ID 找人 + 按名称/ID 找群
      *   messages 全站消息（**只搜自己有权看的**：能进的群 + 涉及自己的私聊）
-     *   friends  联系人
+     *   friends  联系人（按昵称/ID）
      *
      * 返回项统一形状：{type:'user'|'room'|'msg', ...}，前端按 type 分发点击行为。
      * msg 额外带 room_id（0 = 私聊）、peer（私聊对象键）、from（发送者昵称）。
@@ -969,27 +987,30 @@ class Chat
      */
     public static function search(array $actor, string $scope, string $q, array $opt = []): array
     {
-        $q = trim($q);
+        [$q, $isId] = self::cleanSearchKey($q);
         if ($q === '') return [];
-        if (mb_strlen($q) > 50) $q = mb_substr($q, 0, 50);
         $like = '%' . $q . '%';
+        $idNum = $isId ? (int)$q : 0;
 
         switch ($scope) {
             case 'people':
                 $out = [];
-                // 找人：排除自己（自己不会「找」自己），只返回正常状态账号
-                foreach (DB::all(
-                    'SELECT id, nickname, avatar, role FROM users
-                     WHERE status=1 AND nickname LIKE ? AND id<>? ORDER BY nickname LIMIT 20',
-                    [$like, (int)($actor['id'] ?? 0)]) as $u) {
+                // 找人：昵称模糊 **或** ID 精确（v1.2.32 支持直接输 ID 找人）；排除自己
+                $sql = 'SELECT id, nickname, avatar, role FROM users
+                        WHERE status=1 AND (nickname LIKE ?' . ($idNum > 0 ? ' OR id=?' : '') . ')
+                          AND id<>? ORDER BY nickname LIMIT 20';
+                $args = $idNum > 0 ? [$like, $idNum, (int)($actor['id'] ?? 0)] : [$like, (int)($actor['id'] ?? 0)];
+                foreach (DB::all($sql, $args) as $u) {
                     $out[] = ['type' => 'user', 'user_id' => (int)$u['id'], 'nickname' => (string)$u['nickname'],
                         'avatar' => (string)($u['avatar'] ?? ''), 'role' => (string)$u['role']];
                 }
-                // 找群：走 rooms() 过滤（已含 canEnter 判定，游客看不到的不给）
+                // 找群：名称模糊 **或** ID 精确；仍走 rooms() 过 canEnter（游客看不到的不给）
                 foreach (self::rooms($actor) as $r) {
-                    if (mb_strpos((string)$r['name'], $q) === false) continue;
+                    $hit = $idNum > 0 && (int)$r['id'] === $idNum;
+                    if (!$hit && mb_strpos((string)$r['name'], $q) === false) continue;
                     $out[] = ['type' => 'room', 'room_id' => (int)$r['id'], 'name' => (string)$r['name'],
-                        'avatar' => (string)($r['avatar'] ?? ''), 'need_password' => !empty($r['need_password'])];
+                        'avatar' => (string)($r['avatar'] ?? ''),
+                        'need_password' => !empty($r['need_password']), 'is_public' => !empty($r['is_public'])];
                     if (count($out) >= 30) break;
                 }
                 return $out;
@@ -997,11 +1018,13 @@ class Chat
             case 'friends':
                 if (($actor['kind'] ?? '') !== 'user') return [];
                 $out = [];
-                foreach (DB::all(
-                    'SELECT u.id, u.nickname, u.avatar, u.role FROM friends f
-                     JOIN users u ON u.id = f.friend_id
-                     WHERE f.user_id=? AND u.status=1 AND u.nickname LIKE ?
-                     ORDER BY u.nickname LIMIT 30', [(int)$actor['id'], $like]) as $u) {
+                // 好友：昵称模糊 **或** ID 精确（v1.2.32）
+                $sql = 'SELECT u.id, u.nickname, u.avatar, u.role FROM friends f
+                        JOIN users u ON u.id = f.friend_id
+                        WHERE f.user_id=? AND u.status=1 AND (u.nickname LIKE ?' . ($idNum > 0 ? ' OR u.id=?' : '') . ')
+                        ORDER BY u.nickname LIMIT 30';
+                $args = $idNum > 0 ? [(int)$actor['id'], $like, $idNum] : [(int)$actor['id'], $like];
+                foreach (DB::all($sql, $args) as $u) {
                     $out[] = ['type' => 'user', 'user_id' => (int)$u['id'], 'nickname' => (string)$u['nickname'],
                         'avatar' => (string)($u['avatar'] ?? ''), 'role' => (string)$u['role'], 'is_friend' => true];
                 }
