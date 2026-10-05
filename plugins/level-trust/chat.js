@@ -46,16 +46,46 @@
     HaChat.onCardMetaTop(function (u) {
         if (!u || !u.level) return '';      // 无等级（游客 / 数据缺失）→ 不渲染整行
         var title = u.level_honor ? '荣誉等级' : '等级';
+        // v1.2.46：**不显示阶段名**（用户要求）。阶段信息在 ?page=level 页面里有完整说明，
+        //   资料卡只留等级数字 —— 一行塞三个信息（数字 + 阶段 + 徽章）反而挤。
         return '<a class="ha-card-meta-row ha-lt-row ha-lt-row-link" href="?page=level"'
             + ' title="查看等级规则与今日任务">'
             + '<span class="ha-card-meta-k">' + title + '</span>'
             + '<span class="ha-card-meta-v">'
             + badge(u.level, u.level_stage_no, u.level_honor)
-            + (u.level_stage ? '<span class="ha-lt-stage">' + esc(u.level_stage) + '</span>' : '')
             + '</span></a>';
     }, 1);
 
-    /** 供其它插件/页面取用 */
+    /* ---------- 侧栏底部资料区（.ha-me-click）：昵称右侧显示等级 ---------- */
+    /**
+     * 在昵称右边插入等级徽章（**只有等级数字，不显示阶段名**）。
+     *
+     * 为什么要包一层 renderMe：核心每次渲染资料区都是整块 innerHTML 覆盖，
+     * 我们插进去的节点会被抹掉。包一层在渲染后补插，才能保证
+     * 「改完昵称/头像回来等级还在」。
+     */
+    function paintMeLevel() {
+        var box = d.getElementById('haMe');
+        if (!box || box.className.indexOf('ha-me-click') < 0) return;   // 游客不显示
+        if (box.getElementsByClassName('ha-lt-badge').length) return;    // 已有就别重复插
+        var line = box.querySelector('.ha-me-line');
+        var name = line ? line.querySelector('.ha-me-name') : null;
+        if (!name) return;
+        if (!w.__haLevelMy || !w.__haLevelMy.level) return;              // 数据还没回来
+        var lv = w.__haLevelMy;
+        // badge() 返回的是 **HTML 字符串**，要先落成节点才能加类名
+        //（直接 b.className = ... 会在字符串上赋值，报「Cannot create property on string」）
+        var box2 = d.createElement('span');
+        box2.innerHTML = badge(lv.level, lv.stage_no, lv.honor);
+        var b = box2.firstChild;
+        if (!b) return;
+        b.className += ' ha-lt-badge-sm';
+        b.setAttribute('title', '等级 Lv.' + lv.level);
+        // 插在昵称**后面**、头衔标签**前面**：头衔是用户自己设的，优先级高于等级
+        if (name.nextSibling) line.insertBefore(b, name.nextSibling);
+        else line.appendChild(b);
+    }
+
     w.HaLevel = {
         LABEL: LABEL,
         badge: badge,
@@ -64,6 +94,23 @@
             HaApi.post('plugin_level_trust_mine', {}, function (r) {
                 if (typeof cb === 'function') cb(r);
             });
-        }
+        },
+        /** 侧栏资料区补等级（供 HaTip 之类重渲染后手动调用） */
+        paintMe: paintMeLevel
     };
+
+    /* ---------- 侧栏等级：拉数据 + 包 renderMe ---------- */
+    // 游客没有等级，不发这个请求
+    if (w.HaChat && HaChat.cfg && HaChat.cfg.me && HaChat.cfg.me.id) {
+        HaApi.post('plugin_level_trust_mine', {}, function (r) {
+            if (!r || !r.ok || !r.level) return;
+            w.__haLevelMy = { level: r.level, stage_no: r.stage_no, honor: r.honor };
+            paintMeLevel();
+        });
+        var origRenderMe = HaChat.renderMe;
+        HaChat.renderMe = function () {
+            origRenderMe.apply(HaChat, arguments);
+            paintMeLevel();
+        };
+    }
 })(window, document);

@@ -28,7 +28,8 @@
     box-shadow: 0 0 0 1px rgba(180, 120, 0, .35);
 }
 
-.ha-lt-stage { font-size: 12px; color: #5C5C5C; margin-left: 6px; }
+/* v1.2.46：原 .ha-lt-stage（资料卡里的阶段名）已随「资料卡不显示阶段」删除。
+   阶段名的样式现在只在前台等级页用 .ha-lv-hero-stage。 */
 
 /* 后台：任务进度条 */
 .ha-lt-tasks { margin-top: 8px; }
@@ -134,4 +135,13 @@
     display: flex; justify-content: space-between;
     margin: 4px 0 0 86px; padding-right: 78px;
     font-size: 11px; color: var(--ha-text-sub);
+}
+
+/* 侧栏底部资料区里的等级徽章（v1.2.46）
+   比资料卡里的小一号：侧栏那行本来就窄（昵称 + 头衔 + 徽章），
+   用资料卡的 12px/18px 会把昵称挤没。 */
+.ha-me-line .ha-lt-badge.ha-lt-badge-sm {
+    font-size: 11px; line-height: 15px; padding: 0 5px; border-radius: 3px;
+    margin-left: 0; flex-shrink: 0; -webkit-flex-shrink: 0;
+    vertical-align: middle; cursor: default;
 }
