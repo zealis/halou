@@ -848,12 +848,37 @@ input[type=range] {
     padding: 12px 16px;
     border-top: 1px solid var(--ha-border);
 }
-.ha-me-name { font-weight: 600; color: var(--ha-text-title); }
+/* v1.2.39：昵称强制单行，超出省略号。
+   原先 `.ha-me-name` 没有任何截断规则，昵称长一点就**在资料区里换行**，
+   把下面的「ID · 积分」整块往下顶，资料区高度也跟着变 —— 侧栏底部会忽然变高。
+   三个条件缺一不可：
+     min-width:0      在 flex 容器里允许收缩到内容宽度以下（否则 flex 项不肯缩）
+     white-space:nowrap  不换行
+     overflow:hidden + text-overflow:ellipsis  溢出画省略号
+   `flex:0 1 auto` = 可缩不可扩：短昵称照原样，长昵称才截断。 */
+.ha-me-name {
+    font-weight: 600;
+    color: var(--ha-text-title);
+    flex: 0 1 auto; -webkit-flex: 0 1 auto;
+    min-width: 0; -webkit-min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 /* 登录用户的资料区可点击（弹出操作菜单） */
 .ha-me-click { cursor: pointer; transition: background .15s; }
 .ha-me-click:hover { background: var(--ha-bg-sub); }
 .ha-me-info { min-width: 0; flex: 1; -webkit-flex: 1; }
-.ha-me-line { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 6px; flex-wrap: wrap; -webkit-flex-wrap: wrap; }
+/* 昵称行**不换行**：头衔标签固定在昵称右侧（原来 wrap 会让标签掉到第二行） */
+.ha-me-line {
+    display: flex; display: -webkit-flex;
+    align-items: center; -webkit-align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap; -webkit-flex-wrap: nowrap;
+    min-width: 0; -webkit-min-width: 0;
+}
+/* 头衔标签不参与收缩：昵称被截断时标签仍要完整可读 */
+.ha-me-line .ha-tag { flex-shrink: 0; -webkit-flex-shrink: 0; }
 .ha-side-actions { display: flex; display: -webkit-flex; gap: 8px; padding: 0 16px 14px; flex-wrap: wrap; -webkit-flex-wrap: wrap; }
 
 /* 主区域 */
