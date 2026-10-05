@@ -3294,14 +3294,57 @@
 
         /* ---------- 搜索窗（v1.2.31，替代原「品牌区竖三点」菜单） ----------
            v1.2.31 之前这里是 onBrandMenu 扩展点 + toggleBrandMenu（头像+昵称/联系人/插件项）。
-           用户要求删除并改成搜索：**默认搜「当前聊天」**，下方可切换
-           当前聊天 / 找人·群 / 消息 / 好友 四个范围。
+           用户要求删除并改成搜索：**默认搜「当前聊天」**，下方可切换搜索范围。
            ⚠️ onBrandMenu 扩展点一并删除（全项目零引用，plugins/ 下无任何调用）；
               打开自己资料卡仍有入口 —— 侧栏底部资料区 #haMe（toggleMeMenu）。 */
+
+        /**
+         * 搜索范围（v1.2.32 调整顺序：找人/群 挪到最后）。
+         * 顺序即标签条上的呈现顺序；插件追加的排在最后。
+         *   current  当前聊天（默认）
+         *   messages 全站消息
+         *   friends  联系人
+         *   people   找人/群
+         */
+        _srScopeDefs: [
+            { id: 'current', label: '当前聊天' },
+            { id: 'messages', label: '消息' },
+            { id: 'friends', label: '好友' },
+            { id: 'people', label: '找人/群' },
+        ],
+        _searchExt: [],       // 插件追加的自定义搜索范围
+
+        /**
+         * 插件扩展点：追加自定义搜索范围。
+         * 回调签名 fn(defs, env)：
+         *   - 只给 {id, label} → 走核心 doSearch（后端需认得这个 scope，否则结果为空）
+         *   - 给 {id, label, run(self, keyword)} → 点击该标签时由插件自己搜、自己渲染，
+         *     核心只负责把输入框的值传过去（适合要调自己接口、或结果结构不同的插件）
+         * @example
+         * HaChat.onSearchScopes(function (defs) {
+         *     defs.push({ id: 'files', label: '文件', run: function (self, kw) { /* 自搜 *\/ } });
+         * });
+         */
+        onSearchScopes: function (fn) { if (typeof fn === 'function') this._searchExt.push(fn); },
+
+        /** 取范围定义表（含插件追加项） */
+        searchScopes: function () {
+            var defs = [], i;
+            for (i = 0; i < this._srScopeDefs.length; i++) defs.push(this._srScopeDefs[i]);
+            for (i = 0; i < this._searchExt.length; i++) {
+                try { this._searchExt[i](defs, { actor: this.cfg.actor, me: this.cfg.me }); } catch (e) {}
+            }
+            return defs;
+        },
 
         /** 打开搜索窗。scope 缺省为「当前聊天」 */
         openSearch: function (scope) {
             var self = this;
+            // v1.2.32：游客不能搜索（没有会话体系，搜什么都是空的）
+            if (!this.cfg.actor || this.cfg.actor.kind !== 'user') {
+                toast('游客暂不支持搜索');
+                return;
+            }
             this._srScope = scope || 'current';
             this._srTimer = null;
             this._srSeq = 0;
@@ -3310,14 +3353,15 @@
             var hint = this._srScope === 'current'
                 ? (cur ? ('在「' + cur.name + '」里搜索') : '当前没有打开的会话')
                 : '输入关键词';
+            var defs = this.searchScopes(), i;
+            var scopeHtml = '';
+            for (i = 0; i < defs.length; i++) {
+                scopeHtml += '<button class="ha-tab' + (defs[i].id === this._srScope ? ' is-active' : '')
+                    + '" data-scope="' + esc(defs[i].id) + '" type="button">' + esc(defs[i].label) + '</button>';
+            }
             this.openModal(
                 '<h3>搜索</h3>'
-                + '<div class="ha-tabs ha-sr-scope" id="haSrScope">'
-                + '<button class="ha-tab' + (this._srScope === 'current' ? ' is-active' : '') + '" data-scope="current" type="button">当前聊天</button>'
-                + '<button class="ha-tab' + (this._srScope === 'people' ? ' is-active' : '') + '" data-scope="people" type="button">找人/群</button>'
-                + '<button class="ha-tab' + (this._srScope === 'messages' ? ' is-active' : '') + '" data-scope="messages" type="button">消息</button>'
-                + '<button class="ha-tab' + (this._srScope === 'friends' ? ' is-active' : '') + '" data-scope="friends" type="button">好友</button>'
-                + '</div>'
+                + '<div class="ha-tabs ha-sr-scope" id="haSrScope">' + scopeHtml + '</div>'
                 + '<input class="ha-input" id="haSrQ" placeholder="' + esc(hint) + '" autocomplete="off">'
                 + '<div class="ha-sr-list" id="haSrList"></div>'
             , 460);
@@ -3341,10 +3385,20 @@
                 var sc = t.getAttribute('data-scope');
                 if (!sc || sc === self._srScope) return;
                 self._srScope = sc;
-                var bs = bar.getElementsByClassName('ha-tab'), i;
-                for (i = 0; i < bs.length; i++) {
-                    if (bs[i].getAttribute('data-scope') === sc) bs[i].className += ' is-active';
-                    else bs[i].className = bs[i].className.replace(' is-active', '');
+                var bs = bar.getElementsByClassName('ha-tab'), i2;
+                for (i2 = 0; i2 < bs.length; i2++) {
+                    if (bs[i2].getAttribute('data-scope') === sc) bs[i2].className += ' is-active';
+                    else bs[i2].className = bs[i2].className.replace(' is-active', '');
+                }
+                // 插件自定义范围：走它自己的 run（自搜自渲染）
+                var defs2 = self.searchScopes(), j;
+                for (j = 0; j < defs2.length; j++) {
+                    if (defs2[j].id === sc && typeof defs2[j].run === 'function') {
+                        self._srData = [];
+                        self.renderSearchResults([]);
+                        try { defs2[j].run(self, ($('haSrQ') || {}).value || ''); } catch (err) {}
+                        return;
+                    }
                 }
                 self.doSearch($('haSrQ') ? $('haSrQ').value : '');
             };
@@ -3410,11 +3464,16 @@
                         + '<span class="ha-sr-sub">' + (d.need_password ? '需要密码才能进入' : '点击进入群聊') + '</span>'
                         + '</span></div>';
                 } else {
+                    // v1.2.32：ID 提到**标题行**做标签（原来只在副行一行小字，
+                    // 找特定用户时扫一眼标题看不到，还得逐条读完副行）
                     html += '<div class="ha-sr-item" data-i="' + i + '">'
                         + avatarHtml(d.avatar, d.nickname, true, d.role)
                         + '<span class="ha-sr-main">'
-                        + '<span class="ha-sr-title">' + esc(d.nickname) + '<span class="ha-sr-tag">' + (d.is_friend ? '好友' : '用户') + '</span></span>'
-                        + '<span class="ha-sr-sub">用户 ID ' + esc(fmtUid(d.user_id)) + '</span>'
+                        + '<span class="ha-sr-title">' + esc(d.nickname)
+                        + '<span class="ha-sr-tag">ID ' + esc(fmtUid(d.user_id)) + '</span>'
+                        + (d.is_friend ? '<span class="ha-sr-tag">好友</span>' : '')
+                        + '</span>'
+                        + '<span class="ha-sr-sub">' + esc(d.signature || ('用户 ID ' + fmtUid(d.user_id))) + '</span>'
                         + '</span></div>';
                 }
             }
@@ -3448,18 +3507,84 @@
                 toast('该群聊当前不可进入');
                 return;
             }
-            // 消息结果：跳到它所在的会话（不做精确定位高亮 —— 为一次搜索引入定位机制不划算）
+            // 消息结果：跳到**那条消息**并弹出它的操作菜单（v1.2.32）
             this.closeModal();
             if (this.view !== 'chat') this.switchTab('chat');
             if (d.room_id) {
                 var rs = this.cfg.rooms || [];
                 for (var k = 0; k < rs.length; k++) {
-                    if (rs[k].id === d.room_id) { this.switchRoom(d.room_id, rs[k].name, null); return; }
+                    if (rs[k].id === d.room_id) { this.switchRoom(d.room_id, rs[k].name, null); break; }
                 }
-                toast('该消息所在的群聊已不可进入');
+                if (k >= rs.length) { toast('该消息所在的群聊已不可进入'); return; }
             } else if (d.peer) {
                 this.openDm(d.peer, this.dmNameOf(d.peer));
+            } else {
+                return;
             }
+            this.jumpToMsg(d);
+        },
+
+        /**
+         * 跳到指定消息：先在当前 DOM 里找，找不到就**回溯加载历史**直到那条出现，
+         * 然后滚动居中 + 高亮 + 弹出该消息的操作菜单（v1.2.32）。
+         *
+         * ⚠️ 不复用 loadHistory：它带 `loadingHistory` 并发闸门且会按 scrollHeight
+         * 回推视口，套进来容易出现「回调永不触发 → 定位静默失败」。这里自己按页拉，
+         * 逻辑直白：拉一页 → 看有没有 → 没有就继续往前。
+         */
+        jumpToMsg: function (d) {
+            var self = this;
+            setTimeout(function () { self._tryLocateMsg(d.msg_id, 0); }, 700);
+        },
+
+        _tryLocateMsg: function (msgId, page) {
+            var self = this, box = $('haMessages');
+            if (!box) return;
+            var node = $('haMsg' + msgId);
+            if (!node) {
+                // 最多回溯 15 页（≈450 条）；到顶还找不到就放弃并说明
+                if (page >= 15 || this.historyDone) { toast('该消息太靠前，未能定位'); return; }
+                var first = box.querySelector('.ha-msg');
+                if (!first) { toast('未能定位到该消息'); return; }
+                var firstId = parseInt(first.id.replace('haMsg', ''), 10);
+                if (firstId <= msgId) { toast('该消息太靠前，未能定位'); return; }
+                var isDm = !!this.dm;
+                var peer = isDm ? this.dm.peer : '';
+                HaApi.post(isDm ? 'dm_history' : 'history',
+                    isDm ? { peer: peer, before_id: firstId } : { room_id: this.room, before: firstId },
+                    function (r) {
+                        // 已切走/已切私聊 → 丢弃，别把别处的消息插进来
+                        if ((!!self.dm) !== isDm || (isDm && self.dm.peer !== peer)) return;
+                        if (!r.ok || !r.data.length) { self.historyDone = true; self._tryLocateMsg(msgId, 99); return; }
+                        var oldH = box.scrollHeight, i;
+                        for (i = r.data.length - 1; i >= 0; i--) self.addMessageBefore(r.data[i], first);
+                        box.scrollTop = box.scrollHeight - oldH;   // 保持视口不跳
+                        if (r.data.length < 30) self.historyDone = true;
+                        self._tryLocateMsg(msgId, page + 1);
+                    });
+                return;
+            }
+            this._focusMsgNode(node);
+        },
+
+        /** 滚动到某条消息 → 高亮 → 弹出它的操作菜单 */
+        _focusMsgNode: function (node) {
+            var self = this, box = $('haMessages');
+            var r = node.getBoundingClientRect(), br = box.getBoundingClientRect();
+            // 居中：把元素中心对到容器中心
+            box.scrollTop += (r.top - br.top) - (box.clientHeight / 2) + (r.height / 2);
+            // ⚠️ 必须在此闭包外抓 self：setTimeout 回调里的 this 是 undefined
+            //（本文件是严格模式），写 this.msgCache 会抛
+            // 「Cannot read properties of undefined」并中断后面的菜单弹出。
+            setTimeout(function () {
+                var rr = node.getBoundingClientRect();
+                node.className += ' ha-msg-hit';
+                setTimeout(function () {
+                    node.className = node.className.replace(' ha-msg-hit', '');
+                }, 2400);
+                var m = self.msgCache[parseInt(node.id.replace('haMsg', ''), 10)];
+                if (m) self.showContentMenu(Math.round(rr.left + Math.min(rr.width, 360)), Math.round(rr.top + 8), m);
+            }, 60);
         },
 
         /**

@@ -1005,6 +1005,19 @@ class Chat
                     $out[] = ['type' => 'user', 'user_id' => (int)$u['id'], 'nickname' => (string)$u['nickname'],
                         'avatar' => (string)($u['avatar'] ?? ''), 'role' => (string)$u['role'], 'is_friend' => true];
                 }
+                // 好友补签名（插件）：signature 未启用时不阻断，与联系人列表同一口径
+                if ($out) {
+                    $ids = array_map(fn($x) => (int)$x['user_id'], $out);
+                    $q = implode(',', array_fill(0, count($ids), '?'));
+                    try {
+                        foreach (DB::all("SELECT user_id, signature FROM plugin_signature WHERE user_id IN ($q)", $ids) as $sg) {
+                            $sid = (int)$sg['user_id'];
+                            for ($i2 = 0; $i2 < count($out); $i2++) {
+                                if ((int)$out[$i2]['user_id'] === $sid) $out[$i2]['signature'] = (string)$sg['signature'];
+                            }
+                        }
+                    } catch (Throwable $e) { /* 表不存在（插件未启用）：忽略 */ }
+                }
                 return $out;
 
             case 'messages':

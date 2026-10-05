@@ -570,14 +570,24 @@ input[type=range] {
    ⚠️ transform 不参与布局，品牌条高度与分隔线位置不受影响。 */
 .ha-brand img { width: 22px; height: 22px; transform: translateY(1.5px); -webkit-transform: translateY(1.5px); }
 /* v1.2.31：站点名右侧的**搜索按钮**（原竖三点菜单已删除）。
+   v1.2.32 位置修正：原来用 line-height 顶行 + 继承 .ha-icon-btn 的 padding，
+   图标在 28px 方框里偏上、按钮也显得偏左。改为 flex 双向居中 + 加大右间距。
    ⚠️ 这个 28px 同时是**品牌条高度的支点**：logo 缩到 22px、站点名 16px 之后，
    整条的高度就靠它撑着（实测 57px）。别再顺手改小，否则品牌条会跟着变矮，
    与顶栏、侧栏第一行的分隔线错位（下方「首行分隔线与顶栏下边框水平对齐」一节有说明）。 */
 .ha-brand .ha-brand-search {
     margin-left: auto;
-    width: 28px; height: 28px; line-height: 28px;
+    margin-right: -8px;          /* 视觉贴右：抵消 icon-btn 自带留白 + .ha-brand 的 16px padding */
+    /* ⚠️ 负边距的上限：hover 背景块（28px 宽）右缘不得越过侧栏右边界。
+       -8px 时块右缘 = 侧栏右缘 - 4px，仍在界内；再往负就溢到聊天区了。 */
+    width: 28px; height: 28px;
+    display: inline-flex; display: -webkit-inline-flex;
+    align-items: center; -webkit-align-items: center;
+    justify-content: center; -webkit-justify-content: center;
+    line-height: 1;
     flex-shrink: 0; -webkit-flex-shrink: 0;
 }
+.ha-brand .ha-brand-search .ha-ico { display: block; }   /* 消掉 svg 的基线间隙 */
 /* ---------- 搜索窗（v1.2.31） ---------- */
 .ha-sr-scope { margin-bottom: 10px; }        /* 范围切换复用 .ha-tabs 组件外观 */
 .ha-sr-scope .ha-tab { font-size: 13px; padding: 6px 8px; }
@@ -615,6 +625,12 @@ input[type=range] {
 /* 消息结果：发送者与片段分两行，避免长文本把标题挤没 */
 .ha-sr-item.is-msg { align-items: flex-start; -webkit-align-items: flex-start; }
 .ha-sr-empty { padding: 18px 6px; font-size: 13px; color: var(--ha-text-sub); text-align: center; }
+/* 搜索命中定位后的高亮（v1.2.32）：一次性闪一下就撤，不常驻 */
+.ha-msg-hit { animation: haMsgHit 2.4s ease-out; }
+@keyframes haMsgHit {
+    0%, 55% { background: #FFF3C4; box-shadow: 0 0 0 6px #FFF3C4; border-radius: 8px; }
+    100% { background: transparent; box-shadow: 0 0 0 6px transparent; border-radius: 8px; }
+}
 .ha-side-title {
     padding: 12px 16px 6px;
     font-size: 12px;
