@@ -641,6 +641,17 @@ input[type=range] {
     color: var(--ha-text-sub);
     background: var(--ha-bg-sub);
 }
+/* v1.2.35：结果条目分批懒渲染后，再让**屏外条目**跳过布局与绘制。
+   content-visibility 是渐进增强：不支持的浏览器忽略这两行，行为不变。
+   ⚠️ contain-intrinsic-size 必须给，否则浏览器会按 0 高度估算，
+   滚动条会随批次跳动（每加一批滚动条就抖一下）。 */
+.ha-sr-item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 46px;
+}
+/* 追加批次时的淡入，让「还有更多」可感知（同时也是性能优化的视觉反馈） */
+@keyframes haSrIn { from { opacity: .4; } to { opacity: 1; } }
+.ha-sr-batch-in > .ha-sr-item { animation: haSrIn .18s ease-out; }
 /* 消息结果：发送者与片段分两行，避免长文本把标题挤没 */
 .ha-sr-item.is-msg { align-items: flex-start; -webkit-align-items: flex-start; }
 .ha-sr-empty { padding: 18px 6px; font-size: 13px; color: var(--ha-text-sub); text-align: center; }

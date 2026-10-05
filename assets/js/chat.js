@@ -3472,7 +3472,25 @@
             });
         },
 
-        /** 渲染搜索结果（用户 / 群 / 消息 三类行） */
+        /**
+         * 渲染搜索结果（用户 / 群 / 消息 三类行）。
+         *
+         * v1.2.35 起**分批懒渲染**（原先一次性插完，最坏 80 条 × 每条一个头像
+         * = 80 个 DOM 子树 + 80 个图片请求，首屏会明显卡）。
+         * 现在：首批只渲染 20 条，滚动到底再追加下一批；
+         * 头像带 loading="lazy"（屏外不发起请求）；再叠加 CSS content-visibility
+         * 让屏外条目跳过布局与绘制。
+         * 结论区最后才拼（必须等所有批次都渲染完，否则会夹在中间）。
+         */
+        _srBatchSize: 20,
+        _srRendered: 0,
+
+        /** 搜索结果里的头像：加 loading=lazy / decoding=async，屏外不请求 */
+        srAvatar: function (url, name, size, role) {
+            var h = avatarHtml(url, name, size, role);
+            return h.replace('<img ', '<img loading="lazy" decoding="async" ');
+        },
+
         renderSearchResults: function (list) {
             var self = this, box = $('haSrList');
             if (!box) return;
@@ -3481,12 +3499,34 @@
                 box.innerHTML = '<div class="ha-sr-empty">' + (kw ? '没有找到相关内容' : '输入关键词开始搜索') + '</div>';
                 return;
             }
+            this._srRendered = 0;
+            box.innerHTML = '';
+            // ⚠️ 两个坑：
+            //  ① 用 onscroll 赋值而不是 addEventListener —— 每次搜索都会重跑这个函数，
+            //     addEventListener 会不断叠加监听器，回调里重复追加。
+            //  ② 判断条件里的 scrollTop/clientHeight/scrollHeight 必须取 **box**（列表元素），
+            //     不是 self（HaChat 对象）。写成 self.scrollTop 恒为 undefined，
+            //     比较恒为 false → 永远不触发追加，列表就停在首批 20 条。
+            box.onscroll = function () {
+                if (box.scrollTop + box.clientHeight >= box.scrollHeight - 48) self.appendSrBatch();
+            };
+            this.appendSrBatch();
+        },
+
+        /** 追加一批（默认 20 条）；已全部渲染完则收尾加分隔线说明 */
+        appendSrBatch: function () {
+            var self = this, box = $('haSrList');
+            if (!box || !this._srData) return;
+            var total = this._srData.length;
+            var from = this._srRendered;
+            if (from >= total) return;
+            var to = Math.min(from + this._srBatchSize, total);
             var html = '', i, d;
-            for (i = 0; i < list.length; i++) {
-                d = list[i];
+            for (i = from; i < to; i++) {
+                d = this._srData[i];
                 if (d.type === 'msg') {
                     html += '<div class="ha-sr-item is-msg" data-i="' + i + '">'
-                        + avatarHtml('', d.from, true, 'guest')
+                        + this.srAvatar('', d.from, true, 'guest')
                         + '<span class="ha-sr-main">'
                         + '<span class="ha-sr-title">' + esc(d.from) + '<span class="ha-sr-tag">' + (d.room_id ? '群聊' : '私聊') + '</span></span>'
                         + '<span class="ha-sr-sub">' + esc(d.text) + '</span>'
@@ -3503,10 +3543,9 @@
                         + '<span class="ha-sr-sub">' + (d.need_password ? '需要密码才能进入' : '点击进入群聊') + '</span>'
                         + '</span></div>';
                 } else {
-                    // v1.2.32：ID 提到**标题行**做标签（原来只在副行一行小字，
-                    // 找特定用户时扫一眼标题看不到，还得逐条读完副行）
+                    // v1.2.32：ID 提到**标题行**做标签
                     html += '<div class="ha-sr-item" data-i="' + i + '">'
-                        + avatarHtml(d.avatar, d.nickname, true, d.role)
+                        + this.srAvatar(d.avatar, d.nickname, true, d.role)
                         + '<span class="ha-sr-main">'
                         + '<span class="ha-sr-title">' + esc(d.nickname)
                         + '<span class="ha-sr-tag">ID ' + esc(fmtUid(d.user_id)) + '</span>'
@@ -3516,19 +3555,29 @@
                         + '</span></div>';
                 }
             }
-            // v1.2.34：结果条数触到该范围上限时补一句「仅显示前 N 条」。
-            // 不提示的话用户会以为搜全了 —— 这是搜索最容易被误会的地方。
-            if (this._srTruncated && this._srLimit) {
-                html += '<div class="ha-sr-tip">结果较多，仅显示前 ' + this._srLimit + ' 条，试试更精确的关键词</div>';
+            this._srRendered = to;
+            box.insertAdjacentHTML('beforeend', html);
+
+            // 最后一批之后才补截断说明
+            if (to >= total && this._srTruncated && this._srLimit) {
+                box.insertAdjacentHTML('beforeend',
+                    '<div class="ha-sr-tip">结果较多，仅显示前 ' + this._srLimit + ' 条，试试更精确的关键词</div>');
             }
-            box.innerHTML = html;
-            box.onclick = function (e) {
-                var t = e.target;
-                while (t && t !== box && !(t.getAttribute && t.getAttribute('data-i'))) t = t.parentNode;
-                if (!t || t === box) return;
-                var idx = parseInt(t.getAttribute('data-i'), 10);
-                if (self._srData && self._srData[idx]) self.pickSearchResult(self._srData[idx]);
-            };
+            // 内容不足一屏（结果少或窗口很高）时继续补，否则用户永远滚不到底、
+            // 后面的批次就永远加载不出来。
+            if (to < total && box.scrollHeight <= box.clientHeight + 8) this.appendSrBatch();
+
+            // 首次绑定点击委托（只绑一次，重渲染不叠加）
+            if (!this._srClickBound) {
+                this._srClickBound = true;
+                box.onclick = function (e) {
+                    var t = e.target;
+                    while (t && t !== box && !(t.getAttribute && t.getAttribute('data-i'))) t = t.parentNode;
+                    if (!t || t === box) return;
+                    var idx = parseInt(t.getAttribute('data-i'), 10);
+                    if (self._srData && self._srData[idx]) self.pickSearchResult(self._srData[idx]);
+                };
+            }
         },
 
         /** 点击搜索结果的分发：人 → 私聊，群 → 进群，消息 → 跳到所在会话 */
