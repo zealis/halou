@@ -601,7 +601,8 @@ if ($action !== '') {
             if ($actor['role'] !== 'admin' && DB::setting('room_create_allow', '1') !== '1') {
                 Api::json(['ok' => false, 'msg' => '站点未开放用户创建群聊']);
             }
-            $gate = ['allowed' => true, 'reason' => '', 'cost' => 0, 'free' => true, 'quota' => 0, 'used' => 0];
+            $gate = ['allowed' => true, 'reason' => '', 'cost' => 0, 'free' => true,
+                     'quota' => 0, 'used' => 0, 'level' => 0, 'min_room_level' => 0];
             Plugin::fire('room.create.gate', [&$gate, $actor]);
             $gate['points'] = (int)DB::val('SELECT points FROM users WHERE id=?', [(int)$actor['id']]);
             Api::json(['ok' => true, 'gate' => $gate]);
@@ -662,7 +663,8 @@ if ($action !== '') {
             //   - 名额用完 / 等级不够**且允许花积分**：allowed=true, cost>0
             //   - 不允许且不能付费：allowed=false + reason（前端原样展示这个原因）
             //   ⚠️ cost 只由插件给出，核心不自己定价；管理员在插件侧一律 cost=0。
-            $dec = ['allowed' => true, 'reason' => '', 'cost' => 0, 'free' => true, 'quota' => 0, 'used' => 0];
+            $dec = ['allowed' => true, 'reason' => '', 'cost' => 0, 'free' => true,
+                    'quota' => 0, 'used' => 0, 'level' => 0, 'min_room_level' => 0];
             Plugin::fire('room.create.gate', [&$dec, $actor]);
             if (!$dec['allowed']) {
                 Api::json(['ok' => false, 'msg' => (string)($dec['reason'] ?: '当前无法创建群聊')]);

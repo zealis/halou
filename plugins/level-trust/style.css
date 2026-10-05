@@ -104,9 +104,12 @@
 }
 
 /* 资料卡里的等级行：整行可点 */
-.ha-lt-row-link { text-decoration: none; color: inherit; display: flex; align-items: baseline; }
+.ha-lt-row-link {
+    text-decoration: none; color: inherit;
+    display: flex; align-items: baseline; cursor: pointer;
+    border-radius: 3px; padding: 0 4px; margin: 0 -4px;   /* hover 背景不越出内容区 */
+}
 .ha-lt-row-link:hover { background: var(--ha-bg-sub); }
-.ha-lt-go { margin-left: 8px; font-size: 12px; color: var(--ha-primary-strong); }
 
 /* ---------- 后台：参数分组标题 + 活跃趋势柱状图（v1.2.44） ---------- */
 .ha-lt-cap {

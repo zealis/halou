@@ -124,6 +124,127 @@
             + '</label>';
     }
 
+    /* ==================================================================
+       表单说明气泡（v1.2.45）
+       把「输入框/选择框/开关下方的灰色说明文字」收进标题右侧的圆形 ⓘ，
+       悬浮才显示。目的：说明一多，每个表单项都被撑高一行，界面看着参差不齐。
+
+       为什么做成「自动增强」而不是逐个改 HTML：
+         · 前后台 + 十几个插件的表单都是手写 HTML 字符串，逐个改要动几十处、极易漏；
+         · 自动增强对新写的插件同样生效 —— 只要按约定写说明段落（12px 灰字），
+           不用记得调任何函数。
+       因此这里是「扫 DOM + 搬文字」，不是「生成控件」。
+       ================================================================== */
+    var HaTip = (function () {
+
+        /** 造一个圆形 ⓘ 气泡；title 兜底（万一 CSS 气泡被父级 overflow 裁掉仍能看到） */
+        function badge(text) {
+            var b = document.createElement('span');
+            b.className = 'ha-tip';
+            b.setAttribute('title', text);
+            b.setAttribute('aria-label', text);
+            b.innerHTML = '<i>i</i><span class="ha-tip-box"></span>';
+            b.getElementsByClassName('ha-tip-box')[0].textContent = text;
+            return b;
+        }
+
+        /**
+         * 判断一个 <p> 是不是「说明文字」。
+         * 判据：无 class（或显式 ha-form-hint）+ 生效字号 ≤ 12.5px。
+         * ⚠️ 必须排除带 class 的 —— 那些是有语义的块（.ha-rc-note 公开性说明、
+         *    .ha-form-msg 报错、.ha-panel-empty 空态），搬走会丢信息。
+         */
+        function isHint(node) {
+            if (!node || node.tagName !== 'P') return false;
+            var cn = (node.className || '').trim();
+            if (cn && cn !== 'ha-form-hint') return false;
+            var fs = parseFloat(getComputedStyle(node).fontSize) || 0;
+            return fs > 0 && fs <= 12.5;
+        }
+
+        /** 处理一个 .ha-form-item：把说明搬进 label 右侧的 ⓘ */
+        function oneItem(item) {
+            if (!item) return;
+            var label = item.querySelector('label');
+            if (!label || label.getElementsByClassName('ha-tip').length) return;
+            var kids = item.children, i, hint = null;
+            for (i = 0; i < kids.length; i++) {
+                if (isHint(kids[i])) { hint = kids[i]; break; }
+            }
+            if (!hint) return;
+            var txt = (hint.textContent || '').replace(/^\s+|\s+$/g, '');
+            if (txt) {
+                label.appendChild(badge(txt));
+                label.className += ' ha-form-label-tip';
+            }
+            if (hint.parentNode) hint.parentNode.removeChild(hint);
+        }
+
+        /** 处理一个开关行（switchHtml 生成的 .ha-switch-row + p.ha-switch-hint） */
+        function oneSwitch(row) {
+            if (!row || (row.className || '').indexOf('ha-switch-row') < 0) return;
+            if (row.getElementsByClassName('ha-tip').length) return;
+            var lb = row.querySelector('.ha-switch-label');
+            var hint = row.querySelector('.ha-switch-hint');
+            if (!lb || !hint) return;
+            var txt = (hint.textContent || '').replace(/^\s+|\s+$/g, '');
+            if (txt) lb.insertAdjacentElement('afterend', badge(txt));
+            if (hint.parentNode) hint.parentNode.removeChild(hint);
+        }
+
+        /** 扫描一个容器（或整篇文档） */
+        function scan(root) {
+            var scope = (root && root.querySelectorAll) ? root : w.document;
+            if (scope.nodeType === 1) {
+                if (scope.classList && scope.classList.contains('ha-form-item')) oneItem(scope);
+                if (scope.classList && scope.classList.contains('ha-switch-row')) oneSwitch(scope);
+            }
+            if (!scope.querySelectorAll) return;
+            var items = scope.querySelectorAll('.ha-form-item'), i;
+            for (i = 0; i < items.length; i++) oneItem(items[i]);
+            var rows = scope.querySelectorAll('.ha-switch-row');
+            for (i = 0; i < rows.length; i++) oneSwitch(rows[i]);
+        }
+
+        /** 手动给某个 label 挂气泡（新代码用；已有说明段落交给 scan 即可） */
+        function add(label, text) {
+            if (!label || !text) return;
+            label.appendChild(badge(String(text)));
+            label.className += ' ha-form-label-tip';
+        }
+
+        // 自动启用：首屏 + 之后任何异步插入的表单（弹窗 / 后台 Ajax / 插件页）
+        if (w.document.readyState === 'loading') {
+            w.document.addEventListener('DOMContentLoaded', function () { scan(w.document); });
+        } else {
+            scan(w.document);
+        }
+        if (w.MutationObserver) {
+            // ⚠️ 必须先判断「新增节点里有没有表单」再做扫描：
+            //    聊天页消息区每秒都在变，无条件重扫会持续触发重排。
+            new w.MutationObserver(function (recs) {
+                for (var i = 0; i < recs.length; i++) {
+                    var list = recs[i].addedNodes;
+                    for (var j = 0; j < list.length; j++) {
+                        var n = list[j];
+                        if (n.nodeType !== 1) continue;
+                        if ((n.classList && (n.classList.contains('ha-form-item')
+                                || n.classList.contains('ha-switch-row')))
+                            || n.querySelector('.ha-form-item, .ha-switch-row')) {
+                            scan(n);
+                            // ⚠️ 这里**不能 break**：一次 innerHTML 替换会同时加入多个
+                            //    顶层节点（表单容器 + 独立表单项 + 按钮…），
+                            //    扫完第一个就 break 会漏掉同一批里的其它表单项
+                            //    （实测：个人设置里「昵称」挂上了气泡、「第三方授权」没挂）。
+                        }
+                    }
+                }
+            }).observe(w.document.body || w.document.documentElement, { childList: true, subtree: true });
+        }
+
+        return { scan: scan, add: add, badge: badge };
+    })();
+
     /**
      * 绑定开关的视觉同步：监听 change，把 .ha-switch 的 is-on 跟上 checkbox。
      * 必须在元素插入 DOM 后调用（可传事件委托的容器，或单个 input）。
@@ -2107,29 +2228,37 @@
                 gateInfo = (rg && rg.ok) ? rg.gate : null;
                 renderGateTip();
             });
+            // v1.2.45：文案全部由**前端**拼，数字用 <b> 强调。
+            //   服务端只给纯文本 reason + 结构化字段（cost/quota/used/level/points/min_level），
+            //   这样既不会把 <b> 当字面量显示出来，也不必在插件里拼 HTML 交给前端转义。
             function renderGateTip() {
                 var g = gateInfo;
                 if (!g) { tip.innerHTML = ''; return; }
                 var html = '';
                 if (!g.allowed) {
-                    // 不能建：原样展示插件给的原因（含「还差几级 / 还差多少积分」）
                     html = '<span style="color:#C41D1F">' + esc(g.reason || '当前无法创建群聊') + '</span>';
                     $('haRCCreate').disabled = true;
                     $('haRCCreate').style.opacity = '.5';
                     $('haRCCreate').style.cursor = 'not-allowed';
                 } else if (g.cost > 0) {
-                    // 可以建，但要花积分（名额用完或等级不够）
-                    html = '<span style="color:#B06000">' + esc(g.reason || '') + '</span>';
+                    var why = (typeof g.level === 'number' && g.min_room_level && g.level < g.min_room_level)
+                        ? '建群需 <b>' + g.min_room_level + '</b> 级（当前 Lv.' + g.level + '）'
+                        : '免费名额已用完（<b>' + g.used + '/' + g.quota + '</b>）';
+                    html = '<span style="color:#B06000">' + why + '，可消耗 <b>' + g.cost
+                        + '</b> 积分创建（当前 <b>' + g.points + '</b>）。</span>';
                     if (g.points < g.cost) {
-                        html += '<br><span style="color:#C41D1F">积分不足：需要 <b>' + g.cost
-                            + '</b>，当前 <b>' + g.points + '</b>。</span>';
+                        html += '<br><span style="color:#C41D1F">积分不足：还需 <b>'
+                            + (g.cost - g.points) + '</b> 积分。</span>';
                         $('haRCCreate').disabled = true;
                         $('haRCCreate').style.opacity = '.5';
                         $('haRCCreate').style.cursor = 'not-allowed';
                     }
                 } else if (g.quota > 0) {
-                    html = '<span style="color:var(--ha-text-sub)">免费名额 '
-                        + g.used + ' / ' + g.quota + '（超出后可用积分创建）。</span>';
+                    html = '<span style="color:var(--ha-text-sub)">免费名额 <b>' + g.used + '</b> / <b>'
+                        + g.quota + '</b>（超出后可用积分创建）。</span>';
+                } else if (g.quota === 0 && !g.level) {
+                    // gate 字段全为默认值 = 没有任何插件接管（未安装 / 已停用 / 超管）
+                    html = '<span style="color:var(--ha-text-sub)">创建群聊不受等级或名额限制。</span>';
                 } else {
                     html = '';
                 }
@@ -5009,6 +5138,7 @@ logs: function (main) {
     w.esc = esc; w.toast = toast; w.fmtUid = fmtUid; w.opts = opts; w.ROLE_CN = ROLE_CN;
     // 开关（State 按钮）通用轮子：前后台与插件共用同一套 HTML 与绑定逻辑
     w.switchHtml = switchHtml; w.bindSwitches = bindSwitches;
+    w.HaTip = HaTip;   // 表单说明气泡（v1.2.45），核心已自动启用，插件直接用 HaTip.scan()
 
     /* ==========================================================================
        HaGate：请求单飞闸门（v1.2.38，通用轮子，前后台与插件共用）

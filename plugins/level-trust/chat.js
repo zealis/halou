@@ -40,7 +40,9 @@
     }
 
     // v1.2.44：整行可点击 → 跳到前台等级页 ?page=level（规则 / 今日任务 / 解锁对比）。
-    // 用 <a> 而不是 onclick：右键「新标签打开」和 Ctrl+点击才可用。
+    //   用 <a> 而不是 onclick：右键「新标签打开」和 Ctrl+点击才可用。
+    // v1.2.45：去掉了行尾的「详情 ›」文字（用户要求）—— 整行已经可点，
+    //   再放指引文字属于冗余，且会把 meta 行撑宽。可点性用 hover 背景 + 手型光标表达。
     HaChat.onCardMetaTop(function (u) {
         if (!u || !u.level) return '';      // 无等级（游客 / 数据缺失）→ 不渲染整行
         var title = u.level_honor ? '荣誉等级' : '等级';
@@ -50,7 +52,6 @@
             + '<span class="ha-card-meta-v">'
             + badge(u.level, u.level_stage_no, u.level_honor)
             + (u.level_stage ? '<span class="ha-lt-stage">' + esc(u.level_stage) + '</span>' : '')
-            + '<span class="ha-lt-go">详情 ›</span>'
             + '</span></a>';
     }, 1);
 

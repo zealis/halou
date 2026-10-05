@@ -1682,3 +1682,46 @@ input[type=range] {
 @media (max-width: 640px) {
     .ha-page-main { padding: 14px 10px 32px; }
 }
+
+/* ---------- 表单说明气泡（v1.2.45） ----------
+   把「输入框/选择框/开关下方的灰色说明」收进标题右侧的圆形 ⓘ，悬浮才显示。
+   前后台与所有插件共用：由 assets/js/chat.js 的 HaTip 自动扫 DOM 挂载，
+   插件无需任何改动（按约定写 12px 灰色说明段落即可被自动收走）。
+
+   ⚠️ 气泡用纯 CSS 悬浮显示（不靠 JS 算位置）：跟随滚动/缩放不会错位，
+      老内核也不依赖。另外 badge 同时写了 title 属性做兜底 ——
+      万一某个父容器 overflow:hidden 把气泡裁了，浏览器原生提示仍能看。 */
+.ha-form-label-tip { display: flex !important; align-items: center; gap: 2px; }
+.ha-tip {
+    position: relative;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px; margin-left: 4px; border-radius: 50%;
+    background: #C4C8CE; color: #FFFFFF;
+    font-size: 10px; font-weight: 700; line-height: 1; text-align: center;
+    cursor: help; flex-shrink: 0; -webkit-flex-shrink: 0;
+    vertical-align: middle; -webkit-user-select: none; user-select: none;
+}
+.ha-tip > i { font-style: normal; }
+.ha-tip:hover, .ha-tip:focus { background: var(--ha-primary-strong); outline: none; }
+.ha-tip-box {
+    display: none;
+    position: absolute; left: 50%; bottom: 20px;
+    -webkit-transform: translateX(-50%); transform: translateX(-50%);
+    width: max-content; max-width: 260px; min-width: 120px;
+    padding: 8px 10px;
+    background: #2C2C2E; color: #FFFFFF;
+    font-size: 12px; font-weight: 400; line-height: 1.7; text-align: left;
+    white-space: normal; word-break: break-word;
+    border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, .22);
+    z-index: 130;
+}
+.ha-tip-box::after {   /* 小箭头，指向 ⓘ */
+    content: ''; position: absolute; left: 50%; bottom: -5px;
+    width: 0; height: 0; margin-left: -5px;
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-top: 5px solid #2C2C2E;
+}
+.ha-tip:hover > .ha-tip-box, .ha-tip:focus > .ha-tip-box { display: block; }
+/* 贴右边缘的表单项：气泡靠右展开，避免被视口/容器裁掉 */
+.ha-form-row > .ha-form-item:last-child .ha-tip-box { left: auto; right: -6px; -webkit-transform: none; transform: none; }
+.ha-form-row > .ha-form-item:last-child .ha-tip-box::after { left: auto; right: 12px; margin-left: 0; }

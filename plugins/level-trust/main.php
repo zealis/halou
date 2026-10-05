@@ -773,6 +773,7 @@ Plugin::on('room.create.gate', function (array &$dec, array $actor) {
     $dec['quota'] = (int)$u['quota'];
     $dec['used']  = $used;
     $dec['level'] = $lv;
+    $dec['min_room_level'] = (int)$u['min_room_level'];   // 前端拼「还差几级」用
 
     // ① 还有免费名额
     if ($used < (int)$u['quota']) { $dec['free'] = true; return; }
@@ -790,7 +791,10 @@ Plugin::on('room.create.gate', function (array &$dec, array $actor) {
     }
     $dec['free']   = false;
     $dec['cost']   = $cost;
-    $dec['reason'] = $why . '，可消耗 <b>' . $cost . '</b> 积分创建（当前 ' . $pts . ' 积分）。';
+    // ⚠️ reason 必须是**纯文本**：前端会整体 esc() 再插入，
+    //    这里塞 <b> 会被原样显示成「<b>50</b>」（v1.2.44 实测踩过）。
+    //    需要强调的数字由前端用结构化字段（cost/quota/used/level/points）自己拼。
+    $dec['reason'] = $why . '，可消耗 ' . $cost . ' 积分创建（当前 ' . $pts . ' 积分）。';
 });
 
 /**
