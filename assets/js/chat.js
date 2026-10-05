@@ -4971,4 +4971,90 @@ logs: function (main) {
     w.esc = esc; w.toast = toast; w.fmtUid = fmtUid; w.opts = opts; w.ROLE_CN = ROLE_CN;
     // 开关（State 按钮）通用轮子：前后台与插件共用同一套 HTML 与绑定逻辑
     w.switchHtml = switchHtml; w.bindSwitches = bindSwitches;
+
+    /* ==========================================================================
+       HaGate：请求单飞闸门（v1.2.38，通用轮子，前后台与插件共用）
+       --------------------------------------------------------------------------
+       解决什么：多个**互不相干的轻量状态查询**同时触发时（比如心跳、聊天更新、未读数），
+       请求会并发打出去、响应乱序回，旧值覆盖新值；请求一多还会堆积成雪崩。
+
+       本项目原有的 5 种防堆积手法**都不等于串行化**：
+         · 世代号 pollGen/dmGen → 作废在途回调（丢弃）
+         · loadingHistory      → 在途时丢弃新请求
+         · _roomPollRunning    → 防循环起两份
+         · failCount           → 失败指数退避
+         · _srSeq              → 只认最后一次响应
+       它们都不提供「第二个请求排队等第一个完成」这个语义，所以这里单列一个轮子。
+
+       两种模式：
+         queue（默认）—— 同 key 严格串行，后来者**排队**，前一个完成才发下一个。
+                        适合「必须按顺序、结果都要」的状态查询。
+         drop          —— 同 key 在途时**直接丢弃**后来者，不发请求。
+                        适合「只要最新值」的轮询式查询（旧的已经过时了）。
+
+       用法：
+         HaGate.run('heartbeat_status', function (done) {
+             HaApi.post('heartbeat_status', {}, function (r) { done(null, r); });
+         }, function (err, r) { ... });
+
+         // 只要最新值（丢弃模式）+ 最小间隔 3s
+         HaGate.run('notification_count', task, cb, { drop: true, minGap: 3000 });
+       ========================================================================== */
+    var HaGate = {
+        _q: {},        // key -> { busy, chain:[], lastAt }
+        _minGap: 0,    // 默认最小间隔（ms），0 = 不限；可被 opts.minGap 覆盖
+
+        /**
+         * 过闸：同 key 串行。
+         * @param key   闸门键（一般用接口名，如 'heartbeat_status'）
+         * @param task  function (done) {} —— 异步任务，**必须调 done(err, res)**
+         * @param cb    function (err, res) {} —— 轮到该请求时的回调
+         * @param opts  { drop: boolean 在途时丢弃不排队, minGap: number 最小间隔ms }
+         * @return boolean false = 被丢弃（仅 drop 模式可能）
+         */
+        run: function (key, task, cb, opts) {
+            opts = opts || {};
+            var g = this._q[key];
+            if (!g) g = this._q[key] = { busy: false, chain: [], lastAt: 0 };
+            if (g.busy && opts.drop) return false;         // 丢弃模式：旧的已过时
+            g.chain.push({ task: task, cb: cb, opts: opts });
+            if (!g.busy) this._drain(key, g);
+            return true;
+        },
+
+        /** 取队首执行；无论成功失败都继续排下一个（失败不能卡死整条队列） */
+        _drain: function (key, g) {
+            var self = this;
+            if (g.busy || !g.chain.length) return;
+            var it = g.chain.shift();
+            g.busy = true;
+            var settled = false;
+            var done = function (err, res) {
+                if (settled) return;                       // 任务重复调 done 只算一次
+                settled = true;
+                g.busy = false;
+                g.lastAt = new Date().getTime();
+                if (it.cb) { try { it.cb(err, res); } catch (e) { /* 回调异常不影响队列 */ } }
+                setTimeout(function () { self._drain(key, g); }, 0);
+            };
+            var gap = (it.opts.minGap != null ? it.opts.minGap : this._minGap)
+                - (new Date().getTime() - g.lastAt);
+            var fire = function () {
+                try { it.task(done); } catch (e) { done(e); }   // 任务同步抛错也要放行队列
+            };
+            if (gap > 0) setTimeout(fire, gap); else fire();
+        },
+
+        /** 丢弃某 key 的排队（切页/登出时用；不打断已在途的那个） */
+        clear: function (key) {
+            if (key === undefined || key === null) { this._q = {}; return; }
+            if (this._q[key]) this._q[key].chain.length = 0;
+        },
+
+        /** 该 key 是否正在执行（调试与测试用） */
+        busy: function (key) { var g = this._q[key]; return !!(g && g.busy); },
+        /** 该 key 排队的数量（调试与测试用） */
+        pending: function (key) { var g = this._q[key]; return g ? g.chain.length : 0; }
+    };
+    w.HaGate = HaGate;
 })(window);
