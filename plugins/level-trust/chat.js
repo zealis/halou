@@ -39,15 +39,19 @@
             .replace(/"/g, '&quot;');
     }
 
+    // v1.2.44：整行可点击 → 跳到前台等级页 ?page=level（规则 / 今日任务 / 解锁对比）。
+    // 用 <a> 而不是 onclick：右键「新标签打开」和 Ctrl+点击才可用。
     HaChat.onCardMetaTop(function (u) {
         if (!u || !u.level) return '';      // 无等级（游客 / 数据缺失）→ 不渲染整行
         var title = u.level_honor ? '荣誉等级' : '等级';
-        return '<div class="ha-card-meta-row ha-lt-row">'
+        return '<a class="ha-card-meta-row ha-lt-row ha-lt-row-link" href="?page=level"'
+            + ' title="查看等级规则与今日任务">'
             + '<span class="ha-card-meta-k">' + title + '</span>'
             + '<span class="ha-card-meta-v">'
             + badge(u.level, u.level_stage_no, u.level_honor)
             + (u.level_stage ? '<span class="ha-lt-stage">' + esc(u.level_stage) + '</span>' : '')
-            + '</span></div>';
+            + '<span class="ha-lt-go">详情 ›</span>'
+            + '</span></a>';
     }, 1);
 
     /** 供其它插件/页面取用 */

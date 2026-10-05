@@ -594,7 +594,19 @@ if ($action !== '') {
             [$ok, $urlOrMsg] = Upload::handle($_FILES['file'], $kind);
             Api::json($ok ? ['ok' => true, 'url' => $urlOrMsg] : ['ok' => false, 'msg' => $urlOrMsg]);
 
-        // 用户创建群聊（管理员始终可创建；普通用户受后台开关限制）
+        // v1.2.44：建群前置查询。前端打开建群弹窗时先问一次，把「名额 / 是否需付费 /
+        //   为什么不能建」显示出来，而不是让用户填完一堆表单再被一句报错打回。
+        case 'room_create_gate':
+            if ($actor['kind'] !== 'user') Api::json(['ok' => false, 'msg' => '请先登录']);
+            if ($actor['role'] !== 'admin' && DB::setting('room_create_allow', '1') !== '1') {
+                Api::json(['ok' => false, 'msg' => '站点未开放用户创建群聊']);
+            }
+            $gate = ['allowed' => true, 'reason' => '', 'cost' => 0, 'free' => true, 'quota' => 0, 'used' => 0];
+            Plugin::fire('room.create.gate', [&$gate, $actor]);
+            $gate['points'] = (int)DB::val('SELECT points FROM users WHERE id=?', [(int)$actor['id']]);
+            Api::json(['ok' => true, 'gate' => $gate]);
+
+        // 用户创建群聊（管理员始终可创建；普通用户受后台开关与名额/积分限制）
         // ⚠️ v1.2.43 定案：建群**不再消耗积分**，也**不受任何插件规则约束**
         //   （等级插件的「10 级才能建群 / 建群数量上限」已取消），
         //   唯一约束就是后台「允许用户创建群聊」开关 room_create_allow。
@@ -644,9 +656,29 @@ if ($action !== '') {
                 && DB::setting('room_private_create_allow', '1') !== '1') {
                 Api::json(['ok' => false, 'msg' => '站点已关闭「创建仅邀请群聊」，请创建公开群聊']);
             }
-            $uid = (int)$actor['id'];
-            // 随机位段 ID（同用户 ID 规则）：插入失败（含并发撞主键）重新分配重试，最多 5 次
-            $roomAttempts = 0;
+            // v1.2.44：建群闸门 + 名额/积分判定。
+            //   $dec 形状：['allowed'=>bool,'reason'=>'','cost'=>int,'free'=>bool,'quota'=>int,'used'=>int]
+            //   - 名额没用完：allowed=true, cost=0（免费）
+            //   - 名额用完 / 等级不够**且允许花积分**：allowed=true, cost>0
+            //   - 不允许且不能付费：allowed=false + reason（前端原样展示这个原因）
+            //   ⚠️ cost 只由插件给出，核心不自己定价；管理员在插件侧一律 cost=0。
+            $dec = ['allowed' => true, 'reason' => '', 'cost' => 0, 'free' => true, 'quota' => 0, 'used' => 0];
+            Plugin::fire('room.create.gate', [&$dec, $actor]);
+            if (!$dec['allowed']) {
+                Api::json(['ok' => false, 'msg' => (string)($dec['reason'] ?: '当前无法创建群聊')]);
+            }
+            $cost    = max(0, (int)($dec['cost'] ?? 0));
+            $uid     = (int)$actor['id'];
+            $charged = 0;
+            if ($cost > 0 && $actor['role'] !== 'admin') {
+                // 条件更新：余额不足时影响 0 行，同时杜绝并发下扣成负数
+                $st = DB::run('UPDATE users SET points=points-? WHERE id=? AND points>=?', [$cost, $uid, $cost]);
+                if ($st->rowCount() === 0) {
+                    $pts = (int)DB::val('SELECT points FROM users WHERE id=?', [$uid]);
+                    Api::json(['ok' => false, 'msg' => '积分不足，本次创建需要 ' . $cost . ' 积分（当前 ' . $pts . '）']);
+                }
+                $charged = $cost;
+            }
             while (true) {
                 try {
                     $id = DB::insert('rooms', [
@@ -668,11 +700,19 @@ if ($action !== '') {
                     ]);
                     break;
                 } catch (Throwable $e) {
-                    if (++$roomAttempts >= 5) throw $e;
+                    if (++$roomAttempts >= 5) {
+                        // 付费建群（超名额）失败必须退还，否则用户白扣分
+                        if ($charged > 0) DB::run('UPDATE users SET points=points+? WHERE id=?', [$charged, $uid]);
+                        throw $e;
+                    }
                 }
             }
-            Sec::log('room_create', $actor['nickname'], ['id' => $id, 'name' => $name]);
-            Api::json(['ok' => true, 'msg' => '群聊已创建', 'id' => $id, 'name' => $name]);
+            // v1.2.44：建群成功事件（等级插件据此统计「建群次数」到活跃趋势）
+            Plugin::fire('room.created', [$id, $actor, $charged]);
+            Sec::log('room_create', $actor['nickname'], ['id' => $id, 'name' => $name, 'cost' => $charged]);
+            Api::json(['ok' => true, 'msg' => $charged > 0
+                ? '群聊已创建（消耗 ' . $charged . ' 积分）'
+                : '群聊已创建', 'id' => $id, 'name' => $name, 'cost' => $charged]);
         // 且强制 attachment，避免 html/svg 之类被浏览器内联解析导致 XSS
         case 'file_download':
             // 下载走 GET 链接（带签名），这里直接读 $_GET
@@ -767,18 +807,60 @@ if ($action !== '') {
 }
 
 // ================= 页面 =================
-switch ($page) {
-    case 'login':    renderAuth('login'); break;
-    case 'register': renderAuth('register'); break;
-    case 'forgot':   renderAuth('forgot'); break;
-    case 'admin':
-        if ($actor['role'] !== 'admin') { header('Location: ?page=login'); exit; }
-        renderAdmin($actor);
-        break;
-    default:
-        if (!$user && DB::setting('guest_browse', '1') !== '1') { header('Location: ?page=login'); exit; }
-        if (!$user && !$guest) $guest = Auth::ensureGuest();
-        renderChat(Auth::actor($user, $guest), $user, $guest);
+// v1.2.44：插件前台页（Plugin::page() 注册）优先命中，之后才是核心页面。
+// ⚠️ 必须先查插件再走 switch —— 放在 default 分支里会被 renderChat 吞掉
+//    （任何未知 page 都会落到聊天页，?page=level 就会变成「进了聊天但啥也没有」）。
+$frontPages = Plugin::frontPages();
+if (isset($frontPages[$page])) {
+    renderPluginPage($page, $frontPages[$page], $actor, $user);
+} else {
+    switch ($page) {
+        case 'login':    renderAuth('login'); break;
+        case 'register': renderAuth('register'); break;
+        case 'forgot':   renderAuth('forgot'); break;
+        case 'admin':
+            if ($actor['role'] !== 'admin') { header('Location: ?page=login'); exit; }
+            renderAdmin($actor);
+            break;
+        default:
+            if (!$user && DB::setting('guest_browse', '1') !== '1') { header('Location: ?page=login'); exit; }
+            if (!$user && !$guest) $guest = Auth::ensureGuest();
+            renderChat(Auth::actor($user, $guest), $user, $guest);
+    }
+}
+
+/**
+ * 渲染插件注册的前台页（v1.2.44）。
+ *
+ * 布局刻意做**极简**：一条顶栏（站点名 + 返回聊天）+ 插件自己的内容。
+ * 不复用聊天页那套三栏结构 —— 插件页的用途是「看一份说明」，
+ * 套上侧栏与输入栏反而让人以为还能发消息。
+ *
+ * ⚠️ 同样要引入合并资源包并打 HALOU_ASSETS_JS_EMITTED 标记：
+ *    插件页也可能需要前端脚本（等级页的任务进度刷新就用到）。
+ */
+function renderPluginPage(string $slug, array $pg, array $actor, ?array $user): void
+{
+    pageHead((string)$pg['title']);
+    $site = Sec::e(DB::setting('site_name', 'Halou-Chat'));
+    echo '<body class="ha-page-body">'
+       . '<div class="ha-page-top">'
+       . '<span class="ha-page-brand">' . $site . '</span>'
+       . '<a class="ha-page-back" href="?page=chat">返回聊天</a>'
+       . '</div>'
+       . '<main class="ha-page-main">';
+    try {
+        echo (string)call_user_func($pg['fn'], $actor, $user);
+    } catch (Throwable $e) {
+        Sec::log('plugin_page_error', $slug, ['error' => $e->getMessage()]);
+        echo '<div class="ha-card">页面加载失败，请联系管理员。</div>';
+    }
+    echo '</main>'
+       . '<div class="ha-toast" id="haToast" style="display:none"></div>'
+       . '<script src="assets/js/chat.js?v=' . HALOU_VERSION . '"></script>';
+    define('HALOU_ASSETS_JS_EMITTED', true);
+    echo '<script src="?action=assets&type=js"></script>'
+       . '</body></html>';
 }
 
 // ================= 站点地址 =================

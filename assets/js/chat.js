@@ -2098,11 +2098,49 @@
             };
             typeSel.onchange = refreshTip;
             refreshTip();
-            // v1.2.43：建群**不再消耗积分**（原先这里会按 room_create_cost 提示并禁用按钮）。
-            //   现在唯一约束是后台「允许用户创建群聊」开关，服务端校验；
-            //   前端不再做任何积分判断，避免出现「前端说能建、服务端却拒绝」的错位。
-            tip.innerHTML = '';
+            // v1.2.44：建群前置提示 —— 名额 / 是否需花积分 / 为什么不能建。
+            //   先问服务端再渲染（异步），拿到前保持按钮可用（乐观），
+            //   ⚠️ 不能反过来先禁用再放开：请求失败时用户会卡在一个永远点不动的按钮上。
+            tip.innerHTML = '<span style="color:var(--ha-text-sub)">检查创建资格…</span>';
+            var gateInfo = null;
+            HaApi.post('room_create_gate', {}, function (rg) {
+                gateInfo = (rg && rg.ok) ? rg.gate : null;
+                renderGateTip();
+            });
+            function renderGateTip() {
+                var g = gateInfo;
+                if (!g) { tip.innerHTML = ''; return; }
+                var html = '';
+                if (!g.allowed) {
+                    // 不能建：原样展示插件给的原因（含「还差几级 / 还差多少积分」）
+                    html = '<span style="color:#C41D1F">' + esc(g.reason || '当前无法创建群聊') + '</span>';
+                    $('haRCCreate').disabled = true;
+                    $('haRCCreate').style.opacity = '.5';
+                    $('haRCCreate').style.cursor = 'not-allowed';
+                } else if (g.cost > 0) {
+                    // 可以建，但要花积分（名额用完或等级不够）
+                    html = '<span style="color:#B06000">' + esc(g.reason || '') + '</span>';
+                    if (g.points < g.cost) {
+                        html += '<br><span style="color:#C41D1F">积分不足：需要 <b>' + g.cost
+                            + '</b>，当前 <b>' + g.points + '</b>。</span>';
+                        $('haRCCreate').disabled = true;
+                        $('haRCCreate').style.opacity = '.5';
+                        $('haRCCreate').style.cursor = 'not-allowed';
+                    }
+                } else if (g.quota > 0) {
+                    html = '<span style="color:var(--ha-text-sub)">免费名额 '
+                        + g.used + ' / ' + g.quota + '（超出后可用积分创建）。</span>';
+                } else {
+                    html = '';
+                }
+                tip.innerHTML = html;
+            }
             var submit = function () {
+                if (gateInfo && !gateInfo.allowed) {
+                    msg.innerHTML = '<span style="color:#C41D1F">'
+                        + esc(gateInfo.reason || '当前无法创建群聊') + '</span>';
+                    return;
+                }
                 var name = $('haRCName').value.replace(/^\s+|\s+$/g, '');
                 /* v1.2.19：空 = 合法（走默认名）；填了才校验长度。
                    ⚠️ 不能写成 `name.length < 2` —— 那会把「留空」也判成非法，

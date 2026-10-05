@@ -39,3 +39,96 @@
 .ha-lt-task-k { min-width: 132px; color: var(--ha-text-sub); }
 .ha-lt-task-v { font-weight: 600; }
 .ha-lt-task-v.done { color: #237804; }
+
+/* ---------- 前台等级页 ?page=level（v1.2.44） ----------
+   作用域全部用 ha-lv- 前缀：这是独立页面，挂在 body 下，没有容器 id 可依赖。 */
+
+.ha-lv-hero { border-left: 4px solid #9AA5B1; }
+.ha-lv-hero.ha-lv-s2 { border-left-color: #0099FF; }
+.ha-lv-hero.ha-lv-s3 { border-left-color: #13A8A8; }
+.ha-lv-hero.ha-lv-s4 { border-left-color: #7A5AF8; }
+.ha-lv-hero.ha-lv-s5 { border-left-color: #D4A017; }
+.ha-lv-hero-lv { display: flex; align-items: center; gap: 10px; }
+.ha-lv-hero-stage { font-size: 14px; color: var(--ha-text-sub); }
+.ha-lv-hero-meta {
+    display: flex; flex-wrap: wrap; gap: 6px 20px;
+    margin-top: 10px; font-size: 13px; color: #5C5C5C;
+}
+.ha-lv-hero-meta b { color: var(--ha-text-title); }
+.ha-lv-bar {
+    margin-top: 10px; height: 8px; border-radius: 4px;
+    background: #EDF0F4; overflow: hidden;
+}
+.ha-lv-bar > i { display: block; height: 100%; background: var(--ha-primary-strong); border-radius: 4px; }
+
+.ha-lv-h3 { margin: 0 0 10px; font-size: 15px; color: var(--ha-text-title); }
+.ha-lv-task { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
+.ha-lv-task-k { width: 132px; flex-shrink: 0; color: var(--ha-text-sub); }
+.ha-lv-task-bar { flex: 1; height: 6px; border-radius: 3px; background: #EDF0F4; overflow: hidden; }
+.ha-lv-task-bar > i { display: block; height: 100%; background: #9AA5B1; }
+.ha-lv-task-v { width: 56px; text-align: right; font-weight: 600; }
+.ha-lv-task-v.done { color: #237804; }
+.ha-lv-task-alt {
+    font-size: 11px; color: #B06000; background: #FFF6E5;
+    border: 1px solid #FFE1B0; border-radius: 2px; padding: 0 4px;
+}
+.ha-lv-task-sum { margin-top: 10px; font-size: 13px; color: #5C5C5C; }
+.ha-lv-ch { margin-top: 6px; font-size: 12px; color: var(--ha-text-sub); }
+
+.ha-lv-formula {
+    font-family: Menlo, Consolas, monospace; font-size: 13px;
+    background: #F5F7FA; border: 1px solid var(--ha-border);
+    border-radius: 4px; padding: 10px 12px; margin-bottom: 10px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+.ha-lv-ul { margin: 0; padding-left: 20px; font-size: 13px; color: #5C5C5C; line-height: 1.9; }
+.ha-lv-tip {
+    margin-top: 10px; font-size: 12px; color: var(--ha-text-sub);
+    background: #F5F7FA; border-radius: 4px; padding: 8px 10px; line-height: 1.8;
+}
+
+.ha-lv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ha-lv-table th, .ha-lv-table td {
+    border: 1px solid var(--ha-border); padding: 7px 8px;
+    text-align: left; vertical-align: top; line-height: 1.6;
+}
+.ha-lv-table th { background: #F5F7FA; font-weight: 600; color: var(--ha-text-sub); white-space: nowrap; }
+.ha-lv-table tr.is-cur { background: #F0F8FF; }
+.ha-lv-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.ha-lv-yes { color: #237804; font-weight: 700; }
+.ha-lv-no { color: #C4C8CE; }
+@media (max-width: 640px) {
+    /* 窄屏表格横向滚动，不硬压列宽（压了中文会挤成两行更难读） */
+    .ha-lv-card-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .ha-lv-task-k { width: 96px; }
+}
+
+/* 资料卡里的等级行：整行可点 */
+.ha-lt-row-link { text-decoration: none; color: inherit; display: flex; align-items: baseline; }
+.ha-lt-row-link:hover { background: var(--ha-bg-sub); }
+.ha-lt-go { margin-left: 8px; font-size: 12px; color: var(--ha-primary-strong); }
+
+/* ---------- 后台：参数分组标题 + 活跃趋势柱状图（v1.2.44） ---------- */
+.ha-lt-cap {
+    margin: 16px 0 8px; font-size: 13px; color: #5C5C5C; font-weight: 600;
+    padding-left: 8px; border-left: 3px solid var(--ha-primary-strong);
+}
+.ha-lt-cap:first-child { margin-top: 0; }
+
+.ha-lt-trend { margin-top: 8px; }
+.ha-lt-trow { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.ha-lt-tname { width: 76px; flex-shrink: 0; font-size: 12px; color: var(--ha-text-sub); }
+.ha-lt-tbars {
+    flex: 1; height: 46px; display: flex; align-items: flex-end; gap: 2px;
+    background: #F5F7FA; border-radius: 3px; padding: 3px 4px;
+}
+.ha-lt-tbars > i {
+    flex: 1; min-width: 2px; border-radius: 1px 1px 0 0; display: block;
+    -webkit-transition: height .2s; transition: height .2s;
+}
+.ha-lt-tmax { width: 68px; flex-shrink: 0; font-size: 11px; color: var(--ha-text-sub); text-align: right; }
+.ha-lt-tx {
+    display: flex; justify-content: space-between;
+    margin: 4px 0 0 86px; padding-right: 78px;
+    font-size: 11px; color: var(--ha-text-sub);
+}

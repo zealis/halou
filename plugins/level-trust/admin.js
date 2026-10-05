@@ -1,8 +1,10 @@
 /**
  * 等级信任 —— 后台交互
- * 全局对象 HaLT：统计概览 / 用户查询 / 补签·冻结·直设等级 / 限制总开关。
+ * 全局对象 HaLT：概览 / 活跃趋势 / 参数设置 / 用户查询与操作。
  * 兼容老浏览器：仅使用 var / function，不用箭头函数、let/const、fetch。
- * 敏感操作（plugin_level_trust_op）走 HaApi.secure —— 服务端已声明 sensitive。
+ *
+ * ⚠️ 本文件随合并资源包在**所有**后台页加载，非本页时容器不存在 → 统一经 boot() 判空。
+ * 插件页是点菜单后由 Ajax 塞进 #haAdminMain 的，所以要 MutationObserver 等容器出现。
  */
 (function (w, d) {
     'use strict';
@@ -11,7 +13,7 @@
         login: '登录', gm: '群发言', gfirst: '群聊首条',
         pfirst: '私聊首条', fup: '上传文件', fdl: '下载文件', fact: '群文件操作'
     };
-    var KN = { k: 'login' };
+    var booted = false;
 
     function esc(s) {
         return String(s == null ? '' : s)
@@ -19,46 +21,103 @@
             .replace(/"/g, '&quot;');
     }
     function taskName(k) { return LABEL[k] || k; }
+    function row(k, v) {
+        return '<div class="ha-card-meta-row"><span class="ha-card-meta-k">' + esc(k)
+            + '</span><span class="ha-card-meta-v">' + esc(v) + '</span></div>';
+    }
+
+    /* ================= 概览 ================= */
+    function renderStats(r) {
+        var names = { 1: '新手 1-5', 2: '日常', 3: '活跃', 4: '核心', 5: '荣誉' };
+        var html = '<h3 style="margin:0 0 8px">概览</h3>'
+            + '<div class="ha-card-meta">'
+            + row('有等级记录', (r.users || 0) + ' 人')
+            + row('等级中位数', 'Lv.' + (r.median || 1))
+            + row('平均等级', 'Lv.' + (r.avg || 0))
+            + row('等级限制', String(r.gating) === '1' ? '已开启' : '已关闭')
+            + '</div><div class="ha-lt-tasks">';
+        for (var i = 1; i <= 5; i++) {
+            html += '<div class="ha-lt-task"><span class="ha-lt-task-k">' + names[i]
+                + '</span><span class="ha-lt-task-v">' + ((r.dist && r.dist[i]) || 0) + ' 人</span></div>';
+        }
+        var box = $('haLTStats');
+        if (box) box.innerHTML = html + '</div>';
+    }
+
+    /* ================= 活跃趋势（纯 CSS 柱状图，不引图表库） ================= */
+    var TREND_FIELDS = [
+        { k: 'actives', label: '活跃用户', color: '#0099FF' },
+        { k: 'upgrades', label: '升级次数', color: '#13A8A8' },
+        { k: 'msgs', label: '有效发言', color: '#7A5AF8' },
+        { k: 'files', label: '文件操作', color: '#D4A017' },
+        { k: 'rooms', label: '建群', color: '#9AA5B1' }
+    ];
+
+    function renderTrend(trend, note) {
+        var box = $('haLTTrend');
+        if (!box) return;
+        if (!trend || !trend.length) { box.innerHTML = '<p class="ha-panel-empty">暂无数据</p>'; return; }
+
+        // 各指标**各自**归一化：放一张图里共用一个刻度的话，人数会把「建群」压成一条平线
+        var maxes = {};
+        TREND_FIELDS.forEach(function (f) {
+            var m = 0;
+            trend.forEach(function (d) { if (d[f.k] > m) m = d[f.k]; });
+            maxes[f.k] = m || 1;
+        });
+
+        var html = '<div class="ha-lt-trend">';
+        TREND_FIELDS.forEach(function (f) {
+            html += '<div class="ha-lt-trow"><div class="ha-lt-tname">' + f.label
+                + '</div><div class="ha-lt-tbars">';
+            for (var i = 0; i < trend.length; i++) {
+                var v = trend[i][f.k] || 0;
+                var h = v > 0 ? Math.max(6, Math.round(v / maxes[f.k] * 100)) : 2;
+                html += '<i title="' + esc(trend[i].day) + '：' + v + '" style="height:' + h
+                    + '%;background:' + f.color + '"></i>';
+            }
+            html += '</div><div class="ha-lt-tmax">峰值 ' + maxes[f.k] + '</div></div>';
+        });
+        html += '</div>'
+            + '<div class="ha-lt-tx"><span>' + esc(trend[0].day) + '</span>'
+            + '<span>' + esc(trend[trend.length - 1].day) + '</span></div>'
+            + '<div class="ha-lv-tip">' + esc(note || '') + '</div>';
+        box.innerHTML = html;
+    }
+
+    /* ================= 参数设置 ================= */
+    function collectCfg() {
+        var cfg = {};
+        var inputs = d.querySelectorAll('[id^="haCfg_"]');
+        for (var i = 0; i < inputs.length; i++) cfg[inputs[i].id.substring(7)] = inputs[i].value;
+        return cfg;
+    }
 
     w.HaLT = {
-        init: function () {
-            // ⚠️ 本文件随合并资源包在**所有**后台页加载，非本页时 #haLTStats 不存在，
-            //    直接写 innerHTML 会抛「Cannot set properties of null」。
-            //    真正的启动由下方 watch() 负责（插件页是 Ajax 异步渲染的）。
-            boot();
-        },
+        init: function () { boot(); },
 
-        /* ---------- 概览 ---------- */
-        stats: function () {
+        load: function () {
             HaApi.post('plugin_level_trust_stats', {}, function (r) {
                 if (!r.ok) { toast(r.msg); return; }
-                var g = $('haLTGate');
-                if (g) g.value = String(r.gating || '1');
-                var names = { 1: '新手 1-5', 2: '日常 6-15', 3: '活跃 16-30', 4: '核心 31-45', 5: '荣誉 46+' };
-                var html = '<h3 style="margin:0 0 8px">概览</h3>'
-                    + '<div class="ha-card-meta">'
-                    + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">有等级记录</span>'
-                    + '<span class="ha-card-meta-v">' + (r.users || 0) + ' 人</span></div>'
-                    + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">等级中位数</span>'
-                    + '<span class="ha-card-meta-v">Lv.' + (r.median || 1) + '</span></div>'
-                    + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">平均等级</span>'
-                    + '<span class="ha-card-meta-v">Lv.' + (r.avg || 0) + '</span></div>'
-                    + '</div><div class="ha-lt-tasks">';
-                for (var i = 1; i <= 5; i++) {
-                    html += '<div class="ha-lt-task"><span class="ha-lt-task-k">' + names[i] + '</span>'
-                        + '<span class="ha-lt-task-v">' + ((r.dist && r.dist[i]) || 0) + ' 人</span></div>';
-                }
-                html += '</div>';
-                var box = $('haLTStats');
-                if (box) box.innerHTML = html;
+                renderStats(r);
+                renderTrend(r.trend, r.trend_note);
             });
         },
 
-        saveGate: function () {
-            var v = $('haLTGate') ? $('haLTGate').value : '1';
-            HaApi.secure('plugin_level_trust_op', { op: 'gate', v: v, uid: 0 }, function (r) {
+        /** 保存全部参数（一次提交，避免分多次保存出现「一半新一半旧」的中间态） */
+        saveCfg: function () {
+            var cfg = collectCfg();
+            if (!Object.prototype.hasOwnProperty.call(cfg, 'gating')) { toast('配置表单不存在'); return; }
+            if (Object.prototype.hasOwnProperty.call(cfg, 'room_tiers')) {
+                // 与服务端同一套校验：整段都解析不出来就别提交，免得把名额全清零
+                var lines = String(cfg.room_tiers).split(/[\r\n,;]+/);
+                var ok = lines.some(function (l) { return /^\s*\d{1,4}\s*[:：]\s*\d{1,4}\s*$/.test(l); });
+                if (!ok) { toast('名额档位格式不对，每行需形如「等级:名额」，例如 10:3'); return; }
+            }
+            HaApi.secure('plugin_level_trust_cfg_save', cfg, function (r) {
                 toast(r.msg || (r.ok ? '已保存' : '保存失败'));
-                if (r.ok) HaLT.stats();
+                // 配置一改，前台等级页的公式/解锁表就变了 → 重载让管理员直接看到新文案
+                if (r.ok) w.location.reload();
             });
         },
 
@@ -72,58 +131,41 @@
                 if (!r.ok) { box.innerHTML = '<p class="ha-panel-empty">' + esc(r.msg) + '</p>'; return; }
 
                 var html = '<div class="ha-card-meta" style="border-top:0;padding-top:0">'
-                    + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">用户</span>'
-                    + '<span class="ha-card-meta-v">' + esc(r.nickname) + '（ID ' + r.uid + '）'
-                    + (r.role === 'admin' ? ' · 超级管理员' : '') + '</span></div>'
-                    + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">等级</span>'
-                    + '<span class="ha-card-meta-v">' + (w.HaLevel
-                        ? w.HaLevel.badge(r.level, r.stage_no, r.honor) : 'Lv.' + r.level)
-                    + '<span class="ha-lt-stage">' + esc(r.stage) + '</span></span></div>'
-                    + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">累计完成</span>'
-                    + '<span class="ha-card-meta-v">' + r.days + ' 天 · 加权 ' + r.weight + ' 天</span></div>'
-                    + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">登录</span>'
-                    + '<span class="ha-card-meta-v">连续 ' + r.login_streak + ' 天 · 累计 ' + r.login_days + ' 天</span></div>'
-                    + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">今日</span>'
-                    + '<span class="ha-card-meta-v">'
-                    + (r.frozen ? '已冻结' : (r.settled ? '已完成并结算' : '进行中'))
-                    + ' · 本周已补签 ' + r.patch_used + ' 次 · 本月已用保护 ' + r.protect_used + ' 次'
-                    + '</span></div>'
+                    + row('用户', r.nickname + '（ID ' + r.uid + '）' + (r.role === 'admin' ? ' · 超级管理员' : ''))
+                    + row('等级', (w.HaLevel ? w.HaLevel.badge(r.level) : 'Lv.' + r.level) + ' ' + esc(r.stage))
+                    + row('累计完成', r.days + ' 天 · 加权 ' + r.weight + ' 天')
+                    + row('登录', '连续 ' + r.login_streak + ' 天 · 累计 ' + r.login_days + ' 天')
+                    + row('今日', (r.frozen ? '已冻结' : (r.settled ? '已完成并结算' : '进行中'))
+                        + ' · 本周补签 ' + r.patch_used + ' 次 · 本月保护 ' + r.protect_used + ' 次')
                     + '</div>';
 
                 html += '<div class="ha-lt-tasks">';
                 for (var i = 0; i < (r.tasks || []).length; i++) {
                     var t = r.tasks[i];
                     var done = t.cur >= t.n;
-                    html += '<div class="ha-lt-task"><span class="ha-lt-task-k">'
-                        + esc(taskName(t.k)) + '</span>'
-                        + '<span class="ha-lt-task-v' + (done ? ' done' : '') + '">'
+                    html += '<div class="ha-lt-task"><span class="ha-lt-task-k">' + esc(taskName(t.k))
+                        + '</span><span class="ha-lt-task-v' + (done ? ' done' : '') + '">'
                         + t.cur + ' / ' + t.n + '</span></div>';
                 }
                 html += '</div>';
 
                 html += '<div class="ha-modal-actions" style="margin-top:12px">'
                     + '<button class="ha-btn ha-btn-ghost" onclick="HaLT.op(' + r.uid + ',\'patch\')">补签（每周 1 次）</button>'
-                    + '<button class="ha-btn ha-btn-ghost" onclick="HaLT.op(' + r.uid + ',\'' + (r.frozen ? 'unfreeze' : 'freeze') + '\')">'
-                    + (r.frozen ? '解除冻结' : '冻结今日') + '</button>'
+                    + '<button class="ha-btn ha-btn-ghost" onclick="HaLT.op(' + r.uid + ',\''
+                    + (r.frozen ? 'unfreeze' : 'freeze') + '\')">' + (r.frozen ? '解除冻结' : '冻结今日') + '</button>'
                     + '<button class="ha-btn ha-btn-primary" onclick="HaLT.setLevel(' + r.uid + ',' + r.level + ',' + r.days + ')">直接设置</button>'
                     + '</div>';
                 box.innerHTML = html;
             });
         },
 
-        /** 补签 / 冻结 / 解冻 */
         op: function (uid, op) {
             HaApi.secure('plugin_level_trust_op', { uid: uid, op: op }, function (r) {
                 toast(r.msg || (r.ok ? '已操作' : '操作失败'));
-                if (r.ok) HaLT.query();
+                if (r.ok) w.HaLT.query();
             });
         },
 
-        /**
-         * 直接设置等级：用核心自研弹窗（**禁用浏览器原生 prompt**）。
-         * 等级与天数一次填完再提交 —— 分两次弹窗时用户容易改了等级忘了天数，
-         * 结果等级与「累计完成天数」对不上，后面再升级会算出一个跳变的等级。
-         */
         setLevel: function (uid, lv, days) {
             HaChat.openModal(
                 '<h3>设置等级</h3>'
@@ -132,8 +174,7 @@
                 + '<div class="ha-form-item"><label>累计完成天数（≥0）</label>'
                 + '<input class="ha-input" id="haLtSetDays" type="number" min="0" value="' + days + '">'
                 + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">'
-                + '等级一般由公式 L = 1 + ⌊天数 + 加权⌋ 自动算出；这里只用于迁移或纠错，'
-                + '直接改数值不会同步改加权。</p></div>'
+                + '等级一般由公式自动算出；这里只用于迁移或纠错，直接改数值不会同步改加权。</p></div>'
                 + '<div class="ha-modal-actions">'
                 + '<button class="ha-btn ha-btn-ghost" onclick="HaChat.closeModal()">取消</button>'
                 + '<button class="ha-btn ha-btn-primary" onclick="HaLT.doSet(' + uid + ')">保存</button>'
@@ -152,22 +193,13 @@
         }
     };
 
-    var booted = false;
-
-    /** 真正初始化（#haLTStats 存在才做） */
+    /* ================= 启动 ================= */
     function boot() {
         if (booted || !$('haLTStats')) return;
         booted = true;
-        HaLT.stats();
+        w.HaLT.load();
     }
 
-    /**
-     * ⚠️ 不能只在 DOMContentLoaded 时初始化：插件后台页是**点菜单后由 Ajax 塞进
-     * #haAdminMain** 的，DOMContentLoaded 那一刻本页 HTML 还不存在，
-     * `$('haLTStats').innerHTML` 会抛「Cannot set properties of null」。
-     * 也不能只跑一次就放弃：用户在后台里切走再切回来，容器会被重建。
-     * 因此监听 #haAdminMain 的变化，容器出现就初始化、消失就把标记复位。
-     */
     function watch() {
         var main = d.getElementById('haAdminMain');
         if (!main || !w.MutationObserver) { boot(); return; }

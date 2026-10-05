@@ -21,6 +21,7 @@ class Plugin
     private static array $hooks = [];
     private static array $routes = [];
     private static array $adminPages = [];
+    private static array $frontPages = [];   // v1.2.44：插件注册的前台页 slug => ['title'=>..,'fn'=>..]
     private static array $assets = ['css' => [], 'js' => []];
     private static array $crons = [];   // 插件注册的计划任务（v1.1.13）
     private static array $stats = [];   // 兼容保留：每个插件本次加载的注册计数
@@ -53,6 +54,7 @@ class Plugin
         self::$hooks = [];
         self::$routes = [];
         self::$adminPages = [];
+        self::$frontPages = [];
         self::$assets = ['css' => [], 'js' => []];
         self::$meta = [];
         self::$manifest = [];
@@ -157,7 +159,7 @@ class Plugin
 
     private static function blankManifestParts(): array
     {
-        return ['hooks' => [], 'routes' => [], 'pages' => [], 'sensitive' => [], 'crons' => [],
+        return ['hooks' => [], 'routes' => [], 'pages' => [], 'fpages' => [], 'sensitive' => [], 'crons' => [],
                 'assets' => ['css' => [], 'js' => []],
                 'stats' => ['hooks' => 0, 'routes' => 0, 'pages' => 0, 'crons' => 0]];
     }
@@ -172,7 +174,7 @@ class Plugin
         // 落盘丢失 → 下次读缓存缺失 → 判定为「清单不完整」→ 每次请求都重新加载插件，
         // 而按需加载（fire/dispatch 靠清单里的 hooks/crons 决定要不要加载）随之失效。
         // 加新的注册类型时，这里必须同步加，否则症状是「性能下降 + 行为诡异」而非报错。
-        $keep = array_flip(['hooks', 'routes', 'pages', 'sensitive', 'crons', 'assets', 'stats', 'sig']);
+        $keep = array_flip(['hooks', 'routes', 'pages', 'fpages', 'sensitive', 'crons', 'assets', 'stats', 'sig']);
         foreach (self::$manifest as $n => $m) {
             $data['plugins'][$n] = array_intersect_key($m, $keep)
                 + ['sig' => self::sigOf($n), 'meta' => self::$meta[$n] ?? []]
@@ -195,7 +197,7 @@ class Plugin
         $main = self::$dir . '/' . $name . '/main.php';
         if (!is_file($main)) return;
 
-        self::$pending = ['hooks' => [], 'routes' => [], 'pages' => [], 'sensitive' => [], 'crons' => [], 'assets' => ['css' => [], 'js' => []]];
+        self::$pending = ['hooks' => [], 'routes' => [], 'pages' => [], 'fpages' => [], 'sensitive' => [], 'crons' => [], 'assets' => ['css' => [], 'js' => []]];
         self::$loading = $name;
         // ⚠️ 必须 require_once，不能用 require。
         // 同一请求内一个插件可能被加载两次：init() 的「重建清单」与 inspect() 的「探测计数」，
@@ -209,11 +211,12 @@ class Plugin
         $p = self::$pending;
         self::$pending = null;
 
-        $stats = ['hooks' => count($p['hooks']), 'routes' => count($p['routes']), 'pages' => count($p['pages']), 'crons' => count($p['crons'])];
+        $stats = ['hooks' => count($p['hooks']), 'routes' => count($p['routes']),
+                  'pages' => count($p['pages']) + count($p['fpages']), 'crons' => count($p['crons'])];
         self::$stats[$name] = $stats;
         $old = self::$manifest[$name] ?? null;
         $m = ($old ?? []) + self::blankManifestParts() + ['sig' => []];
-        foreach (['hooks', 'routes', 'pages', 'sensitive', 'crons'] as $k) {
+        foreach (['hooks', 'routes', 'pages', 'fpages', 'sensitive', 'crons'] as $k) {
             $m[$k] = array_values(array_unique(array_merge($m[$k], $p[$k])));
         }
         foreach (['css', 'js'] as $t) {
@@ -261,6 +264,37 @@ class Plugin
     {
         self::$adminPages[$slug] = ['title' => $title, 'fn' => $fn];
         if (self::$pending !== null) self::$pending['pages'][] = $slug;
+    }
+
+    /**
+     * 注册一个**前台页面**（v1.2.44）：访问 ?page=<slug> 时渲染。
+     *
+     * 与 adminPage 的区别：那个挂在后台「插件管理」子菜单里、需要管理员身份；
+     * 这个是**面向访客**的独立页面（如等级说明页），自带页面布局与返回入口。
+     * slug 只允许字母数字短横线，避免与核心页面（chat/login/register/admin…）撞名。
+     *
+     * ```php
+     * Plugin::page('level', '等级', function (array $actor): string {
+     *     return '<div class="ha-lv-page">…</div>';
+     * });
+     * ```
+     */
+    public static function page(string $slug, string $title, callable $fn): void
+    {
+        if (!preg_match('/^[a-z][a-z0-9-]{1,30}$/', $slug)) return;
+        // 核心保留页：插件不得覆盖
+        if (in_array($slug, ['chat', 'login', 'register', 'forgot', 'admin', 'install'], true)) return;
+        self::$frontPages[$slug] = ['title' => $title, 'fn' => $fn];
+        if (self::$pending !== null) self::$pending['fpages'][] = $slug;
+    }
+
+    /** 已注册的前台页（按需加载声明了 fpages 的插件后再返回） */
+    public static function frontPages(): array
+    {
+        foreach (self::$order as $name) {
+            if (empty(self::$loaded[$name]) && !empty(self::$manifest[$name]['fpages'])) self::loadPlugin($name);
+        }
+        return self::$frontPages;
     }
 
     public static function asset(string $type, string $path): void
@@ -632,7 +666,7 @@ class Plugin
     /** 注册计数快照：加载插件前后对比，得到该插件注册的钩子/路由/后台页数量 */
     private static function snapshot(): array
     {
-        return ['hooks' => self::$hooks, 'routes' => self::$routes, 'pages' => self::$adminPages];
+        return ['hooks' => self::$hooks, 'routes' => self::$routes, 'pages' => self::$adminPages, 'fpages' => self::$frontPages];
     }
 
     private static function countReg(array $before): array
@@ -641,7 +675,9 @@ class Plugin
         foreach (self::$hooks as $list) $h += count($list);
         $h0 = 0;
         foreach ($before['hooks'] as $list) $h0 += count($list);
-        return ['hooks' => $h - $h0, 'routes' => count(self::$routes) - count($before['routes']), 'pages' => count(self::$adminPages) - count($before['pages'])];
+        return ['hooks' => $h - $h0, 'routes' => count(self::$routes) - count($before['routes']),
+                'pages' => count(self::$adminPages) - count($before['pages'])
+                         + count(self::$frontPages) - count($before['fpages'])];
     }
 
     /** 已启用插件的注册计数（加载时记录） */
@@ -662,7 +698,7 @@ class Plugin
         $before = self::snapshot();
         $beforeAssets = self::$assets;
         $beforeCrons = self::$crons;
-        self::$pending = ['hooks' => [], 'routes' => [], 'pages' => [], 'sensitive' => [], 'crons' => [], 'assets' => ['css' => [], 'js' => []]];
+        self::$pending = ['hooks' => [], 'routes' => [], 'pages' => [], 'fpages' => [], 'sensitive' => [], 'crons' => [], 'assets' => ['css' => [], 'js' => []]];
         self::$loading = $name;
         // require_once：inspect() 可能与 loadPlugin() 在同一请求内先后加载同一插件，
         // 用 require 会因函数重复声明直接 fatal（见 loadPlugin 内的说明）。
@@ -675,13 +711,14 @@ class Plugin
         self::$hooks = $before['hooks'];
         self::$routes = $before['routes'];
         self::$adminPages = $before['pages'];
+        self::$frontPages = $before['fpages'];
         self::$assets = $beforeAssets;
         // ⚠️ 计划任务必须一并回滚：Plugin::cron() 直接 push 到 self::$crons，
         // 漏掉会让「探测」变成真注册，同一任务在表里出现两次。
         self::$crons = $beforeCrons;
         // 刷新清单与签名（后续后台列表免探测）
         $m = (self::$manifest[$name] ?? []) + self::blankManifestParts() + ['sig' => []];
-        foreach (['hooks', 'routes', 'pages', 'sensitive', 'crons'] as $k) {
+        foreach (['hooks', 'routes', 'pages', 'fpages', 'sensitive', 'crons'] as $k) {
             $m[$k] = array_values(array_unique(array_merge($m[$k], $p[$k])));
         }
         foreach (['css', 'js'] as $t) {

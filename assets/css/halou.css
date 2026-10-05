@@ -1660,3 +1660,25 @@ input[type=range] {
 @media screen and (max-width: 0\0) { /* IE 专属 hack，仅兜底 */
     .ha-layout, .ha-sidebar, .ha-main { display: block; }
 }
+
+/* ---------- 插件前台页（v1.2.44，Plugin::page() 注册的 ?page=<slug>） ----------
+   极简布局：顶栏（站点名 + 返回聊天）+ 内容区。
+   不复用聊天页的三栏结构 —— 这类页面是「读一份说明」，套上侧栏与输入栏
+   会让人误以为还能发消息。内容宽度按阅读舒适区收敛到 860px。 */
+.ha-page-body { background: var(--ha-bg-sub); min-height: 100vh; }
+.ha-page-top {
+    display: flex; display: -webkit-flex;
+    align-items: center; -webkit-align-items: center;
+    height: 52px; padding: 0 16px;
+    background: #FFFFFF; border-bottom: 1px solid var(--ha-border);
+}
+.ha-page-brand { font-size: 15px; font-weight: 600; color: var(--ha-text-title); }
+.ha-page-back {
+    margin-left: auto; -webkit-margin-start: auto;
+    font-size: 13px; color: var(--ha-primary-strong); text-decoration: none;
+}
+.ha-page-back:hover { text-decoration: underline; }
+.ha-page-main { max-width: 860px; margin: 0 auto; padding: 20px 16px 40px; }
+@media (max-width: 640px) {
+    .ha-page-main { padding: 14px 10px 32px; }
+}
