@@ -1246,7 +1246,16 @@
                 // ⚠️ 兜底：若进页面后一直待在别处，conversations 可能从未拉过，
                 //   此时列表是空的。补拉一次；已拉过则跳过（不白打接口）。
                 if (!this.conversations) this.loadConversations();
+                // v1.2.29：从「联系人」切回来时中间是空白的（那边已把 room/dm 清掉），
+                // 这里补上「还没选会话」的闸门；点某个会话后由 switchRoom/openDm 解禁。
+                if (!this.dm && !this.room) {
+                    this.renderRoomPanel();
+                    this.applyInputGate('conv');
+                }
             } else if (tab === 'friends') {
+                // v1.2.29：先「关掉」中间正在显示的会话，再渲染联系人名单。
+                // 顺序不能反 —— 否则名单渲染完又被随后的清理逻辑影响。
+                this.blankChatForFriends();
                 this.loadFriends();
             } else {
                 // 插件标签：把面板容器交给插件自己填
@@ -1600,6 +1609,9 @@
             });
             this.dmPollLoop();
             this.renderRoomPanel();   // v1.2.28：私聊下侧栏渲染四个会话操作入口（并隐藏「所有成员」）
+            // v1.2.29：进私聊 → 解除「先选联系人 / 先选会话」的闸门
+            //（私聊双方都是注册用户且不存在「未加入」，所以直接解禁）
+            this.applyInputGate('');
             // v1.1.0：进入私聊视图 → 通知插件清理群级装饰（公告条等）
             this._fireViewChange();
         },
@@ -2454,9 +2466,14 @@
         send: function (opt) {
             opt = opt || {};
             var input = $('haInput');
-            // v1.2.27：未加入群聊时前端先拦一道（服务端 send 也有同样校验，
-            // 这里是「给出可操作的提示」而不是让用户对着一个没反应的输入框）。
-            if (this._needJoin) { toast('请先加入该群聊后再发言'); return; }
+            // v1.2.29：输入区闸门统一在这里拦一道。
+            //   'join'   未加入群聊（服务端 send 也有同样校验）
+            //   'friend' 停在「联系人」标签 —— 这是**防误发**的关键一环：
+            //            中间是空白的，用户可能以为还在跟刚才那个人聊天
+            //   'conv'   没选中任何会话
+            if (this._inputGate === 'join') { toast('请先加入该群聊后再发言'); return; }
+            if (this._inputGate === 'friend') { toast('请先选择一个联系人'); return; }
+            if (this._inputGate === 'conv') { toast('请先选择一个会话'); return; }
             var content = opt.content != null ? opt.content : input.value;
             if (!content || !content.replace(/^\s+|\s+$/g, '')) return;
             var self = this;
@@ -2749,28 +2766,89 @@
         },
 
         /**
+         * 切到「联系人」标签时**关掉**中间正在显示的会话（v1.2.29）。
+         *
+         * 要解决的问题：切标签只换了左侧栏，中间还留着刚才那个群聊/私聊的聊天记录，
+         * 用户很容易「以为还在跟刚才那个人/群聊天」，直接在输入框打字发出去 ——
+         * 发错对象。要让「切换标签」等价于「离开当前会话」。
+         *
+         * 四件事缺一不可：
+         *  ① 停两路轮询（群聊长轮询 + 私聊长轮询），否则在途回调醒来又往
+         *     已清空的 #haMessages 里塞消息（还会把 since 推走）；
+         *  ② 清空消息区 + 取消列表高亮（视觉上彻底「关掉」）；
+         *  ③ 清掉 this.room / this.dm（**不留后路**：否则输入框一解禁就能往刚才那个群发消息）；
+         *  ④ 输入区落闸（禁发言 + 提示先选联系人）。
+         */
+        blankChatForFriends: function () {
+            this.pollGen = (this.pollGen || 0) + 1;      // 作废群聊长轮询世代
+            this.dmGen = (this.dmGen || 0) + 1;          // 作废私聊长轮询世代
+            this._roomPollRunning = false;
+            this.dm = null;
+            this.room = 0;
+            this.since = 0;
+            this.historyDone = true;                     // 已无可加载历史，禁掉上滚懒加载
+            this.loadingHistory = false;
+            var box = $('haMessages');
+            if (box) box.innerHTML = '';
+            ChatList.activate('haRoomList', '');         // 取消任何一行的高亮
+            this.renderRoomPanel();                      // 右侧栏回到「请先选择」空态
+            this.applyInputGate('friend');
+        },
+
+        /**
+         * 输入区闸门（v1.2.29 统一入口）。此前只有 applyJoinGate 一条路，
+         * 现在要覆盖三种「不能发」的原因，抽成一处，避免多路径互相覆盖。
+         *   ''        正常
+         *   'join'    未加入该群聊 → 显示加入按钮
+         *   'friend'  停在「联系人」标签 → 先点一个联系人
+         *   'conv'    停在「消息」标签但没选中任何会话
+         */
+        applyInputGate: function (kind) {
+            var box = $('haJoinGate');
+            var input = $('haInput');
+            this._inputGate = kind || '';
+            if (!input) return;
+            // 工具栏一并禁用：选图/选文件会直接走 send 发出消息，
+            // 只禁输入框的话，用户还能从工具栏把消息发到「已经关掉的会话」里。
+            var tbIds = ['haBtnEmoji', 'haBtnImage', 'haBtnFile'], i, tb;
+            for (i = 0; i < tbIds.length; i++) {
+                tb = $(tbIds[i]);
+                if (tb) tb.disabled = !!kind;
+            }
+            if (!kind) {
+                if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+                input.disabled = false;
+                input.placeholder = '输入消息，按 Enter 发送，Ctrl+V 粘贴图片';
+                return;
+            }
+            input.disabled = true;
+            if (kind === 'join') {
+                if (box) {
+                    box.innerHTML = '<span>你还没有加入该群聊，加入后即可发言</span>'
+                        + '<button class="ha-btn ha-btn-primary ha-btn-mini" onclick="HaChat.joinCurrentRoom()">加入群聊</button>';
+                    box.style.display = '';
+                }
+                input.placeholder = '加入群聊后即可发言';
+                return;
+            }
+            // 'friend' / 'conv'：没有具体对话对象，只禁用并给一句话提示
+            if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+            input.placeholder = (kind === 'friend') ? '请先选择一个联系人' : '请先选择一个会话';
+        },
+
+        /**
          * 未加入群聊时的发言闸门（v1.2.27）。
          * 正常流程下点击公开群聊会先弹「是否加入」，取消就不进入，走不到这里；
          * 这里是 URL 直达 / 被移出成员 / 服务端已拒发等异常态的兜底：
          * 让界面自洽（看得见为什么发不出去）而不是让用户对着一个没反应的输入框。
+         *
+         * v1.2.29：实现已并入 applyInputGate，这里只保留业务判定。
          */
         applyJoinGate: function (isMember, isPublic) {
-            var box = $('haJoinGate');
-            this._needJoin = false;
-            var input = $('haInput');
             var isUser = this.cfg.actor && this.cfg.actor.kind === 'user';
-            if (!box) return;
-            if (!isUser || isPublic === false || isMember) {
-                box.style.display = 'none';
-                box.innerHTML = '';
-                if (input) { input.disabled = false; input.placeholder = '输入消息，按 Enter 发送，Ctrl+V 粘贴图片'; }
-                return;
-            }
-            this._needJoin = true;
-            box.innerHTML = '<span>你还没有加入该群聊，加入后即可发言</span>'
-                + '<button class="ha-btn ha-btn-primary ha-btn-mini" onclick="HaChat.joinCurrentRoom()">加入群聊</button>';
-            box.style.display = '';
-            if (input) { input.disabled = true; input.placeholder = '加入群聊后即可发言'; }
+            var needJoin = !(!isUser || isPublic === false || isMember);
+            this._needJoin = needJoin;
+            this.applyInputGate(needJoin ? 'join' : '');
         },
 
         /** 在闸门里点「加入群聊」：就地加入，不必回会话列表重点一次 */
@@ -2812,6 +2890,16 @@
             var isDm = this.room === 0;                    // 私聊是 room_id=0 的虚拟空间
             var r = null, list = this.cfg.rooms || [], i;
             for (i = 0; i < list.length; i++) { if (list[i].id === this.room) { r = list[i]; break; } }
+
+            // v1.2.29：什么会话都没选（刚进页、或从「联系人」标签切回来）——
+            // 不属于私聊也不属于群聊，给一个中性空态，别误用私聊那套入口。
+            var noTarget = !this.dm && !this.room;
+            if (noTarget) {
+                box.innerHTML = '<div class="ha-panel-hint">请先选择一个会话</div>';
+                var memSec0 = document.querySelector('.ha-panel-members');
+                if (memSec0) memSec0.style.display = 'none';
+                return;
+            }
 
             // v1.2.28：私聊**不显示「所有成员」区块** —— 那是群聊概念，
             // 私聊只有两个人，列出来是噪音。用 display 切换而不是移除节点：
