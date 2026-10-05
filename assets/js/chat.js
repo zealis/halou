@@ -724,7 +724,9 @@
                       + esc(c.name) + (c.tag ? '<span class="ha-cl-tag">' + esc(c.tag) + '</span>' : '') + '</span>'
                       + '<span class="ha-cl-sub">' + esc(c.last_text || '') + '</span>'
                       + '</span>'
-                      + '<span class="ha-cl-time">' + ChatList.time(c.last_at) + '</span>'
+                      // v1.2.28：hideTime 用于联系人列表（无消息流，时间没有参考价值）。
+                      // 不渲染这个 span 而不是传空串 —— 空 span 仍占位、仍可能带 margin。
+                      + (opts.hideTime ? '' : '<span class="ha-cl-time">' + ChatList.time(c.last_at) + '</span>')
                       + '</li>';
             }
             box.innerHTML = html;
@@ -1352,24 +1354,22 @@
             });
         },
 
-        /**
-         * 渲染联系人列表 —— **复用 ChatList 轮子**（同一个 DOM 结构与样式）。
-         * 数据形状对齐 ChatList.render 需要的字段：
-         *   conv='dm'（决定走用户头像分支）、peer=数字 user_id（点击时 openDm）、
-         *   name=昵称、last_text=个性签名、last_at=添加时间（右上角时间）。
-         */
         /* ---------- 联系人增删（v1.1.24） ----------
            入口在「用户资料卡」底部按钮（与「发私信」同排）。加/删互斥，
            靠 user_card 返回的 is_friend 决定显示哪个 —— 不做乐观切换，
            避免「界面显示已加、实际请求失败」的不一致。 */
 
-        /** 加为联系人。幂等：重复加服务端返回明确错误，不插重行。 */
+        /** 加为联系人。幂等：重复加服务端返回明确错误，不插重行。
+         *  ⚠️ v1.2.28：**只加，不切私聊**。
+         *     加好友是「加一个联系人」的动作，不是「去跟 TA 聊天」——
+         *     自动跳进私聊会让中间的消息区无声地换成另一个人，
+         *     正在打字的消息就发到别处去了（用户明确要求避免这个）。 */
         addFriend: function (uid) {
             var self = this;
             HaApi.post('friend_add', { friend_id: uid }, function (r) {
                 toast(r.msg || (r.ok ? '已添加' : '添加失败'));
                 if (!r.ok) return;
-                // 刷新资料卡让按钮切成「删除联系人」
+                // 刷新资料卡让按钮切成「删除好友」（不切换会话）
                 self.userCard(uid);
                 // 正在联系人视图里则同步刷新名单
                 if (self.view === 'friends') self.loadFriends();
@@ -1387,6 +1387,18 @@
             });
         },
 
+        /**
+         * 渲染联系人列表 —— **复用 ChatList 轮子**（同一个 DOM 结构与样式）。
+         * 数据形状对齐 ChatList.render 需要的字段：
+         *   conv='dm'（决定走用户头像分支）、peer=**'user:' + id**（点击走 openDm）、
+         *   name=昵称、last_text=个性签名。
+         *
+         * v1.2.28 两处修正：
+         *  ① peer 之前传的是**纯数字**（f.user_id），而 openDm 只认 `user:20` 这种
+         *     带前缀的格式（`/^(\w+):(\d+)$/` 不匹配就静默 return）→ **点联系人进不去**。
+         *  ② 右上角时间取消：原显示「加入联系人的时间」，
+         *     联系人列表没有消息流，这个时间对用户没有参考价值。
+         */
         renderFriends: function (list) {
             var self = this, box = $('haRoomList');
             if (!box) return;
@@ -1394,12 +1406,10 @@
             for (i = 0; i < (list || []).length; i++) {
                 var f = list[i];
                 rows.push({
-                    conv: 'dm', peer: f.user_id, id: f.user_id,
+                    conv: 'dm', peer: 'user:' + f.user_id, id: f.user_id,
                     name: f.nickname, avatar: f.avatar, role: f.role,
                     last_text: f.signature || '',
-                    // ⚠️ 时间列显示「加入联系人的时间」而非最后聊天时间 ——
-                    //   联系人列表没有消息流，拿聊天时间会全为空或全同值，没意义。
-                    last_at: f.added_at || 0,
+                    last_at: 0
                 });
             }
             // v1.2.20：联系人数量徽标一并移除（与消息标签同理，计数非必要信息）
@@ -1407,7 +1417,9 @@
                 container: 'haRoomList',
                 activeKey: this.dm ? ('dm:' + this.dm.peer) : '',
                 emptyText: '还没有联系人，去「成员管理」或资料卡添加吧',
+                hideTime: true,          // v1.2.28：取消右上角时间
                 onClick: function (el) {
+                    // v1.2.28：peer 现在是 'user:20' 完整格式，openDm 才认（旧代码传纯数字，静默失败）
                     var peer = el.getAttribute('data-dm');
                     if (peer) self.openDm(peer, el.getAttribute('data-name'));
                 }
@@ -1587,7 +1599,7 @@
                 self.fillIfShort();
             });
             this.dmPollLoop();
-            this.renderRoomPanel();   // v1.1.1：私聊视图下侧栏群设置区显示占位提示
+            this.renderRoomPanel();   // v1.2.28：私聊下侧栏渲染四个会话操作入口（并隐藏「所有成员」）
             // v1.1.0：进入私聊视图 → 通知插件清理群级装饰（公告条等）
             this._fireViewChange();
         },
@@ -2800,6 +2812,12 @@
             var isDm = this.room === 0;                    // 私聊是 room_id=0 的虚拟空间
             var r = null, list = this.cfg.rooms || [], i;
             for (i = 0; i < list.length; i++) { if (list[i].id === this.room) { r = list[i]; break; } }
+
+            // v1.2.28：私聊**不显示「所有成员」区块** —— 那是群聊概念，
+            // 私聊只有两个人，列出来是噪音。用 display 切换而不是移除节点：
+            // 切回群聊时无需重建，且 poll 返回的 members 仍有地方可写。
+            var memSec = document.querySelector('.ha-panel-members');
+            if (memSec) memSec.style.display = isDm ? 'none' : '';
 
             // v1.2.28：私聊不再是「没有群聊信息」的空洞提示，改渲染四个会话操作入口。
             if (isDm) {
