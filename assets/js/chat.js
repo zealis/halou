@@ -937,15 +937,9 @@
             };
             $('haTogglePanel').onclick = togglePanel;
             $('haOnlineClose').onclick = function () { setPanel(false); };
-            // v1.1.15：站点名右侧竖三点 → 品牌区菜单（头像+昵称 / 联系人 / 插件项）
-            // ⚠️ 必须 stopPropagation：document 级「点击菜单外关闭」会在冒泡到文档时
-            // 立刻把刚打开的菜单关掉（与 haMe 菜单同一个坑）。
-            var bm = $('haBrandMore');
-            if (bm) bm.onclick = function (e) {
-                e = e || w.event;
-                if (e.stopPropagation) e.stopPropagation(); else e.cancelBubble = true;
-                self.toggleBrandMenu();
-            };
+            // v1.2.31：站点名右侧 → 搜索按钮（原竖三点菜单已删除）
+            var sb = $('haBrandSearch');
+            if (sb) sb.onclick = function () { self.openSearch(); };
             // 所有成员面板默认一律不展开（v1.0.101，v1.0.119 恢复：游客入口已移到顶栏）
             setPanel(false);
             $('haMask').onclick = function () { setSide(false); setPanel(false); };
@@ -3297,88 +3291,175 @@
             }
         },
 
-        /* ---------- 品牌区（站点名右侧竖三点）菜单，v1.1.15 ---------- */
-        _brandExt: [],        // 插件扩展点：HaChat.onBrandMenu 追加的菜单项
-        /**
-         * 插件扩展点：向「站点名右侧竖三点」菜单追加菜单项。
-         * 回调签名与 onMsgCtx 一致：fn(items, env)，
-         * items 元素支持 {t, run} 与 {t, dis:true, tip}（禁用，提示 tip）。
-         * @example
-         * HaChat.onBrandMenu(function (items) {
-         *     items.push({ t: '我的入口', run: function () { alert(1); } });
-         * });
-         */
-        onBrandMenu: function (fn) { if (typeof fn === 'function') this._brandExt.push(fn); },
 
-        /**
-         * 组装并弹出品牌区菜单。
-         * 菜单项：① 头像+昵称（登录用户可点 → 打开个人资料；游客禁用）
-         *        ② 联系人（**当前仅文字占位，功能未实现**，点击给出说明）
-         *        ③ 插件通过 onBrandMenu 追加的项
-         * 定位：贴着按钮下缘、左边缘对齐；空间不足时上翻，防出视口。
-         */
-        toggleBrandMenu: function () {
-            var self = this, me = this.cfg.me, menu = $('haCtxMenu');
-            var btn = $('haBrandMore');
-            if (!menu || !btn) return;
-            // 再次点击同一按钮 = 收起
-            if (menu.style.display !== 'none' && menu._from === 'brand') { this.hideCtxMenu(); return; }
+        /* ---------- 搜索窗（v1.2.31，替代原「品牌区竖三点」菜单） ----------
+           v1.2.31 之前这里是 onBrandMenu 扩展点 + toggleBrandMenu（头像+昵称/联系人/插件项）。
+           用户要求删除并改成搜索：**默认搜「当前聊天」**，下方可切换
+           当前聊天 / 找人·群 / 消息 / 好友 四个范围。
+           ⚠️ onBrandMenu 扩展点一并删除（全项目零引用，plugins/ 下无任何调用）；
+              打开自己资料卡仍有入口 —— 侧栏底部资料区 #haMe（toggleMeMenu）。 */
 
-            var items = [];
-            // ① 头像 + 昵称。html 走白名单构造（头像/昵称都经 esc 或 avatarHtml 转义）
-            if (me) {
-                items.push({
-                    t: me.nickname, head: true,
-                    html: '<span class="ha-ctx-head-in">' + avatarHtml(me.avatar, me.nickname, 'sm', me.role)
-                        + '<span class="ha-me-name">' + esc(me.nickname) + '</span></span>',
-                    run: function () { self.userCard(me.id, me.nickname); },
-                });
-            } else {
-                // 游客：同样显示这一行（保持菜单结构一致），但禁用并说明原因
-                items.push({
-                    t: this.cfg.actor.nickname || '游客', head: true, dis: true,
-                    tip: '请先登录后查看个人资料',
-                    html: '<span class="ha-ctx-head-in">' + avatarHtml('', this.cfg.actor.nickname || '?', 'sm', 'guest')
-                        + '<span class="ha-me-name">' + esc(this.cfg.actor.nickname || '游客') + '</span></span>',
-                });
-            }
-            // ② v1.2.20：原「联系人」菜单项**已移除** —— 它上移为侧栏标签了。
-            // 菜单里再留一个同功能入口，用户会以为两者行为不同（尤其「返回聊天」
-            // 那种 toggle 文案，会让人以为菜单项和标签是两套东西）。
-            // 插件扩展位后移为 ②，编号沿用注释的语义顺序。
-            for (var i = 0; i < this._brandExt.length; i++) {
-                try { this._brandExt[i](items, { actor: this.cfg.actor, me: me }); } catch (e) {}
-            }
+        /** 打开搜索窗。scope 缺省为「当前聊天」 */
+        openSearch: function (scope) {
+            var self = this;
+            this._srScope = scope || 'current';
+            this._srTimer = null;
+            this._srSeq = 0;
+            this._srData = [];
+            var cur = this.searchContext();
+            var hint = this._srScope === 'current'
+                ? (cur ? ('在「' + cur.name + '」里搜索') : '当前没有打开的会话')
+                : '输入关键词';
+            this.openModal(
+                '<h3>搜索</h3>'
+                + '<div class="ha-tabs ha-sr-scope" id="haSrScope">'
+                + '<button class="ha-tab' + (this._srScope === 'current' ? ' is-active' : '') + '" data-scope="current" type="button">当前聊天</button>'
+                + '<button class="ha-tab' + (this._srScope === 'people' ? ' is-active' : '') + '" data-scope="people" type="button">找人/群</button>'
+                + '<button class="ha-tab' + (this._srScope === 'messages' ? ' is-active' : '') + '" data-scope="messages" type="button">消息</button>'
+                + '<button class="ha-tab' + (this._srScope === 'friends' ? ' is-active' : '') + '" data-scope="friends" type="button">好友</button>'
+                + '</div>'
+                + '<input class="ha-input" id="haSrQ" placeholder="' + esc(hint) + '" autocomplete="off">'
+                + '<div class="ha-sr-list" id="haSrList"></div>'
+            , 460);
+            var q = $('haSrQ');
+            this.renderSearchResults([]);
+            if (!q) return;
+            // 防抖 300ms（输入过程），回车立即搜一次
+            q.oninput = function () {
+                if (self._srTimer) clearTimeout(self._srTimer);
+                self._srTimer = setTimeout(function () { self.doSearch(q.value); }, 300);
+            };
+            q.onkeydown = function (e) {
+                e = e || w.event;
+                if (e.keyCode === 13) { if (self._srTimer) clearTimeout(self._srTimer); self.doSearch(q.value); }
+            };
+            var bar = $('haSrScope');
+            if (bar) bar.onclick = function (e) {
+                var t = e.target || e.srcElement;
+                while (t && t !== bar && !(t.getAttribute && t.getAttribute('data-scope'))) t = t.parentNode;
+                if (!t || t === bar) return;
+                var sc = t.getAttribute('data-scope');
+                if (!sc || sc === self._srScope) return;
+                self._srScope = sc;
+                var bs = bar.getElementsByClassName('ha-tab'), i;
+                for (i = 0; i < bs.length; i++) {
+                    if (bs[i].getAttribute('data-scope') === sc) bs[i].className += ' is-active';
+                    else bs[i].className = bs[i].className.replace(' is-active', '');
+                }
+                self.doSearch($('haSrQ') ? $('haSrQ').value : '');
+            };
+            setTimeout(function () { try { q.focus(); } catch (e) {} }, 30);
+        },
 
-            this._ctxItems = items;
-            menu._from = 'brand';
-            var html = '', j;
-            for (j = 0; j < items.length; j++) {
-                var cls = ' class="' + (items[j].head ? 'ha-ctx-head' : '') + (items[j].dis ? ' ha-ctx-dis' : '') + '"';
-                html += '<a href="javascript:;"' + (cls === ' class=""' ? '' : cls) + ' data-i="' + j + '">'
-                    + (items[j].html || esc(items[j].t)) + '</a>';
-                // 首行与后续项之间加一条分隔线（首行是身份，下方是功能）
-                if (j === 0) html += '<div class="ha-ctx-sep"></div>';
+        /** 当前搜索上下文：群聊给 room_id，私聊给 peer；都没有返回 null */
+        searchContext: function () {
+            if (this.dm) return { roomId: 0, peer: this.dm.peer, name: this.roomName || '私聊' };
+            if (this.room) return { roomId: this.room, peer: '', name: this.roomName || '' };
+            return null;
+        },
+
+        /** 执行搜索（竞态保护：只认最后一次请求的结果，先回来的旧请求直接丢弃） */
+        doSearch: function (kw) {
+            var self = this;
+            kw = (kw || '').replace(/^\s+|\s+$/g, '');
+            var list = $('haSrList');
+            if (!kw) { this.renderSearchResults([]); return; }
+            if (this._srScope === 'current' && !this.searchContext()) {
+                // 中间是空白的（切到「联系人」标签后就是这状态）→ 明确告诉用户，别让人干等
+                if (list) list.innerHTML = '<div class="ha-sr-empty">当前没有打开的聊天，请先点开一个会话，或切换上面的搜索范围</div>';
+                return;
             }
-            menu.innerHTML = html;
-            menu.style.display = 'block';
-            // 定位：按钮**右缘**与侧栏右缘对齐（不是左缘对齐）。
-            // ⚠️ 左缘对齐会让 136px 宽的菜单从按钮左侧起、右侧溢出到主聊天区
-            // （实测溢出 91px，像聊天区里凭空冒出一块浮层）。
-            // 右对齐既避免溢出，也符合「菜单从按钮下方展开」的视觉预期。
-            var r = btn.getBoundingClientRect();
-            var side = $('haSidebar');
-            var sideR = side ? side.getBoundingClientRect().right : r.right;
-            var vh = w.innerHeight || document.documentElement.clientHeight;
-            var mw = menu.offsetWidth || 136, mh = menu.offsetHeight || items.length * 32;
-            // 左缘：优先「侧栏右缘 - 菜单宽」；仍小于 4px 才退回按钮左缘
-            var left = Math.round(sideR - mw);
-            if (left < 4) left = Math.max(4, r.left);
-            menu.style.left = left + 'px';
-            // 上缘：按钮下方；放不下则上翻
-            var top = r.bottom + 4;
-            if (top + mh > vh - 4) top = Math.max(4, r.top - mh - 4);
-            menu.style.top = top + 'px';
+            var ctx = this.searchContext() || { roomId: 0, peer: '' };
+            var mySeq = ++this._srSeq;
+            if (list) list.innerHTML = '<div class="ha-sr-empty">搜索中…</div>';
+            HaApi.post('search', {
+                scope: this._srScope, q: kw,
+                room_id: ctx.roomId || 0, peer: ctx.peer || ''
+            }, function (r) {
+                if (mySeq !== self._srSeq) return;
+                if (!r.ok) { if (list) list.innerHTML = '<div class="ha-sr-empty">' + esc(r.msg || '搜索失败') + '</div>'; return; }
+                self._srData = r.data || [];
+                self.renderSearchResults(self._srData);
+            });
+        },
+
+        /** 渲染搜索结果（用户 / 群 / 消息 三类行） */
+        renderSearchResults: function (list) {
+            var self = this, box = $('haSrList');
+            if (!box) return;
+            if (!list.length) {
+                var kw = ($('haSrQ') || {}).value || '';
+                box.innerHTML = '<div class="ha-sr-empty">' + (kw ? '没有找到相关内容' : '输入关键词开始搜索') + '</div>';
+                return;
+            }
+            var html = '', i, d;
+            for (i = 0; i < list.length; i++) {
+                d = list[i];
+                if (d.type === 'msg') {
+                    html += '<div class="ha-sr-item is-msg" data-i="' + i + '">'
+                        + avatarHtml('', d.from, true, 'guest')
+                        + '<span class="ha-sr-main">'
+                        + '<span class="ha-sr-title">' + esc(d.from) + '<span class="ha-sr-tag">' + (d.room_id ? '群聊' : '私聊') + '</span></span>'
+                        + '<span class="ha-sr-sub">' + esc(d.text) + '</span>'
+                        + '</span></div>';
+                } else if (d.type === 'room') {
+                    html += '<div class="ha-sr-item" data-i="' + i + '">'
+                        + roomAvatarHtml(d.avatar, true, 'ha-cl-icon')
+                        + '<span class="ha-sr-main">'
+                        + '<span class="ha-sr-title">' + esc(d.name) + '<span class="ha-sr-tag">' + (d.need_password ? '密码房' : '群聊') + '</span></span>'
+                        + '<span class="ha-sr-sub">' + (d.need_password ? '需要密码才能进入' : '点击进入群聊') + '</span>'
+                        + '</span></div>';
+                } else {
+                    html += '<div class="ha-sr-item" data-i="' + i + '">'
+                        + avatarHtml(d.avatar, d.nickname, true, d.role)
+                        + '<span class="ha-sr-main">'
+                        + '<span class="ha-sr-title">' + esc(d.nickname) + '<span class="ha-sr-tag">' + (d.is_friend ? '好友' : '用户') + '</span></span>'
+                        + '<span class="ha-sr-sub">用户 ID ' + esc(fmtUid(d.user_id)) + '</span>'
+                        + '</span></div>';
+                }
+            }
+            box.innerHTML = html;
+            box.onclick = function (e) {
+                var t = e.target;
+                while (t && t !== box && !(t.getAttribute && t.getAttribute('data-i'))) t = t.parentNode;
+                if (!t || t === box) return;
+                var idx = parseInt(t.getAttribute('data-i'), 10);
+                if (self._srData && self._srData[idx]) self.pickSearchResult(self._srData[idx]);
+            };
+        },
+
+        /** 点击搜索结果的分发：人 → 私聊，群 → 进群，消息 → 跳到所在会话 */
+        pickSearchResult: function (d) {
+            var self = this;
+            if (d.type === 'user') {
+                this.closeModal();
+                this.openDm('user:' + d.user_id, d.nickname);
+                return;
+            }
+            if (d.type === 'room') {
+                var rl = this.cfg.rooms || [], i;
+                for (i = 0; i < rl.length; i++) {
+                    if (rl[i].id === d.room_id) {
+                        this.closeModal();
+                        this.switchRoom(d.room_id, rl[i].name, null);
+                        return;
+                    }
+                }
+                toast('该群聊当前不可进入');
+                return;
+            }
+            // 消息结果：跳到它所在的会话（不做精确定位高亮 —— 为一次搜索引入定位机制不划算）
+            this.closeModal();
+            if (this.view !== 'chat') this.switchTab('chat');
+            if (d.room_id) {
+                var rs = this.cfg.rooms || [];
+                for (var k = 0; k < rs.length; k++) {
+                    if (rs[k].id === d.room_id) { this.switchRoom(d.room_id, rs[k].name, null); return; }
+                }
+                toast('该消息所在的群聊已不可进入');
+            } else if (d.peer) {
+                this.openDm(d.peer, this.dmNameOf(d.peer));
+            }
         },
 
         /**

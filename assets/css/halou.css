@@ -552,7 +552,7 @@ input[type=range] {
 /* v1.2.25：28px → 22px。品牌条总高 57px（14px 上下内边距 + 28px 内容），
    28px 的图标在条内基本顶满，与旁边 16px 的站点名并排偏大。
    缩到 22px 后图标不再压住站点名，但**品牌条高度不变** ——
-   条高由 .ha-brand-more 的 28px 撑住（见下一条），
+   条高由 .ha-brand-search 的 28px 撑住（见下一条），
    所以顶栏与左侧栏的分隔线仍在 y=56/57，三线齐平不受影响。 */
 /* v1.2.26：光学居中补偿 translateY(1.5px)。
    为什么盒子已经居中了还是看着歪：本 logo 的造型是「上方实心方块 + 下方伸出一个尖角」，
@@ -569,16 +569,52 @@ input[type=range] {
    不存在「与文字并排」的对齐诉求，加了反而整体下沉。
    ⚠️ transform 不参与布局，品牌条高度与分隔线位置不受影响。 */
 .ha-brand img { width: 22px; height: 22px; transform: translateY(1.5px); -webkit-transform: translateY(1.5px); }
-/* v1.1.15：站点名右侧的竖三点。margin-left:auto 把它推到最右，
-   尺寸收窄到 28×28（比顶栏的 36 小一号），避免与 16px 站点名抢视觉重心。
-   ⚠️ 这个 28px 同时是**品牌条高度的支点**：logo 缩到 22px 后，
-   整条的高度就靠它撑着。别再顺手改小，否则品牌条会跟着变矮，
-   与顶栏、侧栏第一行的分隔线错位（下方 1241 行有对齐说明）。 */
-.ha-brand .ha-brand-more {
+/* v1.2.31：站点名右侧的**搜索按钮**（原竖三点菜单已删除）。
+   ⚠️ 这个 28px 同时是**品牌条高度的支点**：logo 缩到 22px、站点名 16px 之后，
+   整条的高度就靠它撑着（实测 57px）。别再顺手改小，否则品牌条会跟着变矮，
+   与顶栏、侧栏第一行的分隔线错位（下方「首行分隔线与顶栏下边框水平对齐」一节有说明）。 */
+.ha-brand .ha-brand-search {
     margin-left: auto;
     width: 28px; height: 28px; line-height: 28px;
     flex-shrink: 0; -webkit-flex-shrink: 0;
 }
+/* ---------- 搜索窗（v1.2.31） ---------- */
+.ha-sr-scope { margin-bottom: 10px; }        /* 范围切换复用 .ha-tabs 组件外观 */
+.ha-sr-scope .ha-tab { font-size: 13px; padding: 6px 8px; }
+.ha-sr-list { margin-top: 10px; max-height: 380px; overflow-y: auto; }
+.ha-sr-item {
+    display: flex; display: -webkit-flex;
+    align-items: center; -webkit-align-items: center;
+    gap: 10px;
+    padding: 8px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.ha-sr-item:hover { background: var(--ha-hover-bg); }
+.ha-sr-main { flex: 1; -webkit-flex: 1; min-width: 0; }
+.ha-sr-title {
+    display: flex; display: -webkit-flex;
+    align-items: center; -webkit-align-items: center;
+    gap: 6px;
+    font-size: 14px; color: var(--ha-text-title);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ha-sr-sub {
+    display: block;
+    font-size: 12px; color: var(--ha-text-sub);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ha-sr-tag {
+    flex-shrink: 0; -webkit-flex-shrink: 0;
+    padding: 0 5px;
+    font-size: 11px; line-height: 17px;
+    border-radius: 3px;
+    color: var(--ha-text-sub);
+    background: var(--ha-bg-sub);
+}
+/* 消息结果：发送者与片段分两行，避免长文本把标题挤没 */
+.ha-sr-item.is-msg { align-items: flex-start; -webkit-align-items: flex-start; }
+.ha-sr-empty { padding: 18px 6px; font-size: 13px; color: var(--ha-text-sub); text-align: center; }
 .ha-side-title {
     padding: 12px 16px 6px;
     font-size: 12px;

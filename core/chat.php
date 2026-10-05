@@ -953,6 +953,148 @@ class Chat
         return self::sortConversations($out);
     }
 
+    // ---------- 搜索（v1.2.31） ----------
+
+    /**
+     * 统一搜索入口，四个范围：
+     *   current  当前会话内的消息（群聊传 room_id，私聊传 peer）
+     *   people   按昵称找人 + 按名称找群
+     *   messages 全站消息（**只搜自己有权看的**：能进的群 + 涉及自己的私聊）
+     *   friends  联系人
+     *
+     * 返回项统一形状：{type:'user'|'room'|'msg', ...}，前端按 type 分发点击行为。
+     * msg 额外带 room_id（0 = 私聊）、peer（私聊对象键）、from（发送者昵称）。
+     *
+     * @param array $opt ['room_id'=>int, 'peer'=>string]
+     */
+    public static function search(array $actor, string $scope, string $q, array $opt = []): array
+    {
+        $q = trim($q);
+        if ($q === '') return [];
+        if (mb_strlen($q) > 50) $q = mb_substr($q, 0, 50);
+        $like = '%' . $q . '%';
+
+        switch ($scope) {
+            case 'people':
+                $out = [];
+                // 找人：排除自己（自己不会「找」自己），只返回正常状态账号
+                foreach (DB::all(
+                    'SELECT id, nickname, avatar, role FROM users
+                     WHERE status=1 AND nickname LIKE ? AND id<>? ORDER BY nickname LIMIT 20',
+                    [$like, (int)($actor['id'] ?? 0)]) as $u) {
+                    $out[] = ['type' => 'user', 'user_id' => (int)$u['id'], 'nickname' => (string)$u['nickname'],
+                        'avatar' => (string)($u['avatar'] ?? ''), 'role' => (string)$u['role']];
+                }
+                // 找群：走 rooms() 过滤（已含 canEnter 判定，游客看不到的不给）
+                foreach (self::rooms($actor) as $r) {
+                    if (mb_strpos((string)$r['name'], $q) === false) continue;
+                    $out[] = ['type' => 'room', 'room_id' => (int)$r['id'], 'name' => (string)$r['name'],
+                        'avatar' => (string)($r['avatar'] ?? ''), 'need_password' => !empty($r['need_password'])];
+                    if (count($out) >= 30) break;
+                }
+                return $out;
+
+            case 'friends':
+                if (($actor['kind'] ?? '') !== 'user') return [];
+                $out = [];
+                foreach (DB::all(
+                    'SELECT u.id, u.nickname, u.avatar, u.role FROM friends f
+                     JOIN users u ON u.id = f.friend_id
+                     WHERE f.user_id=? AND u.status=1 AND u.nickname LIKE ?
+                     ORDER BY u.nickname LIMIT 30', [(int)$actor['id'], $like]) as $u) {
+                    $out[] = ['type' => 'user', 'user_id' => (int)$u['id'], 'nickname' => (string)$u['nickname'],
+                        'avatar' => (string)($u['avatar'] ?? ''), 'role' => (string)$u['role'], 'is_friend' => true];
+                }
+                return $out;
+
+            case 'messages':
+                $out = [];
+                // 群消息：只搜「我能进的群」——用 rooms() 拿到的 id 集合，避免搜到进不去的群
+                $roomIds = array_map(fn($r) => (int)$r['id'], self::rooms($actor));
+                if ($roomIds) {
+                    $in = implode(',', array_fill(0, count($roomIds), '?'));
+                    $args = array_merge($roomIds, [$like]);
+                    $rows = DB::all(
+                        "SELECT id, room_id, user_id, guest_id, nickname, type, content, created_at
+                         FROM messages WHERE room_id IN ($in) AND type IN ('text','mention')
+                         AND content LIKE ? ORDER BY id DESC LIMIT 40", $args);
+                    $hidden = self::hiddenIds($actor);
+                    foreach ($rows as $m) {
+                        if (isset($hidden[(int)$m['id']])) continue;   // 我隐藏过的，别再搜出来
+                        $out[] = self::srMsg($m, 0, '');
+                    }
+                }
+                // 私聊消息：只搜涉及我的
+                if (($actor['kind'] ?? '') === 'user') {
+                    $me = (int)$actor['id'];
+                    $rows = DB::all(
+                        "SELECT id, room_id, user_id, guest_id, to_user_id, nickname, type, content, created_at
+                         FROM messages WHERE room_id=0 AND to_user_id>0 AND type IN ('text','mention')
+                         AND (user_id=? OR to_user_id=?) AND content LIKE ?
+                         ORDER BY id DESC LIMIT 40", [$me, $me, $like]);
+                    $hidden = self::hiddenIds($actor);
+                    foreach ($rows as $m) {
+                        if (isset($hidden[(int)$m['id']])) continue;
+                        $sentByMe = (int)($m['user_id'] ?? 0) === $me;
+                        $pId = $sentByMe ? (int)($m['to_user_id'] ?? 0) : (int)($m['user_id'] ?? 0);
+                        if ($pId <= 0) continue;
+                        $out[] = self::srMsg($m, 0, 'user:' . $pId);
+                    }
+                }
+                return $out;
+
+            case 'current':
+            default:
+                $roomId = (int)($opt['room_id'] ?? 0);
+                $peer = (string)($opt['peer'] ?? '');
+                $rows = [];
+                if ($roomId > 0) {
+                    $room = self::room($roomId);
+                    // 必须过 canEnter：否则能通过 URL/构造参数搜到进不去的群
+                    if (!$room || !self::canEnter($room, $actor)) return [];
+                    $rows = DB::all(
+                        "SELECT id, room_id, user_id, guest_id, nickname, type, content, created_at
+                         FROM messages WHERE room_id=? AND type IN ('text','mention')
+                         AND content LIKE ? ORDER BY id DESC LIMIT 50", [$roomId, $like]);
+                } elseif ($peer !== '') {
+                    $pk = self::dmPeerKey($actor, $peer);
+                    if (!$pk) return [];
+                    [$cond, $args] = self::dmPairSql($actor, $pk[0], $pk[1], '', []);
+                    $rows = DB::all(
+                        "SELECT id, room_id, user_id, guest_id, nickname, type, content, created_at
+                         FROM messages WHERE room_id=0 AND to_user_id>0 AND $cond
+                         AND type IN ('text','mention') AND content LIKE ?
+                         ORDER BY id DESC LIMIT 50", array_merge($args, [$like]));
+                } else {
+                    return [];   // 没有任何会话上下文（切到联系人标签后中间是空白的）
+                }
+                $hidden = self::hiddenIds($actor);
+                $out = [];
+                foreach ($rows as $m) {
+                    if (isset($hidden[(int)$m['id']])) continue;
+                    $out[] = self::srMsg($m, $roomId, $peer);
+                }
+                return $out;
+        }
+    }
+
+    /** 搜索结果里的消息项（统一形状） */
+    private static function srMsg(array $m, int $roomId, string $peer): array
+    {
+        $text = (string)($m['content'] ?? '');
+        // 文件/图片类不进搜索（type 已限定 text/mention，这里只是兜底）
+        $snippet = mb_strlen($text) > 80 ? mb_substr($text, 0, 80) . '…' : $text;
+        return [
+            'type' => 'msg',
+            'msg_id' => (int)$m['id'],
+            'room_id' => (int)($m['room_id'] ?? 0),
+            'peer' => $peer,
+            'from' => (string)($m['nickname'] ?? ''),
+            'text' => $snippet,
+            'created_at' => (int)($m['created_at'] ?? 0),
+        ];
+    }
+
     /** 会话排序：**置顶优先**，组内按最后活跃时间倒序；无消息（at=0）的沉底，其内按 id 升序 */
     private static function sortConversations(array $list): array
     {

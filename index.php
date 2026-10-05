@@ -372,6 +372,20 @@ if ($action !== '') {
             [$ok, $msg, $n] = Chat::clearDmForMe($actor, $peer);
             Api::json(['ok' => $ok, 'msg' => $msg, 'cleared' => $n]);
 
+        // ---------- 搜索（v1.2.31）：品牌区搜索图标弹窗 ----------
+        // scope: current 当前会话 / people 找人·群 / messages 全站消息 / friends 联系人
+        case 'search':
+            $scope = (string)$p('scope', 'current');
+            if (!in_array($scope, ['current', 'people', 'messages', 'friends'], true)) $scope = 'current';
+            Api::json([
+                'ok' => true,
+                'scope' => $scope,
+                'data' => Chat::search($actor, $scope, (string)$p('q', ''), [
+                    'room_id' => (int)$p('room_id', '0'),
+                    'peer' => (string)$p('peer', ''),
+                ]),
+            ]);
+
         case 'dm_history':      // 私聊历史（仅双方可见）
             $peer = Chat::dmPeerKey($actor, $p('peer'));
             if (!$peer) Api::json(['ok' => false, 'msg' => '私聊对象不合法']);
@@ -852,6 +866,8 @@ function ow_icon(string $name, int $size = 18): string
         'chevron' => '<polyline points="6.5 9.5 12 15 17.5 9.5"/>',
         // 竖排三点（v1.1.1）：群聊信息入口，替代原「在线成员」人形图标
         'more-v' => '<circle cx="12" cy="5" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.7" fill="currentColor" stroke="none"/>',
+        // v1.2.31：品牌区搜索图标（替代原竖三点菜单）
+        'search' => '<circle cx="11" cy="11" r="6.6"/><path d="M20.2 20.2l-4.5-4.5"/>',
     ];
     $d = $paths[$name] ?? $paths['chat'];
     return '<svg class="ha-ico" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $d . '</svg>';
@@ -1010,12 +1026,13 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
 
     // 左侧栏
     echo '<aside class="ha-sidebar" id="haSidebar">'
-       // v1.1.15：站点名称右侧加竖三点，弹出「头像+昵称 / 联系人」下拉。
-       // 菜单内容由前端 HaChat.brandMenu() 组装（含插件钩子 HaChat.onBrandMenu），
-       // 服务端只负责把按钮放出来——**游客也显示**（内部按身份禁用各项）。
+       // v1.2.31：站点名右侧的**竖三点菜单已删除**（含插件扩展点 HaChat.onBrandMenu，
+       // 全项目零引用；打开自己资料的入口在侧栏底部资料区 #haMe，不受影响），
+       // 改为**搜索图标** → 弹搜索窗，默认搜「当前聊天」，下方可切换
+       // 当前聊天 / 找人·群 / 消息 / 好友。
+       // ⚠️ 服务端只放按钮，弹窗与搜索逻辑全在前端 HaChat.openSearch()。
        . '<div class="ha-brand"><img src="assets/img/logo.svg" alt="logo"><span>' . Sec::e(DB::setting('site_name', 'Halou-Chat')) . '</span>'
-       . '<button class="ha-icon-btn ha-brand-more" id="haBrandMore" aria-label="更多" title="更多">'
-       . ow_icon('more-v', 16) . '</button></div>'
+       . '<button class="ha-icon-btn ha-brand-search" id="haBrandSearch" aria-label="搜索" title="搜索">' . ow_icon('search', 16) . '</button></div>'
        // v1.1.0：列表已是「群聊 + 私聊」聚合，标题改为「聊天」；
        // 徽标数字含义同步改为「会话总数」，由 conversations 接口返回的 total 在前端回填
        // v1.2.20：「聊天」标题 + 数量徽标整体**换成 Tabs 标签条**。
