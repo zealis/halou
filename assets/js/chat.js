@@ -886,21 +886,15 @@
                 for (var i = 0; i < items.length; i++) {
                     if (items[i].type.indexOf('image') === 0) {
                         var f = items[i].getAsFile();
-                        if (f) self.uploadImage(f);
+                        // v1.2.41：走插件暴露的上传器；插件未启用则不粘贴上传
+                        if (f && w.HaAttach) w.HaAttach.uploadImage(f);
                     }
                 }
             };
-            $('haBtnFile').onclick = function () { $('haFileAttach').click(); };
-            $('haFileAttach').onchange = function () {
-                var f = this.files && this.files[0];
-                this.value = '';
-                if (f) self.uploadFile(f);
-            };
-            $('haBtnImage').onclick = function () { $('haFileInput').click(); };
-            $('haFileInput').onchange = function () {
-                if (this.files && this.files[0]) self.uploadImage(this.files[0]);
-                this.value = '';
-            };
+            // v1.2.41：图片/文件按钮及其 file input 移入附件上传插件，
+            // 由插件注入到 #haAttachTools 并自行绑定。插件停用时这两个按钮不存在。
+            // ⚠️ 下方「粘贴上传图片」仍留在核心，但要走插件暴露的 HaAttach；
+            //    插件未启用时静默跳过（不能因为没插件就整个粘贴功能报错）。
             // 表情面板：按钮切换 + 点击外部/Esc 关闭（原来只能靠再点一次按钮）
             var setEmoji = function (open) {
                 var p = $('haEmojiPanel');
@@ -2518,30 +2512,6 @@
          * 上传文件附件，并作为一条 file 消息发送。
          * v1.2.1：私聊可用（路由由 send() 统一处理，此处无需分支）。
          */
-        uploadFile: function (file) {
-            var self = this;
-            toast('文件上传中…');
-            HaApi.upload('upload_file', file, {}, function (r) {
-                if (!r.ok) { toast(r.msg); return; }
-                self.send({
-                    type: 'file',
-                    content: JSON.stringify({
-                        name: r.file.name, size: r.file.size,
-                        ext: r.file.ext, path: r.file.path
-                    })
-                });
-            });
-        },
-
-        uploadImage: function (file) {
-            var self = this;
-            toast('图片上传中…');
-            HaApi.upload('upload', file, { kind: 'image' }, function (r) {
-                if (r.ok) self.send({ type: 'image', content: r.url });
-                else toast(r.msg);
-            });
-        },
-
         /**
          * 撤回消息 = 真正的删除，**全局生效**（所有人都不再看到，不可恢复）。
          * v1.2.4 起撤回是物理删除行，所以成功后直接把气泡从 DOM 移除，
@@ -4585,13 +4555,9 @@ logs: function (main) {
                         + '</div>'
                         + '<div class="ha-form-item"><label>注册最低年龄(周岁)</label><input class="ha-input" id="haS_min_register_age" value="' + esc(d.min_register_age || '0') + '">'
                         + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">填 0 表示不限制；填 18 则注册时必须选择出生日期且年满 18 周岁（按日期精确计算）。</p></div>'
-                        + '<div class="ha-form-row">'
-                        + '<div class="ha-form-item"><label>允许上传文件</label>' + sel('file_upload', { '1': '允许', '0': '禁止' }) + '</div>'
-                        + '<div class="ha-form-item"><label>单文件大小上限(MB)</label><input class="ha-input" id="haS_file_max_size" value="' + esc(d.file_max_size || '10') + '"></div>'
-                        + '</div>'
-                        + '<div class="ha-form-item"><label>允许的文件扩展名</label><input class="ha-input" id="haS_file_exts" value="' + esc(d.file_exts || 'zip,rar,7z,pdf,txt,md,doc,docx,xls,xlsx,ppt,pptx,mp3,mp4') + '">'
-                        + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">逗号分隔。只有内置安全类型表内登记过的扩展名才会生效；'
-                        + 'svg/php/html 等可执行或可内嵌脚本的类型不予登记（即使填了也不会放行）。</p></div>'
+                        // v1.2.41：「允许上传文件 / 单文件大小上限(MB) / 允许的文件扩展名」
+                        //   三项已移入**附件上传插件**的后台页（插件管理 → 附件上传），
+                        //   核心设置页不再出现，也不再读这三个键。
                         + '<p style="font-size:12px;color:#5C5C5C;margin-bottom:12px">登录保护：验证码填错也计入失败次数（保证锁定可达），锁定按「账号+IP」记录，成功后清零。全部填 0 表示关闭对应保护。</p>'
                         + '<div class="ha-form-row">'
                         + '<div class="ha-form-item"><label>允许用户创建群聊</label>' + sel('room_create_allow', { '1': '允许', '0': '仅管理员' }) + '</div>'
@@ -4968,9 +4934,6 @@ logs: function (main) {
                 mail_rate_limit: $('haS_mail_rate_limit').value,
                 room_pass_ttl: $('haS_room_pass_ttl') ? $('haS_room_pass_ttl').value : '',
                 min_register_age: $('haS_min_register_age') ? $('haS_min_register_age').value : '',
-                file_upload: $('haS_file_upload') ? $('haS_file_upload').value : '',
-                file_max_size: $('haS_file_max_size') ? $('haS_file_max_size').value : '',
-                file_exts: $('haS_file_exts') ? $('haS_file_exts').value : '',
                 room_create_allow: $('haS_room_create_allow') ? $('haS_room_create_allow').value : '',
                 room_create_cost: $('haS_room_create_cost') ? $('haS_room_create_cost').value : '',
                 room_private_create_allow: $('haS_room_private_create_allow') ? $('haS_room_private_create_allow').value : '',

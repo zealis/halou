@@ -567,26 +567,20 @@ if ($action !== '') {
             [$ok, $msg] = Chat::recall($actor, (int)$p('id'));
             Api::json(['ok' => $ok, 'msg' => $msg]);
 
-        // ---------- 上传 ----------
+        // ---------- 上传（v1.2.41 收窄） ----------
+        // ⚠️ 这里**只剩头像与表情贴纸**：聊天里的图片/文件附件上传已移入附件上传插件
+        //   （路由 plugin_attachment_manager_upload / _upload_file）。
+        //   之所以不把头像/贴纸也移走：它们是账号与表情功能，插件停用后换不了头像
+        //   会被用户当成「网站坏了」。
         case 'upload':
-            $kind = $p('kind', 'image');
-            if ($actor['kind'] === 'none') Api::json(['ok' => false, 'msg' => '请先登录']);
-            if (($kind === 'sticker' || $kind === 'avatar') && $actor['kind'] !== 'user') Api::json(['ok' => false, 'msg' => '游客仅可发送图片']);
+            $kind = $p('kind', 'avatar');
+            if (!in_array($kind, ['avatar', 'sticker'], true)) {
+                Api::json(['ok' => false, 'msg' => '图片与文件附件请使用附件上传功能'], 400);
+            }
+            if ($actor['kind'] !== 'user') Api::json(['ok' => false, 'msg' => '请先登录']);
             if (empty($_FILES['file'])) Api::json(['ok' => false, 'msg' => '未接收到文件']);
             [$ok, $urlOrMsg] = Upload::handle($_FILES['file'], $kind);
             Api::json($ok ? ['ok' => true, 'url' => $urlOrMsg] : ['ok' => false, 'msg' => $urlOrMsg]);
-
-        // 文件附件上传（聊天文件消息）：安全校验见 Upload::storeFile
-        case 'upload_file':
-            if ($actor['kind'] === 'none') Api::json(['ok' => false, 'msg' => '请先登录']);
-            if (empty($_FILES['file'])) Api::json(['ok' => false, 'msg' => '没有选择文件']);
-            if (!Sec::rateLimit('upload_file', $actor['kind'] . ($actor['id'] ?? '') . '|' . Sec::ip(), 60, 20)) {
-                Api::json(['ok' => false, 'msg' => '上传过于频繁，请稍后再试']);
-            }
-            [$ok, $res] = Upload::storeFile($_FILES['file']);
-            if (!$ok) Api::json(['ok' => false, 'msg' => $res]);
-            Sec::log('upload_file', $actor['nickname'], ['size' => $res['size'], 'ext' => $res['ext']]);
-            Api::json(['ok' => true, 'file' => $res]);
 
         // 用户创建群聊（管理员始终可创建；普通用户受后台开关与积分限制）
         case 'room_create':
@@ -758,7 +752,9 @@ if ($action !== '') {
     if (strpos($action, 'admin_') === 0) Admin::handle($action, $actor);
 
     // 插件路由
-    $r = Plugin::dispatch($action, ['actor' => $actor, 'post' => $_POST]);
+    // ⚠️ files 必须传：v1.2.41 起「聊天附件上传」移入附件上传插件，
+    //   插件要处理 multipart 上传就必须能拿到 $_FILES（此前 ctx 只有 actor/post）。
+    $r = Plugin::dispatch($action, ['actor' => $actor, 'post' => $_POST, 'files' => $_FILES]);
     if ($r !== null) Api::json(is_array($r) ? $r : ['ok' => true, 'data' => $r]);
 
     Api::json(['ok' => false, 'msg' => '未知操作'], 404);
@@ -1098,11 +1094,11 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
        . '<div class="ha-toolbar">'
        // 工具栏图标统一 16px（比消息区图标小一号，避免抢视觉重心）
        . '<button class="ha-icon-btn" id="haBtnEmoji" title="表情">' . ow_icon('smile', 16) . '</button>'
-       . '<button class="ha-icon-btn" id="haBtnImage" title="发送图片">' . ow_icon('image', 16) . '</button>'
-       . '<button class="ha-icon-btn" id="haBtnFile" title="发送文件">' . ow_icon('paperclip', 16) . '</button>'
+       // v1.2.41：图片/文件两个按钮**移入附件上传插件**，这里只留一个空锚点。
+       //   插件启用时由其 chat.js 往这里注入按钮（含 file input）；插件停用则按钮不出现 ——
+       //   核心因此不需要任何「插件是否启用」的判断。
+       . '<span id="haAttachTools"></span>'
        . '<button class="ha-icon-btn" id="haBtnSound" title="提示音" data-on="' . Sec::e(ow_icon('bell', 16)) . '" data-off="' . Sec::e(ow_icon('bell-off', 16)) . '">' . ow_icon('bell', 16) . '</button>'
-       . '<input type="file" id="haFileInput" accept="image/*" style="display:none">'
-       . '<input type="file" id="haFileAttach" style="display:none">'
        . '</div>'
        . '<div class="ha-input-row">'
        // 引用条（v1.0.69）：出现在输入框上方，点 ✕ 取消；默认隐藏，由 HaChat.renderQuote 填充

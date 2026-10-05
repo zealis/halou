@@ -15,6 +15,7 @@
         /* 初始化：直接加载首屏列表（群聊ID输入框，0=全部） */
         init: function () {
             HaAM.load(1);
+            HaAT.loadCfg();      // v1.2.41：顺带把上传配置读进表单
         },
 
         /* 重置筛选条件 */
@@ -151,4 +152,40 @@
     } else {
         _amWatchInit();
     }
+
+    /* =======================================================================
+       HaAT：上传配置（v1.2.41 从核心「站点设置」迁入本插件）
+       路由：plugin_attachment_manager_cfg_get / _cfg_save
+       ======================================================================= */
+    w.HaAT = {
+        /** 读配置填表 + 显示当前生效的扩展名 */
+        loadCfg: function () {
+            HaApi.post('plugin_attachment_manager_cfg_get', {}, function (r) {
+                if (!r.ok) { toast(r.msg || '读取配置失败'); return; }
+                var c = r.config || {};
+                var en = $('haAtEnabled'), mb = $('haAtMaxMb'), ex = $('haAtExts');
+                if (en) en.value = c.enabled === '0' ? '0' : '1';
+                if (mb) mb.value = c.max_mb || '10';
+                if (ex) ex.value = c.exts || '';
+                var act = $('haAtActive');
+                if (act) act.textContent = (r.active_exts || []).join('、') || '（无）';
+            });
+        },
+
+        /** 保存配置 */
+        saveCfg: function () {
+            var en = $('haAtEnabled'), mb = $('haAtMaxMb'), ex = $('haAtExts');
+            if (!en || !mb || !ex) { toast('配置表单不存在'); return; }
+            var mbv = parseInt(mb.value, 10);
+            if (isNaN(mbv) || mbv < 1 || mbv > 1024) { toast('大小上限请填 1~1024 的整数'); return; }
+            HaApi.post('plugin_attachment_manager_cfg_save', {
+                enabled: en.value, max_mb: String(mbv), exts: ex.value
+            }, function (r) {
+                if (!r.ok) { toast(r.msg || '保存失败'); return; }
+                toast('配置已保存');
+                HaAT.loadCfg();      // 回读：把被安全表过滤后的结果回显
+            });
+        }
+    };
+
 })(window, document);

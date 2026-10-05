@@ -510,10 +510,9 @@ class DB
             'login_fail_lock'    => '10', // 连续失败达此次数后临时锁定（0=不锁定）
             'login_lock_minutes' => '15', // 锁定时长（分钟）
             'min_register_age' => '0',   // 注册最低年龄（周岁），0=不限制
-            // 文件附件上传
-            'file_upload'   => '1',      // 是否允许上传文件（0=关闭）
-            'file_exts'     => 'zip,rar,7z,pdf,txt,md,doc,docx,xls,xlsx,ppt,pptx,mp3,mp4',
-            'file_max_size' => '10',     // 单个文件上限（MB）
+            // v1.2.41：file_upload / file_exts / file_max_size 三项**已移入附件上传插件**
+            //   （表 plugin_attachment_config）。这里不再声明默认值 ——
+            //   留着的后果是：插件迁移逻辑会读到核心默认值，把用户已改过的配置覆盖回去。
             // 用户创建群聊
             'room_create_allow' => '1',  // 是否允许普通用户创建群聊（管理员始终可创建）
             'room_create_cost'  => '0',  // 创建群聊扣除的积分（0=免费；管理员不扣）

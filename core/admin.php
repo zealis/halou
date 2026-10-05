@@ -260,7 +260,6 @@ class Admin
                           'msg_rate_window', 'msg_rate_max', 'mail_rate_limit',
                           'sound_default', 'room_pass_ttl',
                           'login_fail_captcha', 'login_fail_lock', 'login_lock_minutes', 'min_register_age',
-                          'file_upload', 'file_exts', 'file_max_size',
                           'room_create_allow', 'room_create_cost',
                           // v1.1.14：普通用户能否创建不公开群聊（管理员始终可）
                           'room_private_create_allow'];
