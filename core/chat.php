@@ -217,6 +217,113 @@ class Chat
         return $out;
     }
 
+    /**
+     * 加入群聊（幂等）。v1.2.27：公开群聊从「点进去就能说话」改为**必须显式加入**。
+     *
+     * 背景：以前 room_join 只做密码房通行校验，公开群点了就直接进、不产生任何成员关系，
+     * 于是「所有成员」区块只能拿 online 心跳（45 秒窗口）凑数，离线成员根本看不到。
+     *
+     * ⚠️ 只有**注册用户**能成为成员。游客身份随浏览器会话消亡（没有 user_id），
+     * 写进 room_members 会积累永久垃圾行（见 memberRoomIds 注释），
+     * 游客一律走「在场即显示、离开即消失」的 online 心跳口径。
+     */
+    public static function joinRoom(array $room, array $actor): array
+    {
+        if (($actor['kind'] ?? '') !== 'user') return [false, '游客无需加入，直接进入即可'];
+        $uid = (int)($actor['id'] ?? 0);
+        if ($uid <= 0) return [false, '请先登录'];
+        if ((int)($room['owner_id'] ?? 0) === $uid) return [true, '你是群主，无需加入'];
+        if (self::isMember($room, $actor)) return [true, '已在本群'];   // 幂等：不重复插
+        DB::insert('room_members', [
+            'room_id' => (int)$room['id'],
+            'user_id' => $uid,
+            'invited_by' => 0,          // 0 = 主动加入（非邀请）
+            'created_at' => time(),
+        ]);
+        return [true, '已加入群聊'];
+    }
+
+    /**
+     * 「所有成员」区块的统一口径（v1.2.27）。
+     *
+     *   注册用户成员 = room_members **全量**（含离线） + 群主补位
+     *   在场游客     = online 表里本群的 guest_id 行（心跳 45 秒内）
+     *
+     * 为什么成员不再直接用 online 表：online 只有 45 秒窗口，问的是「谁在线」；
+     * 「所有成员」要的是「谁加入了这个群」，离线的也必须在列。
+     * 为什么游客仍走 online：游客没有持久身份，只能按在场判定（见 joinRoom 注释）。
+     *
+     * @return array{members:array,guests:array}
+     */
+    public static function allMembers(array $room, array $actor): array
+    {
+        $rid = (int)($room['id'] ?? 0);
+        $ownerId = (int)($room['owner_id'] ?? 0);
+        $since = time() - 45;
+
+        // 在线标记：online 表窗口内的 user_id 集合（仅用于打点，不是名单来源）
+        $onlineSet = [];
+        if ($rid > 0) {
+            foreach (DB::all('SELECT user_id FROM online WHERE room_id=? AND last_seen>? AND user_id>0',
+                [$rid, $since]) as $o) {
+                $onlineSet[(int)$o['user_id']] = true;
+            }
+        }
+
+        $out = [];
+        $seen = [];
+        foreach (self::memberList($room) as $m) {
+            $uid = (int)$m['user_id'];
+            if ($uid <= 0 || isset($seen[$uid])) continue;
+            $seen[$uid] = true;
+            $out[] = [
+                'uid' => $uid, 'gid' => null, 'kind' => 'user',
+                'nickname' => (string)$m['nickname'],
+                'role' => (string)($m['role'] ?: 'member'),
+                'avatar' => (string)$m['avatar'],
+                'online' => isset($onlineSet[$uid]),
+                'is_owner' => $uid === $ownerId,
+            ];
+        }
+        // 群主补位：建群时不一定给自己插 room_members 行，但群主恒为成员
+        if ($ownerId > 0 && !isset($seen[$ownerId])) {
+            $u = DB::one('SELECT nickname, role, avatar FROM users WHERE id=?', [$ownerId]);
+            if ($u) {
+                $out[] = [
+                    'uid' => $ownerId, 'gid' => null, 'kind' => 'user',
+                    'nickname' => (string)$u['nickname'],
+                    'role' => (string)($u['role'] ?: 'member'),
+                    'avatar' => (string)($u['avatar'] ?? ''),
+                    'online' => isset($onlineSet[$ownerId]),
+                    'is_owner' => true,
+                ];
+            }
+        }
+        // 排序：群主 → 在线 → 用户 ID（稳定，避免每次刷新顺序跳动）
+        usort($out, function (array $a, array $b): int {
+            if ($a['is_owner'] !== $b['is_owner']) return $a['is_owner'] ? -1 : 1;
+            if ($a['online'] !== $b['online']) return $a['online'] ? -1 : 1;
+            return (int)$a['uid'] <=> (int)$b['uid'];
+        });
+
+        // 在场游客：只有公开群可能有游客（不公开群游客进不来，查询结果自然为空）
+        $guests = [];
+        if ($rid > 0 && (int)($room['is_public'] ?? 1) === 1) {
+            foreach (DB::all('SELECT guest_id, nickname, avatar FROM online
+                              WHERE room_id=? AND last_seen>? AND guest_id>0
+                              GROUP BY guest_id ORDER BY MIN(last_seen)', [$rid, $since]) as $g) {
+                $guests[] = [
+                    'uid' => null, 'gid' => (int)$g['guest_id'], 'kind' => 'guest',
+                    'nickname' => (string)$g['nickname'],
+                    'role' => 'guest',
+                    'avatar' => (string)($g['avatar'] ?? ''),
+                    'online' => true, 'is_owner' => false,
+                ];
+            }
+        }
+        return ['members' => $out, 'guests' => $guests];
+    }
+
     /** 生成/重置邀请码（仅群主/超管）。返回新码 */
     public static function resetInviteCode(array $room, array $actor): string
     {
@@ -364,6 +471,17 @@ class Chat
             $room = self::room($roomId);
             if (!$room) return [false, '群聊不存在'];
             if (!self::roomAccessOk($room, $actor)) return [false, '无权进入该群聊'];
+            // v1.2.27：注册用户必须先**加入**群聊才能发言（含公开群）。
+            // 以前公开群进得来就能说，成员表因此永远只有被邀请/建群的人，
+            // 「所有成员」只能拿在线心跳凑。现在进入要显式确认加入（前端弹窗）。
+            // ⚠️ 游客不受此限：游客无法成为成员（身份随会话消亡），
+            //    进得来就说，其发言频率由 guest_msg_interval 单独约束。
+            // ⚠️ 群主/超管由 isMember 恒真放行，不受影响。
+            // 返回保持 send 的三元签名 [ok, msg, id]，不加第四个元素 ——
+            // 调用点统一 `[$ok,$msg,$id] = Chat::send()`，多给会踩「Undefined array key」
+            if ($actor['kind'] === 'user' && !self::isMember($room, $actor)) {
+                return [false, '请先加入该群聊后再发言', null];
+            }
         }
 
         // 游客发言权限
@@ -611,10 +729,19 @@ class Chat
             usleep(500000); // 0.5s
             if (connection_aborted()) exit;
         }
+        // v1.2.27：「所有成员」改为「加入的成员全量 + 在场游客」，随 poll 一起下发，
+        // 前端不必再单独维护一份名单。roomId=0（私聊）不查，私聊没有成员概念。
+        $mem = ['members' => [], 'guests' => []];
+        if ($roomId > 0) {
+            $r = self::room($roomId);
+            if ($r) $mem = self::allMembers($r, $actor);
+        }
         return [
             'since' => $sinceId,
             'messages' => $new,
-            'online' => self::onlineList($roomId),
+            'online' => self::onlineList($roomId),      // 保留：插件/旧逻辑可能用
+            'members' => $mem['members'],
+            'guests' => $mem['guests'],
             // v1.1.1：成员在线状态仅超级管理员与群主可见（前端据此决定是否画在线点）。
             // 名单本身对所有人可见，裁剪只发生在「在线/离线」这一层。
             'online_status' => self::canSeeOnlineStatus($actor, $roomId),

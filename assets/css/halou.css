@@ -1237,8 +1237,30 @@ input[type=range] {
 /* 成员区独立滚动：ul 默认 margin/padding 会让滚动区上下留白、边框错位 */
 .ha-online-list { flex: 1; -webkit-flex: 1; margin: 0; padding: 0 0 10px; list-style: none; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .ha-online-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ha-green); flex-shrink: 0; -webkit-flex-shrink: 0; }
+/* v1.2.27：「所有成员」改成显示**加入的成员全量**（含离线），
+   离线成员同样占位 8px 画灰点 —— 不画点会让整列名字左边缩进对不齐。 */
+.ha-online-dot.is-off { background: var(--ha-border); }
 .ha-online-name { flex: 1; -webkit-flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .ha-online-name:hover { color: var(--ha-primary-dark); }
+/* 游客行：名字不可点（游客没有资料卡），去掉 hover 变色与手型以免误导 */
+.ha-online-item.is-guest .ha-online-name { cursor: default; }
+.ha-online-item.is-guest .ha-online-name:hover { color: inherit; }
+.ha-online-empty { padding: 10px 14px; font-size: 12px; color: var(--ha-text-sub); }
+/* 未加入群聊时的输入框闸门（v1.2.27） */
+.ha-join-gate {
+    display: flex; display: -webkit-flex;
+    align-items: center; -webkit-align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: var(--ha-text-sub);
+    background: var(--ha-bg-sub);
+    border: 1px solid var(--ha-border);
+    border-radius: 6px;
+}
+.ha-join-gate span { flex: 1; -webkit-flex: 1; min-width: 0; }
+.ha-input:disabled { background: var(--ha-bg-sub); color: var(--ha-text-sub); cursor: not-allowed; }
 
 /* ---------- v1.1.17：首行分隔线与顶栏下边框水平对齐（仅宽屏） ----------
    现象（1440×900 实测）：右侧栏「群聊设置」下方的分隔线在 y=[60.39, 61.39]，

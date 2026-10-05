@@ -393,13 +393,24 @@ if ($action !== '') {
                     if (!$empty) Sec::log('room_pass_fail', $actor['nickname'] ?? '', ['room' => (int)$room['id']]);
                     Api::json(['ok' => false, 'msg' => $empty ? '该房间需要密码' : '房间密码错误', 'need_password' => true]);
                 }
-                Chat::grantRoomPass((int)$room['id']);   // 管理员同样授予，避免每次点击都往返一次
-            }
-            Api::json([
-                'ok' => true,
-                'room' => ['id' => (int)$room['id'], 'name' => $room['name']],
-                'ttl' => Chat::passTtl(),
-            ]);
+            Chat::grantRoomPass((int)$room['id']);   // 管理员同样授予，避免每次点击都往返一次
+        }
+        // v1.2.27：join=1 = 用户在前台确认了「加入」→ 真正写入 room_members（幂等）。
+        // 以前公开群点了就进、不产生成员关系，「所有成员」因此只能拿在线心跳凑数。
+        // 游客（kind=guest）请求加入时服务端静默跳过 —— 游客不能成为成员（见 joinRoom）。
+        $joined = false;
+        if (($p('join') === '1' || $p('join') === 1) && $actor['kind'] === 'user') {
+            [$okJoin] = Chat::joinRoom($room, $actor);
+            $joined = $okJoin;
+        }
+        Api::json([
+            'ok' => true,
+            'room' => ['id' => (int)$room['id'], 'name' => $room['name']],
+            'ttl' => Chat::passTtl(),
+            // 回传最新成员口径：加入后前端可立即刷新「所有成员」，不用等下一次 poll
+            'joined' => $joined,
+            'is_member' => $actor['kind'] === 'user' && Chat::isMember($room, $actor),
+        ] + Chat::allMembers($room, $actor));
 
         /* ---------- 群成员管理（v1.1.11「不公开群聊」） ----------
            身份口径：邀请对象一律用**数字用户 ID**，不用昵称（可重名）也不用邮箱。
@@ -417,8 +428,12 @@ if ($action !== '') {
                 'owner_id' => (int)($room['owner_id'] ?? 0),
                 'invite_code' => $actor['kind'] === 'user' && Chat::isMember($room, $actor)
                     ? (string)($room['invite_code'] ?? '') : '',
-                'data' => Chat::memberList($room),
-            ]);
+                'data' => Chat::memberList($room),          // 成员管理弹窗用（可移出）
+                // v1.2.27：切群时前端用它立即渲染「所有成员」区块，不等下一次 poll
+                // （poll 最长 20 秒才返回，否则切完群成员区会空白二十秒）
+                'online_status' => Chat::canSeeOnlineStatus($actor, (int)$room['id']),
+            ] + Chat::allMembers($room, $actor)
+              + ['is_member' => $actor['kind'] === 'user' && Chat::isMember($room, $actor)]);
 
         case 'room_invite':
             $room = Chat::room((int)$p('room_id'));
@@ -1029,6 +1044,10 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
        // v1.2.6：消息区初始为空，更早的消息靠向上滚动懒加载（不再有「加载更早消息…」入口）
        . '<div class="ha-messages" id="haMessages"></div>'
        . '<div class="ha-inputbar">'
+       // v1.2.27：未加入群聊时的闸门提示（默认隐藏，由 HaChat.applyJoinGate 控制）。
+       // 正常流程下点击公开群聊会先弹「是否加入」，取消则不进入；这里是 URL 直达 /
+       // 已被移出成员 / 服务端拒绝发言等异常态的兜底入口。
+       . '<div class="ha-join-gate" id="haJoinGate" style="display:none"></div>'
        . '<div class="ha-toolbar">'
        // 工具栏图标统一 16px（比消息区图标小一号，避免抢视觉重心）
        . '<button class="ha-icon-btn" id="haBtnEmoji" title="表情">' . ow_icon('smile', 16) . '</button>'

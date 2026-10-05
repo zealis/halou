@@ -1439,14 +1439,20 @@
                     var id = parseInt(el.getAttribute('data-room'), 10) || 0;
                     var name = el.getAttribute('data-name');
                     if (!id) return;
+                    // 当前会话的公开性与成员态（服务端已随房间下发，前端不自行推断）
+                    var meta = null, rl = self.cfg.rooms || [];
+                    for (var k = 0; k < rl.length; k++) { if (rl[k].id === id) { meta = rl[k]; break; } }
+                    var isPub = !meta || meta.is_public !== false;
+
                     // 群聊：先不带密码尝试一次（是否需要密码由服务端判定）
-                    var tryJoin = function (password) {
-                        HaApi.post('room_join', { room_id: id, password: password || '' }, function (rr) {
+                    // v1.2.27：join=1 表示用户已在前台确认「加入」→ 服务端写 room_members
+                    var tryJoin = function (password, join) {
+                        HaApi.post('room_join', { room_id: id, password: password || '', join: join ? 1 : 0 }, function (rr) {
                             if (!rr.ok) {
                                 if (rr.need_password) {
                                     if (password) toast(rr.msg);
                                     self.passForget(id);
-                                    self.askRoomPassword(id, name, function (pw) { tryJoin(pw); });
+                                    self.askRoomPassword(id, name, function (pw) { tryJoin(pw, join); });
                                     return;
                                 }
                                 toast(rr.msg);
@@ -1454,10 +1460,27 @@
                                 return;
                             }
                             self.passRemember(id, rr.ttl);
+                            // 加入成功后回写缓存，避免下次点同一个群又弹一次确认
+                            if (meta && (rr.joined || rr.is_member)) meta.is_member = true;
                             self.switchRoom(id, rr.room.name, el);
+                            // 立即刷新「所有成员」（刚加入的自己也要出现在列表里）
+                            if (rr.members) self.renderMembers(rr.members, rr.guests, self._canStatus);
                         });
                     };
-                    tryJoin('');
+
+                    // v1.2.27：公开群聊点击时先确认是否加入（未加入者一律先弹窗）。
+                    // 取消 = 不进入（用户选定口径：比「可浏览禁发言」更严格）。
+                    // 游客 is_member 恒为 false，同样走这里 —— 游客看到的是同一句提示，
+                    // 服务端对游客不写成员表，只当「确认进入」处理。
+                    if (isPub && meta && !meta.is_member) {
+                        self.confirm(
+                            '是否加入「' + name + '」？'
+                            + (isPub ? '\n即将加入公开群聊，请注意个人隐私安全。' : ''),
+                            function () { tryJoin('', 1); }
+                        );
+                        return;
+                    }
+                    tryJoin('', 0);
                 }
             });
             // 密码房标签：轮子渲染后补（数据里 need_password 时显示）
@@ -1745,6 +1768,8 @@
             this.renderRoomPanel();     // v1.1.1：右侧栏群聊设置区跟随切群刷新
             this._fireRoomSwitch();   // 插件钩子：切换群聊（公告等按群拉取）
             this._fireViewChange();   // v1.1.0：回到群聊视图 → 插件按 roomId 复原群级装饰
+            // v1.2.27：立即渲染「所有成员」并校准发言闸门，不等首次 poll 返回（最长 20 秒）
+            this.loadMembers();
         },
 
         /* ---------- 长轮询（主通道）+ 断线降级短轮询 ----------
@@ -1792,7 +1817,11 @@
                         // v1.1.0：当前群有消息时立刻前置该会话（其余会话由 startConvPoll 兜底）
                         self.loadConversations();
                     }
-                    self.renderOnline(r.online, r.online_status);
+                    // v1.2.27：优先用新的成员口径（成员全量 + 在场游客）；
+                    // 老服务端没有 members 字段时退回原来的在线名单，不报错。
+                    self._canStatus = r.online_status;
+                    if (r.members) self.renderMembers(r.members, r.guests, r.online_status);
+                    else self.renderOnline(r.online, r.online_status);
                     setTimeout(loop, 100);
                 });
             }
@@ -2381,6 +2410,9 @@
         send: function (opt) {
             opt = opt || {};
             var input = $('haInput');
+            // v1.2.27：未加入群聊时前端先拦一道（服务端 send 也有同样校验，
+            // 这里是「给出可操作的提示」而不是让用户对着一个没反应的输入框）。
+            if (this._needJoin) { toast('请先加入该群聊后再发言'); return; }
             var content = opt.content != null ? opt.content : input.value;
             if (!content || !content.replace(/^\s+|\s+$/g, '')) return;
             var self = this;
@@ -2623,6 +2655,94 @@
                       + roleTag(o.role, '', o.uid) + '</li>';
             }
             box.innerHTML = html;
+        },
+
+        /* ---------- 所有成员（v1.2.27 改口径） ----------
+           以前这里渲染的是 online 表（45 秒心跳 = 「谁在线」），
+           需求要的是「群里都有谁」—— 改成：
+             · 注册用户：room_members **全量**（含离线，群主自动补位）
+             · 游客    ：online 表里本群的在场游客（心跳 45 秒，离开即消失）
+           游客只出现在公开群（不公开群游客进不来，服务端查询结果自然为空）。
+           在线点的显隐仍由服务端 canSeeOnlineStatus 决定，前端不自行判身份。 */
+        renderMembers: function (members, guests, canStatus) {
+            var box = $('haOnlineList'), cnt = $('haOnlineCount');
+            var ms = members || [], gs = guests || [];
+            if (cnt) cnt.innerHTML = ms.length + gs.length;
+            if (!box) return;
+            var html = '', i;
+            for (i = 0; i < ms.length; i++) html += this._memberRow(ms[i], canStatus);
+            for (i = 0; i < gs.length; i++) html += this._memberRow(gs[i], canStatus);
+            box.innerHTML = html || '<li class="ha-online-empty">还没有成员</li>';
+        },
+
+        /** 单行成员/游客。游客没有资料卡，名字不可点（点了只会弹「游客无法查看资料卡」） */
+        _memberRow: function (o, canStatus) {
+            var isGuest = o.kind === 'guest';
+            var dot = '';
+            if (canStatus && !isGuest) {
+                dot = '<span class="ha-online-dot' + (o.online ? '' : ' is-off') + '"></span>';
+            }
+            var nameAttr = isGuest ? '' : ' onclick="HaChat.userCard(' + (o.uid || 0) + ',\'' + esc(o.nickname) + '\')"';
+            var tag = isGuest
+                ? '<span class="ha-tag ha-tag-guest">游客</span>'
+                : roleTag(o.role, '', o.uid);
+            return '<li class="ha-online-item' + (isGuest ? ' is-guest' : '') + '">'
+                + dot
+                + avatarHtml(o.avatar, o.nickname, true, o.role)
+                + '<span class="ha-online-name"' + nameAttr + '>' + esc(o.nickname) + '</span>'
+                + tag + '</li>';
+        },
+
+        /** 切群后立即拉一次成员，不等 poll（poll 最长 20 秒才返回） */
+        loadMembers: function () {
+            var self = this, id = this.room;
+            if (!id) return;
+            HaApi.post('room_members', { room_id: id }, function (r) {
+                if (!r.ok || self.room !== id) return;
+                self.renderMembers(r.members, r.guests, r.online_status);
+                self.applyJoinGate(r.is_member, r.is_public);
+            });
+        },
+
+        /**
+         * 未加入群聊时的发言闸门（v1.2.27）。
+         * 正常流程下点击公开群聊会先弹「是否加入」，取消就不进入，走不到这里；
+         * 这里是 URL 直达 / 被移出成员 / 服务端已拒发等异常态的兜底：
+         * 让界面自洽（看得见为什么发不出去）而不是让用户对着一个没反应的输入框。
+         */
+        applyJoinGate: function (isMember, isPublic) {
+            var box = $('haJoinGate');
+            this._needJoin = false;
+            var input = $('haInput');
+            var isUser = this.cfg.actor && this.cfg.actor.kind === 'user';
+            if (!box) return;
+            if (!isUser || isPublic === false || isMember) {
+                box.style.display = 'none';
+                box.innerHTML = '';
+                if (input) { input.disabled = false; input.placeholder = '输入消息，按 Enter 发送，Ctrl+V 粘贴图片'; }
+                return;
+            }
+            this._needJoin = true;
+            box.innerHTML = '<span>你还没有加入该群聊，加入后即可发言</span>'
+                + '<button class="ha-btn ha-btn-primary ha-btn-mini" onclick="HaChat.joinCurrentRoom()">加入群聊</button>';
+            box.style.display = '';
+            if (input) { input.disabled = true; input.placeholder = '加入群聊后即可发言'; }
+        },
+
+        /** 在闸门里点「加入群聊」：就地加入，不必回会话列表重点一次 */
+        joinCurrentRoom: function () {
+            var self = this, id = this.room;
+            if (!id) return;
+            HaApi.post('room_join', { room_id: id, join: 1 }, function (r) {
+                if (!r.ok) { toast(r.msg); return; }
+                toast('已加入群聊');
+                // 同步侧栏缓存，否则再点一次该会话还会弹「是否加入」
+                var rl = self.cfg.rooms || [];
+                for (var i = 0; i < rl.length; i++) { if (rl[i].id === id) rl[i].is_member = true; }
+                self.applyJoinGate(true, true);
+                if (r.members) self.renderMembers(r.members, r.guests, self._canStatus);
+                else self.loadMembers();
+            });
         },
 
         /* ---------- 右侧栏：群聊信息入口区 ---------- */
