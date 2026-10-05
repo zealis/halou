@@ -3617,67 +3617,78 @@
             this.jumpToMsg(d);
         },
 
-        /**
-         * 跳到指定消息：先在当前 DOM 里找，找不到就**回溯加载历史**直到那条出现，
-         * 然后滚动居中 + 高亮 + 弹出该消息的操作菜单（v1.2.32）。
-         *
-         * ⚠️ 不复用 loadHistory：它带 `loadingHistory` 并发闸门且会按 scrollHeight
-         * 回推视口，套进来容易出现「回调永不触发 → 定位静默失败」。这里自己按页拉，
-         * 逻辑直白：拉一页 → 看有没有 → 没有就继续往前。
-         */
-        jumpToMsg: function (d) {
+        /* ---------- 消息定位轮子（v1.2.36） ----------
+           统一「跳到某条消息」的唯一入口。此前有**两套**并行实现：
+             · jumpToQuote（引用跳转）：scrollIntoView(smooth) + .ha-msg-jump 动画
+                                      + 递归 loadHistory（最多 10 页）
+             · 搜索结果跳转：手动算 scrollTop + .ha-msg-hit 高亮 + 弹操作菜单
+                                      + 自己的按页回溯（15 页）
+           两套的高亮样式、回溯方式、页数上限都不一样，看起来像两个功能。
+           现在合并成一个轮子 `locateMsg(msgId, opt)`，样式与行为完全一致。
+
+           opt:
+             menu  {boolean} 定位后是否弹出该消息的操作菜单（搜索跳转要，引用不要）
+             tip   {string}  定位失败时的提示文案
+
+           为什么不用 scrollIntoView：它会把**最近的祖先滚动容器**一起滚，
+           且老浏览器不支持 smooth 参数。本轮子手动算 scrollTop，行为可预期。 */
+        _srLocateMax: 15,          // 最多回溯 15 页（≈450 条）
+        locateMsg: function (msgId, opt) {
             var self = this;
-            setTimeout(function () { self._tryLocateMsg(d.msg_id, 0); }, 700);
+            opt = opt || {};
+            setTimeout(function () { self._locateStep(msgId, 0, opt); }, 60);
         },
 
-        _tryLocateMsg: function (msgId, page) {
+        _locateStep: function (msgId, page, opt) {
             var self = this, box = $('haMessages');
             if (!box) return;
             var node = $('haMsg' + msgId);
-            if (!node) {
-                // 最多回溯 15 页（≈450 条）；到顶还找不到就放弃并说明
-                if (page >= 15 || this.historyDone) { toast('该消息太靠前，未能定位'); return; }
-                var first = box.querySelector('.ha-msg');
-                if (!first) { toast('未能定位到该消息'); return; }
-                var firstId = parseInt(first.id.replace('haMsg', ''), 10);
-                if (firstId <= msgId) { toast('该消息太靠前，未能定位'); return; }
-                var isDm = !!this.dm;
-                var peer = isDm ? this.dm.peer : '';
-                HaApi.post(isDm ? 'dm_history' : 'history',
-                    isDm ? { peer: peer, before_id: firstId } : { room_id: this.room, before: firstId },
-                    function (r) {
-                        // 已切走/已切私聊 → 丢弃，别把别处的消息插进来
-                        if ((!!self.dm) !== isDm || (isDm && self.dm.peer !== peer)) return;
-                        if (!r.ok || !r.data.length) { self.historyDone = true; self._tryLocateMsg(msgId, 99); return; }
-                        var oldH = box.scrollHeight, i;
-                        for (i = r.data.length - 1; i >= 0; i--) self.addMessageBefore(r.data[i], first);
-                        box.scrollTop = box.scrollHeight - oldH;   // 保持视口不跳
-                        if (r.data.length < 30) self.historyDone = true;
-                        self._tryLocateMsg(msgId, page + 1);
-                    });
-                return;
-            }
-            this._focusMsgNode(node);
+            if (node) { this._locateFocus(node, opt); return; }
+            var fail = function () { toast(opt.tip || '未能定位到该消息'); };
+            if (page >= this._srLocateMax || this.historyDone) { fail(); return; }
+            var first = box.querySelector('.ha-msg');
+            if (!first) { fail(); return; }
+            var firstId = parseInt(first.id.replace('haMsg', ''), 10);
+            if (firstId <= msgId) { fail(); return; }     // 已到顶，这条不存在
+            var isDm = !!this.dm;
+            var peer = isDm ? this.dm.peer : '';
+            HaApi.post(isDm ? 'dm_history' : 'history',
+                isDm ? { peer: peer, before_id: firstId } : { room_id: this.room, before: firstId },
+                function (r) {
+                    // 已切走 / 已切私聊 → 丢弃，别把别处的消息插进当前视图
+                    if ((!!self.dm) !== isDm || (isDm && self.dm.peer !== peer)) return;
+                    if (!r.ok || !r.data.length) { self.historyDone = true; self._locateStep(msgId, 99, opt); return; }
+                    var oldH = box.scrollHeight, i;
+                    for (i = r.data.length - 1; i >= 0; i--) self.addMessageBefore(r.data[i], first);
+                    box.scrollTop = box.scrollHeight - oldH;    // 保持视口不跳
+                    if (r.data.length < 30) self.historyDone = true;
+                    self._locateStep(msgId, page + 1, opt);
+                });
         },
 
-        /** 滚动到某条消息 → 高亮 → 弹出它的操作菜单 */
-        _focusMsgNode: function (node) {
+        /** 滚动居中 + 高亮 +（可选）弹操作菜单 */
+        _locateFocus: function (node, opt) {
             var self = this, box = $('haMessages');
             var r = node.getBoundingClientRect(), br = box.getBoundingClientRect();
-            // 居中：把元素中心对到容器中心
             box.scrollTop += (r.top - br.top) - (box.clientHeight / 2) + (r.height / 2);
-            // ⚠️ 必须在此闭包外抓 self：setTimeout 回调里的 this 是 undefined
-            //（本文件是严格模式），写 this.msgCache 会抛
-            // 「Cannot read properties of undefined」并中断后面的菜单弹出。
             setTimeout(function () {
                 var rr = node.getBoundingClientRect();
                 node.className += ' ha-msg-hit';
                 setTimeout(function () {
                     node.className = node.className.replace(' ha-msg-hit', '');
                 }, 2400);
+                if (!opt.menu) return;
+                // ⚠️ 必须在此闭包外抓 self：setTimeout 回调里的 this 是 undefined
+                //（本文件是严格模式），写 this.msgCache 会抛
+                // 「Cannot read properties of undefined」并中断后面的菜单弹出。
                 var m = self.msgCache[parseInt(node.id.replace('haMsg', ''), 10)];
                 if (m) self.showContentMenu(Math.round(rr.left + Math.min(rr.width, 360)), Math.round(rr.top + 8), m);
             }, 60);
+        },
+
+        /** 跳到指定消息（搜索结果用：定位后顺带弹操作菜单） */
+        jumpToMsg: function (d) {
+            this.locateMsg(d.msg_id, { menu: true });
         },
 
         /**
@@ -3711,6 +3722,125 @@
             menu.style.top = Math.max(4, r.top - mh - 8) + 'px';
         },
 
+        /* ---------- 第三方应用授权（v1.2.36） ----------
+           核心只管「授权关系」，令牌与授权码由插件自己实现（见 core/oauth.php 头注释）。
+           这里两屏：
+             ① 应用列表（已授权的显示「已授权」+ 取消按钮，未授权的显示「授权」）
+             ② 授权弹窗：勾选该应用声明的权限项，确认后 POST oauth_grant
+           权限项是**白名单过滤后的子集** —— 服务端只接受应用自己声明过的 key，
+           前端传了别的也存不进去（OAuth::grant 里过滤）。 */
+
+        /** 应用列表 */
+        openOauthApps: function () {
+            var self = this;
+            HaApi.post('oauth_apps', {}, function (r) {
+                if (!r.ok) { toast(r.msg); return; }
+                // ⚠️ 必须缓存：授权/取消都要按 data-i 索引回这里取应用信息
+                self._oaApps = r.data || [];
+                self.renderOauthApps(self._oaApps);
+            });
+        },
+
+        renderOauthApps: function (list) {
+            var self = this;
+            if (!list.length) {
+                this.openModal('<h3>第三方授权</h3>'
+                    + '<div class="ha-panel-empty">还没有可授权的应用。装了带「应用授权」能力的插件后，这里会出现条目。</div>', 420);
+                return;
+            }
+            var html = '<h3>第三方授权</h3>', i, a;
+            for (i = 0; i < list.length; i++) {
+                a = list[i];
+                html += '<div class="ha-oa-row' + (a.granted ? ' is-granted' : '') + '">'
+                    + '<div class="ha-oa-icon">' + (a.icon
+                        ? '<img src="' + esc(a.icon) + '" alt="">'
+                        : '<span>' + esc((a.name || '?').charAt(0)) + '</span>') + '</div>'
+                    + '<div class="ha-oa-main">'
+                    + '<div class="ha-oa-name">' + esc(a.name) + (a.granted ? '<span class="ha-sr-tag">已授权</span>' : '') + '</div>'
+                    + (a.desc ? '<div class="ha-oa-desc">' + esc(a.desc) + '</div>' : '')
+                    + (a.granted && a.granted_scopes ? '<div class="ha-oa-scopes">已授予：' + esc(a.granted_scopes) + '</div>' : '')
+                    + '</div>'
+                    + '<div class="ha-oa-ops">'
+                    + (a.granted
+                        ? '<button class="ha-btn ha-btn-ghost ha-btn-mini" data-op="revoke" data-i="' + i + '">取消授权</button>'
+                        : '<button class="ha-btn ha-btn-primary ha-btn-mini" data-op="grant" data-i="' + i + '">授权</button>')
+                    + '</div></div>';
+            }
+            this.openModal(html, 420);
+            var box = $('haModal');
+            box.onclick = function (e) {
+                var t = e.target;
+                while (t && t !== box && !(t.getAttribute && t.getAttribute('data-op'))) t = t.parentNode;
+                if (!t || t === box) return;
+                var idx = parseInt(t.getAttribute('data-i'), 10);
+                if (!self._oaApps || !self._oaApps[idx]) return;
+                if (t.getAttribute('data-op') === 'revoke') self.revokeOauth(self._oaApps[idx]);
+                else self.openOauthGrant(self._oaApps[idx]);
+            };
+        },
+
+        /** 授权弹窗：勾选权限 */
+        openOauthGrant: function (app) {
+            var self = this;
+            if (!app.scopes || !app.scopes.length) {
+                toast('该应用没有声明任何权限');
+                return;
+            }
+            var granted = String(app.granted_scopes || '').split(',');
+            var html = '<h3>授权「' + esc(app.name) + '」</h3>', i, s;
+            if (app.desc) html += '<p class="ha-modal-desc">' + esc(app.desc) + '</p>';
+            html += '<div class="ha-oa-scopes-box">';
+            for (i = 0; i < app.scopes.length; i++) {
+                s = app.scopes[i];
+                // 之前授权过就预勾上，方便「改权限」而不是每次从零勾
+                var on = app.granted ? (granted.indexOf(s.key) >= 0) : true;
+                html += '<label class="ha-oa-scope"><input type="checkbox" value="' + esc(s.key) + '"'
+                    + (on ? ' checked' : '') + '>'
+                    + '<span class="ha-oa-scope-t">' + esc(s.name) + '</span>'
+                    + (s.desc ? '<span class="ha-oa-scope-d">' + esc(s.desc) + '</span>' : '')
+                    + '</label>';
+            }
+            html += '</div>'
+                + '<div class="ha-modal-actions">'
+                + '<button class="ha-btn ha-btn-ghost" onclick="HaChat.closeModal()">取消</button>'
+                + '<button class="ha-btn ha-btn-primary" onclick="HaChat.submitOauthGrant(\'' + app.id + '\')">确认授权</button>'
+                + '</div>';
+            this.openModal(html, 400);
+        },
+
+        submitOauthGrant: function (appId) {
+            var self = this;
+            var list = this._oaApps || [], app = null, i;
+            for (i = 0; i < list.length; i++) { if (list[i].id === appId) { app = list[i]; break; } }
+            if (!app) { toast('应用不存在'); return; }
+            var boxes = document.getElementsByClassName('ha-oa-scope'), scopes = [];
+            for (i = 0; i < boxes.length; i++) {
+                var cb = boxes[i].querySelector('input[type=checkbox]');
+                if (cb && cb.checked) scopes.push(cb.value);
+            }
+            if (!scopes.length) { toast('请至少勾选一项权限'); return; }
+            HaApi.post('oauth_grant', {
+                plugin: app.plugin || '', app_id: app.id, scopes: scopes
+            }, function (r) {
+                if (!r.ok) { toast(r.msg); return; }
+                toast(r.msg || '已授权');
+                self.openOauthApps();      // 回到列表刷新状态
+            });
+        },
+
+        /** 取消授权（二次确认） */
+        revokeOauth: function (app) {
+            var self = this;
+            this.confirm('确定取消对「' + (app.name || '该应用') + '」的授权？\n'
+                + '取消后该应用将无法访问你的数据。', function () {
+                HaApi.post('oauth_revoke', { plugin: app.plugin || '', app_id: app.id }, function (r) {
+                    if (!r.ok) { toast(r.msg); return; }
+                    toast(r.msg || '已取消授权');
+                    self.openOauthApps();
+                });
+            });
+        },
+
         openSettings: function () {
             var me = this.cfg.me;
             if (!me) return;
@@ -3724,6 +3854,12 @@
                 + '</div>'
                 + '<div class="ha-form-item"><label>昵称</label><input class="ha-input" id="haSetNick" value="' + esc(me.nickname) + '">'
                 + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">2-20 个字符，支持中英文、数字、下划线与短横线，不含空格或 @；允许重名。</p></div>'
+                // v1.2.36：第三方应用授权入口（放昵称之后、保存之前 —— 它是「账号」类设置，
+                // 不属于资料编辑本身；真正的授权管理在独立弹窗里做）
+                + '<div class="ha-form-item"><label>第三方授权</label>'
+                + '<button class="ha-btn ha-btn-ghost ha-btn-block" onclick="HaChat.openOauthApps()">管理应用授权</button>'
+                + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">'
+                + '把资料、聊天记录等权限授予你安装的插件应用；随时可在此取消。</p></div>'
                 + '<button class="ha-btn ha-btn-primary ha-btn-block" onclick="HaChat.saveSettings()">保存</button>'
             );
             var self = this;
@@ -3990,46 +4126,14 @@
         },
 
         /**
-         * 点击引用块 → 滚动到被引用的原消息并高亮闪烁。
+         * 点击引用块 → 跳到被引用的原消息。
          *
-         * v1.2.6：原消息还没被懒加载到时，**自动往前拉**直到找到为止
-         * （此前只能提示「请加载更早的消息」，但入口节点已移除，那样等于死路）。
-         * 找不到时最多连拉 HISTORY_JUMP_MAX 页，避免无意义的无限翻页。
+         * v1.2.36：原实现已**删除**，改为委托统一的消息定位轮子 
+         * （与搜索结果跳转共用同一套：同样的居中算法、同样的高亮样式、同样的回溯逻辑）。
+         * 差别只有一个：引用跳转**不弹操作菜单**（opt.menu 不传）。
          */
         jumpToQuote: function (msgId) {
-            var self = this;
-            var tryJump = function () {
-                var el = $('haMsg' + msgId);
-                if (!el) return false;
-                try {
-                    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                } catch (e) {
-                    // 老浏览器无 smooth 参数：手动滚动到居中
-                    var box = $('haMessages'), r = el.getBoundingClientRect(), br = box.getBoundingClientRect();
-                    box.scrollTop += r.top - br.top - br.height / 2 + r.height / 2;
-                }
-                el.classList.remove('ha-msg-jump');
-                // 强制重排以重启动画
-                void el.offsetWidth;
-                el.classList.add('ha-msg-jump');
-                setTimeout(function () { el.classList.remove('ha-msg-jump'); }, 1800);
-                return true;
-            };
-            if (tryJump()) return;
-
-            var n = 0, max = 10;
-            var pull = function () {
-                if (self.historyDone || n >= max) {
-                    if (!tryJump()) toast('原消息在更早的历史里，已加载到底');
-                    return;
-                }
-                n++;
-                self.loadHistory(function () {
-                    if (tryJump()) return;
-                    pull();          // 这一批里没有，继续往前拉
-                });
-            };
-            pull();
+            this.locateMsg(msgId, { tip: '原消息在更早的历史里，已加载到底' });
         },
 
         /**

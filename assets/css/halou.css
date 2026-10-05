@@ -1198,10 +1198,57 @@ input[type=range] {
 /* 可跳转的引用块（带原消息 id） */
 .ha-msg-quote.ha-quote-link { cursor: pointer; }
 .ha-msg-quote.ha-quote-link:hover { opacity: 1; background: rgba(0, 160, 233, .12); }
-/* 点击引用后原消息高亮闪烁 */
-@-webkit-keyframes haMsgJump { 0%, 60% { background: rgba(0, 160, 233, .18); } 100% { background: transparent; } }
-@keyframes haMsgJump { 0%, 60% { background: rgba(0, 160, 233, .18); } 100% { background: transparent; } }
-.ha-msg.ha-msg-jump { -webkit-animation: haMsgJump 1.8s ease; animation: haMsgJump 1.8s ease; }
+/* v1.2.36：原消息高亮统一走 .ha-msg-hit（见搜索/消息定位一节），
+   这里删除旧的 haMsgJump 动画 —— 引用跳转与搜索跳转已合并为同一个轮子
+   （HaChat.locateMsg），两处高亮样式必须一致，不能各留一套。 */
+
+/* ---------- 第三方应用授权（v1.2.36） ---------- */
+.ha-oa-row {
+    display: flex; display: -webkit-flex;
+    align-items: flex-start; -webkit-align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--ha-border);
+}
+.ha-oa-row:last-child { border-bottom: none; }
+.ha-oa-icon {
+    flex-shrink: 0; -webkit-flex-shrink: 0;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--ha-bg-sub);
+    color: var(--ha-text-sub);
+    font-size: 15px;
+    line-height: 32px;
+    text-align: center;
+}
+.ha-oa-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ha-oa-main { flex: 1; -webkit-flex: 1; min-width: 0; }
+.ha-oa-name { font-size: 14px; color: var(--ha-text-title); display: flex; align-items: center; gap: 6px; }
+.ha-oa-desc { font-size: 12px; color: var(--ha-text-sub); margin-top: 2px; }
+.ha-oa-scopes { font-size: 11px; color: var(--ha-text-sub); margin-top: 3px; word-break: break-all; }
+.ha-oa-ops { flex-shrink: 0; -webkit-flex-shrink: 0; }
+/* 权限勾选框：.ha-form-item label 的 display:block 会破坏同行排版，这里显式 flex */
+.ha-oa-scopes-box {
+    border: 1px solid var(--ha-border);
+    border-radius: 6px;
+    max-height: 260px;
+    overflow-y: auto;
+    margin-bottom: 14px;
+}
+.ha-oa-scope {
+    display: flex; -webkit-flex;
+    align-items: flex-start; -webkit-align-items: flex-start;
+    gap: 8px;
+    padding: 9px 11px;
+    border-bottom: 1px solid var(--ha-border);
+    margin: 0;
+    cursor: pointer;
+}
+.ha-oa-scope:last-child { border-bottom: none; }
+.ha-oa-scope input { margin: 2px 0 0; flex-shrink: 0; }
+.ha-oa-scope-t { font-size: 13px; color: var(--ha-text); }
+.ha-oa-scope-d { display: block; font-size: 12px; color: var(--ha-text-sub); margin-top: 1px; }
 
 .ha-input-resize {
     position: absolute;

@@ -35,6 +35,7 @@ require __DIR__ . '/core/plugin.php';
 require __DIR__ . '/core/chat.php';
 require __DIR__ . '/core/upload.php';
 require __DIR__ . '/core/admin.php';
+require __DIR__ . '/core/oauth.php';   // v1.2.36：第三方应用授权（插件注册应用，核心只存授权关系）
 
 class Api
 {
@@ -371,6 +372,32 @@ if ($action !== '') {
             if (!$peer) Api::json(['ok' => false, 'msg' => '私聊对象不合法']);
             [$ok, $msg, $n] = Chat::clearDmForMe($actor, $peer);
             Api::json(['ok' => $ok, 'msg' => $msg, 'cleared' => $n]);
+
+        // ---------- 第三方应用授权（v1.2.36） ----------
+        // 核心只存「授权关系」；令牌与授权码流程由插件实现（见 core/oauth.php 头注释）
+        case 'oauth_apps':        // 应用列表 + 当前用户的授权状态
+            if ($actor['kind'] !== 'user') Api::json(['ok' => false, 'msg' => '请先登录'], 403);
+            Api::json(['ok' => true, 'data' => OAuth::appsForUser((int)$actor['id'])]);
+
+        case 'oauth_grant':       // 授权（勾选权限）
+            if ($actor['kind'] !== 'user') Api::json(['ok' => false, 'msg' => '请先登录'], 403);
+            // ⚠️ 前端 HaApi.post 用 encodeURIComponent 逐字段编码，**数组会被拍成逗号串**
+            // （["a","b"] → "a,b"），所以这里必须兼容字符串形态。
+            // 不在 HaApi.post 里特殊处理数组，是全站统一行为，别为这一个接口破例。
+            $rawScopes = $_POST['scopes'] ?? [];
+            if (!is_array($rawScopes)) $rawScopes = explode(',', (string)$rawScopes);
+            [$ok, $msg, $scopes] = OAuth::grant(
+                (int)$actor['id'],
+                (string)$p('plugin', ''),
+                (string)$p('app_id', ''),
+                $rawScopes
+            );
+            Api::json(['ok' => $ok, 'msg' => $msg, 'scopes' => $scopes]);
+
+        case 'oauth_revoke':      // 取消授权
+            if ($actor['kind'] !== 'user') Api::json(['ok' => false, 'msg' => '请先登录'], 403);
+            [$ok, $msg] = OAuth::revoke((int)$actor['id'], (string)$p('plugin', ''), (string)$p('app_id', ''));
+            Api::json(['ok' => $ok, 'msg' => $msg]);
 
         // ---------- 搜索（v1.2.31）：品牌区搜索图标弹窗 ----------
         // scope: current 当前会话 / people 找人·群 / messages 全站消息 / friends 联系人
