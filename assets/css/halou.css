@@ -703,6 +703,16 @@ input[type=range] {
     padding-bottom: 1px;             /* 标题与摘要之间的间距（原 gap:2px 的替代） */
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* v1.2.28：会话置顶标记（inline SVG，12px 描边图钉）。
+   灰 #8E8EA0 与昵称色同源，opacity 再压一档，退到「有信息但不抢眼」的位置。 */
+.ha-cl-pin {
+    display: inline-block;
+    width: 12px; height: 12px;
+    margin-right: 4px;
+    vertical-align: -1px;
+    opacity: .75;
+    background: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238E8EA0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3.5h6M10 3.5v5.2L7.4 13h9.2L14 8.7V3.5'/%3E%3Cpath d='M12 13v7.5'/%3E%3C/svg%3E") no-repeat center / 12px 12px;
+}
 .ha-cl-sub {
     font-size: 12px;
     line-height: 20px;

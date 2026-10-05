@@ -1,6 +1,6 @@
 /**
  * 内容举报插件 - 后台交互
- * 全局对象 HaCR；依赖 HaApi / esc / toast / HaAdmin.uiPager / HaAdmin.confirm / HaApi.secure
+ * 全局对象 HaCRAdmin；依赖 HaApi / esc / toast / HaAdmin.uiPager / HaAdmin.confirm / HaApi.secure
  *
  * 功能：
  *   - 加载并保存举报规则配置（理由 / 间隔 / 字数上限）
@@ -13,7 +13,7 @@
 
     var state = { page: 1, size: 20, total: 0, status: -1 };
 
-    w.HaCR = {
+    w.HaCRAdmin = {
         init: function () {
             this.loadConfig();
             this.list(1);
@@ -62,9 +62,9 @@
                 if (!r.ok) { table.innerHTML = '<tr><td style="color:#5C5C5C">加载失败</td></tr>'; return; }
                 state.total = r.data.total;
                 state.page = r.data.page;
-                w.HaCR.render(r.data.list);
+                w.HaCRAdmin.render(r.data.list);
                 var pager = $('haCRPaging');
-                if (pager) w.HaAdmin.uiPager(pager, state.page, state.total, state.size, function (pg) { w.HaCR.list(pg); });
+                if (pager) w.HaAdmin.uiPager(pager, state.page, state.total, state.size, function (pg) { w.HaCRAdmin.list(pg); });
             });
         },
 
@@ -102,10 +102,10 @@
                     + '<td>' + (row.created_at ? new Date(row.created_at * 1000).toLocaleString() : '-') + '</td>'
                     + '<td class="ha-cr-ops">'
                     + (row.status == 0
-                        ? '<a href="javascript:;" onclick="HaCR.handle(' + row.id + ',1)">已处理</a> '
-                        + '<a href="javascript:;" onclick="HaCR.handle(' + row.id + ',2)">忽略</a> '
+                        ? '<a href="javascript:;" onclick="HaCRAdmin.handle(' + row.id + ',1)">已处理</a> '
+                        + '<a href="javascript:;" onclick="HaCRAdmin.handle(' + row.id + ',2)">忽略</a> '
                         : '')
-                    + '<a href="javascript:;" onclick="HaCR.del(' + row.id + ')">删除</a>'
+                    + '<a href="javascript:;" onclick="HaCRAdmin.del(' + row.id + ')">删除</a>'
                     + '</td></tr>';
             }
             if (!rows.length) h += '<tr><td colspan="9" style="color:#5C5C5C;text-align:center">暂无举报记录</td></tr>';
@@ -115,7 +115,7 @@
         handle: function (id, status) {
             HaApi.secure('plugin_content_report_handle', { id: id, status: status }, function (r) {
                 toast(r.msg || (r.ok ? '已更新' : '操作失败'));
-                if (r.ok) w.HaCR.list(state.page);
+                if (r.ok) w.HaCRAdmin.list(state.page);
             });
         },
 
@@ -123,7 +123,7 @@
             w.HaAdmin.confirm('确定删除该举报记录？', function () {
                 HaApi.secure('plugin_content_report_delete', { id: id }, function (r) {
                     toast(r.msg || (r.ok ? '已删除' : '操作失败'));
-                    if (r.ok) w.HaCR.list(state.page);
+                    if (r.ok) w.HaCRAdmin.list(state.page);
                 });
             });
         }
@@ -132,7 +132,7 @@
     /* 后台页 HTML 由 innerHTML 注入（script 不执行）：检测表格出现后自动初始化 */
     var mo = new MutationObserver(function () {
         var t = $('haCRTable');
-        if (t && !t._inited) { t._inited = true; w.HaCR.init(); }
+        if (t && !t._inited) { t._inited = true; w.HaCRAdmin.init(); }
     });
     mo.observe(d.documentElement, { childList: true, subtree: true });
 })(window, document);

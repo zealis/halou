@@ -583,7 +583,14 @@
        icon 用内联 SVG 路径表（与 PHP 侧 ow_icon 的路径一致，避免为此新增接口）。 */
     var OW_ENTRY_ICONS = {
         gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M2.5 12h3M18.5 12h3M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/>',
-        mega: '<path d="M3 11v3l4 .5V10.5z"/><path d="M7 10.5L18 5v13l-11-4.5"/><path d="M9 15.5V18a2 2 0 0 0 4 .5"/>'
+        mega: '<path d="M3 11v3l4 .5V10.5z"/><path d="M7 10.5L18 5v13l-11-4.5"/><path d="M9 15.5V18a2 2 0 0 0 4 .5"/>',
+        // v1.2.28 私聊右侧栏四入口。统一 24 网格、stroke 1.8、round 端点，
+        // 与 gear/mega 同一套描边风格（禁实心填充，保持扁平 UI）。
+        pin: '<path d="M9 3.5h6M10 3.5v5.2L7.4 13h9.2L14 8.7V3.5"/><path d="M12 13v7.5"/>',
+        pinOff: '<path d="M9 3.5h6M10 3.5v5.2L7.4 13h9.2M14 8.7V3.5"/><path d="M12 13v7.5"/><path d="M4 20.5L20 3.5"/>',
+        trash: '<path d="M4 6.5h16"/><path d="M9.5 6.5V4.2h5v2.3"/><path d="M6.5 6.5l1 13.3h9l1-13.3"/><path d="M10.2 10v6.2M13.8 10v6.2"/>',
+        userX: '<circle cx="10" cy="8" r="3.4"/><path d="M3.8 20.2c0-3.4 2.8-5.7 6.2-5.7 1 0 1.9.2 2.7.5"/><path d="M16.2 16.6l4.6 4.6M20.8 16.6l-4.6 4.6"/>',
+        flag: '<path d="M5.5 21.2V3.6"/><path d="M5.5 4.6h11.8l-2.2 3.9 2.2 3.9H5.5z"/>'
     };
 
     /** 生成一行侧栏入口（整行可点）。onclick 缺省时渲染为不可点的静态行 */
@@ -701,12 +708,20 @@
                     : (c.avatar
                         ? '<span class="ha-cl-icon"><img src="' + esc(c.avatar) + '" alt=""></span>'
                         : '<span class="ha-cl-icon">' + esc((c.name || '?').charAt(0)) + '</span>');
-                html += '<li class="ha-cl-item' + (key === opts.activeKey ? ' active' : '') + '" data-key="' + esc(key) + '"'
+                html += '<li class="ha-cl-item' + (key === opts.activeKey ? ' active' : '') + (c.pinned ? ' is-pinned' : '') + '" data-key="' + esc(key) + '"'
                       + (c.conv === 'dm' ? ' data-dm="' + esc(c.peer) + '"' : ' data-room="' + (c.conv === 'room' ? c.id : 0) + '"')
-                      + ' data-name="' + esc(c.name) + '" data-pw="' + (c.need_password ? 1 : 0) + '">'
+                      + ' data-name="' + esc(c.name) + '" data-pw="' + (c.need_password ? 1 : 0) + '"'
+                      + ' data-pin="' + (c.pinned ? 1 : 0) + '">'
                       + icon
                       + '<span class="ha-cl-main">'
-                      + '<span class="ha-cl-title">' + esc(c.name) + (c.tag ? '<span class="ha-cl-tag">' + esc(c.tag) + '</span>' : '') + '</span>'
+                      // v1.2.28：置顶标记放在**标题内部最前**（与微信一致）。
+                      // ⚠️ 必须放进 .ha-cl-title 里，不能放在 .ha-cl-main 下 ——
+                      //   .ha-cl-main 是 column flex，多一个子节点就**独占一行**，
+                      //   会把标题和摘要挤成三行。title 本身被 flex blockify，
+                      //   里面的 inline span 才与文字同行。
+                      + '<span class="ha-cl-title">'
+                      + (c.pinned ? '<span class="ha-cl-pin" title="已置顶"></span>' : '')
+                      + esc(c.name) + (c.tag ? '<span class="ha-cl-tag">' + esc(c.tag) + '</span>' : '') + '</span>'
                       + '<span class="ha-cl-sub">' + esc(c.last_text || '') + '</span>'
                       + '</span>'
                       + '<span class="ha-cl-time">' + ChatList.time(c.last_at) + '</span>'
@@ -1420,9 +1435,19 @@
             if (this._convTimer) { clearTimeout(this._convTimer); this._convTimer = null; }
         },
 
+        /** 按 peer_key 查会话项（v1.2.28：置顶/好友态的来源） */
+        convByKey: function (peerKey) {
+            var l = this._convList || [], i;
+            for (i = 0; i < l.length; i++) { if (l[i].peer_key === peerKey) return l[i]; }
+            return null;
+        },
+
         /** 会话列表渲染 + 行点击分发（群聊走密码房流程，私聊进私聊页） */
         renderConversations: function () {
             var self = this, list = this.conversations || [];
+            // v1.2.28：缓存整份会话，供 openDm 查「是否已置顶 / 是否是好友」
+            //（右侧栏的「设为置顶」「删除好友」两行要用，不必再发一次请求）
+            this._convList = list;
             // v1.2.20：非「消息」标签下**不要**渲染会话列表 —— 会把它上面板的内容冲掉。
             // loadConversations 已拦了一道，这里再兜一道：任何直接调
             // renderConversations 的路径（切会话、openDm 等）都不该踩坏别的面板。
@@ -1516,7 +1541,14 @@
                 return;
             }
             // 先切状态：startPoll 的 alive() 依赖 !this.dm，赋值即让群聊长轮询自杀
-            this.dm = { peer: peer, kind: m[1], id: parseInt(m[2], 10) };
+            // v1.2.28：从会话列表缓存里取「是否已置顶 / 是否是好友」，
+            // 右侧栏的「设为置顶」「删除好友」两行依赖这两个值。
+            var conv = this.convByKey('dm:' + peer);
+            this.dm = {
+                peer: peer, kind: m[1], id: parseInt(m[2], 10),
+                pinned: !!(conv && conv.pinned),
+                is_friend: !!(conv && conv.is_friend)
+            };
             this.pollGen = (this.pollGen || 0) + 1;          // 作废在途的群聊轮询回调
             this._roomPollRunning = false;                  // 群聊长轮询就此停摆
             this.room = 0;
@@ -2769,8 +2801,13 @@
             var r = null, list = this.cfg.rooms || [], i;
             for (i = 0; i < list.length; i++) { if (list[i].id === this.room) { r = list[i]; break; } }
 
-            if (isDm || !r) {
-                box.innerHTML = '<div class="ha-panel-hint">' + (isDm ? '私聊会话没有群聊信息' : '请先选择一个群聊') + '</div>';
+            // v1.2.28：私聊不再是「没有群聊信息」的空洞提示，改渲染四个会话操作入口。
+            if (isDm) {
+                box.innerHTML = this.dmPanelHtml();
+                return;
+            }
+            if (!r) {
+                box.innerHTML = '<div class="ha-panel-hint">请先选择一个群聊</div>';
                 return;
             }
             var meId = me.id || 0;
@@ -2784,6 +2821,99 @@
             for (var hi = 0; hi < this._roomEditHooks.length; hi++) {
                 try { this._roomEditHooks[hi](ctx); } catch (e) {}
             }
+        },
+
+        /**
+         * 私聊右侧栏的四个入口（v1.2.28）。样式与群聊的「群聊设置」**完全同款**
+         * （同一个 entryRow + .ha-panel-entry-row）。
+         *
+         * ⚠️ 结构不能拍平：分隔线画在 .ha-panel-entry-row 的 border-top 上，
+         * 且宽屏有 `@media (min-width:961px)` 把**首行**撑到 --ha-topbar-h - 1px
+         * 来让这条线与顶栏（聊天名称下方那条）落在同一像素行。
+         * 所以第一个入口必须是 .ha-panel-room-body 的**直接子元素**，
+         * 其余三个放进紧随其后的 .ha-panel-entry-row —— 拍平成同级会同时丢掉：
+         *   ① 顶部分隔线（第一条横线会消失/错位）
+         *   ② 与顶栏横线的平行关系
+         */
+        dmPanelHtml: function () {
+            var d = this.dm || {};
+            var peer = d.peer || '';
+            var uid = d.id || 0;
+            var nick = (this.roomName || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            var peerKey = peer ? 'dm:' + peer : '';
+            var isGuest = this.cfg.actor.kind !== 'user';   // 游客无置顶/好友概念
+
+            var first = isGuest || !peerKey
+                ? entryRow('私聊会话', 'gear', '')       // 游客/异常态：静态行，只作占位保住首行结构
+                : entryRow(d.pinned ? '取消置顶' : '设为置顶', d.pinned ? 'pinOff' : 'pin',
+                    'HaChat.toggleDmPin()');
+
+            var rest = entryRow('删除聊天记录', 'trash', 'HaChat.clearDmHistory()');
+            // 「删除好友」只在对方确实是好友时给：否则点了必然报错（服务端会拒）
+            if (!isGuest && uid && this.dm && this.dm.is_friend) {
+                rest += entryRow('删除好友', 'userX', 'HaChat.removeDmFriend()');
+            }
+            // 「举报」来自 content-report 插件，插件未启用/未加载时**不渲染这一行**，
+            // 不能给一个点了没反应的入口（插件不提供任何核心兜底）。
+            if (!isGuest && uid && w.HaCR && typeof w.HaCR.openReport === 'function') {
+                rest += entryRow('举报', 'flag', 'HaChat.reportDmPeer()');
+            }
+            return first + '<div class="ha-panel-entry-row">' + rest + '</div>';
+        },
+
+        /** 置顶 / 取消置顶当前私聊（仅影响自己的会话列表顺序） */
+        toggleDmPin: function () {
+            var self = this;
+            var peerKey = (this.dm && this.dm.peer) ? ('dm:' + this.dm.peer) : '';
+            if (!peerKey) { toast('私聊对象不合法'); return; }
+            HaApi.post('dm_pin', { peer_key: peerKey }, function (r) {
+                if (!r.ok) { toast(r.msg); return; }
+                if (self.dm) self.dm.pinned = !!r.pinned;
+                toast(r.msg);
+                self.loadConversations();     // 重排列表：置顶的会话整体提到最前
+                self.renderRoomPanel();      // 行文案在「设为置顶 / 取消置顶」之间切
+            });
+        },
+
+        /**
+         * 清空本机聊天记录（v1.2.28）。
+         * 语义 = 项目既有的「删除」：**只写 message_hides，对方照常能看到**，可逆。
+         * 清完把当前会话消息区也清空，否则界面与实际状态不一致。
+         */
+        clearDmHistory: function () {
+            var self = this;
+            var peer = this.dm && this.dm.peer;
+            if (!peer) { toast('私聊对象不合法'); return; }
+            this.confirm('确定清空与「' + (this.roomName || '对方') + '」的聊天记录？\n'
+                + '仅清空你自己这边的视图，对方仍能看到全部消息。', function () {
+                HaApi.post('dm_clear', { peer: peer }, function (r) {
+                    if (!r.ok) { toast(r.msg); return; }
+                    toast(r.msg || '已清空聊天记录');
+                    if (self.dm && self.dm.peer === peer) {
+                        $('haMessages').innerHTML = '';
+                        self.since = 0;
+                        self.historyDone = true;    // 已无可加载的历史，避免上滚又拉回来
+                    }
+                    self.loadConversations();
+                });
+            });
+        },
+
+        /** 删除当前私聊对方这个好友（对方不是好友时按钮本就不渲染，这里再兜一层） */
+        removeDmFriend: function () {
+            var self = this;
+            var uid = this.dm && this.dm.id;
+            if (!uid) { toast('私聊对象不合法'); return; }
+            this.confirm('确定删除好友「' + (this.roomName || '') + '」？\n删除后聊天记录仍会保留。', function () {
+                self.removeFriend(uid);
+            });
+        },
+
+        /** 举报当前私聊对方（入口来自 content-report 插件） */
+        reportDmPeer: function () {
+            var d = this.dm || {};
+            if (!d.id || !w.HaCR) { toast('举报功能不可用'); return; }
+            w.HaCR.openReport(d.id, this.roomName || '', 0, 0, 0);
         },
 
         /**

@@ -356,10 +356,21 @@ if ($action !== '') {
             Api::json(['ok' => $r[0], 'msg' => $r[1]]);
 
         // ---------- 私聊会话（v1.1.0） ----------
-        case 'conversations':   // 会话列表：群聊 + 私聊聚合，按最后活跃时间倒序
+        case 'conversations':   // 会话列表：群聊 + 私聊聚合，置顶优先 + 按最后活跃时间倒序
             $list = Chat::conversations($actor);
             // total = 会话总数（群聊数 + 私聊会话数），侧栏「聊天」徽标用
             Api::json(['ok' => true, 'data' => $list, 'total' => count($list)]);
+
+        /* ---------- 私聊会话操作（v1.2.28，右侧栏四个入口的后端） ---------- */
+        case 'dm_pin':          // 设为置顶 / 取消置顶（按当前状态取反）
+            [$ok, $msg, $pinned] = Chat::togglePin($actor, (string)$p('peer_key'));
+            Api::json(['ok' => $ok, 'msg' => $msg, 'pinned' => $pinned]);
+
+        case 'dm_clear':        // 清空本机聊天记录（只写 message_hides，对方仍可见）
+            $peer = Chat::dmPeerKey($actor, $p('peer'));
+            if (!$peer) Api::json(['ok' => false, 'msg' => '私聊对象不合法']);
+            [$ok, $msg, $n] = Chat::clearDmForMe($actor, $peer);
+            Api::json(['ok' => $ok, 'msg' => $msg, 'cleared' => $n]);
 
         case 'dm_history':      // 私聊历史（仅双方可见）
             $peer = Chat::dmPeerKey($actor, $p('peer'));

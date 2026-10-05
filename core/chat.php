@@ -800,6 +800,73 @@ class Chat
         return $g ? ['kind' => 'guest', 'id' => (int)$g['id'], 'name' => '游客' . substr((string)$g['nickname'], 2), 'avatar' => ''] : [];
     }
 
+    // ---------- 会话置顶（v1.2.28，**按用户**生效） ----------
+
+    /** 会话唯一键：私聊 'dm:user:20'；群聊 'room:5'（预留，前端暂只开放私聊） */
+    public static function convKey(string $conv, string $peer, int $id): string
+    {
+        return $conv === 'dm' ? ('dm:' . $peer) : ('room:' . $id);
+    }
+
+    /** 我置顶过的会话键集合（peer_key => true）。游客没有个人设置，不置顶。 */
+    public static function pinnedKeys(array $actor): array
+    {
+        if (($actor['kind'] ?? '') !== 'user') return [];
+        $uid = (int)($actor['id'] ?? 0);
+        if ($uid <= 0) return [];
+        $set = [];
+        foreach (DB::all('SELECT peer_key FROM conversation_pins WHERE user_id=?', [$uid]) as $r) {
+            $set[(string)$r['peer_key']] = true;
+        }
+        return $set;
+    }
+
+    /**
+     * 切换置顶（幂等语义：按当前状态取反）。返回 [ok, msg, pinned(bool)]。
+     * 只影响调用者自己的会话列表顺序，不影响对方。
+     */
+    public static function togglePin(array $actor, string $peerKey): array
+    {
+        if (($actor['kind'] ?? '') !== 'user') return [false, '游客无法置顶会话', false];
+        $uid = (int)($actor['id'] ?? 0);
+        if ($uid <= 0) return [false, '请先登录', false];
+        $peerKey = mb_substr(trim($peerKey), 0, 40);
+        if ($peerKey === '') return [false, '参数错误', false];
+        $has = (int)DB::val('SELECT 1 FROM conversation_pins WHERE user_id=? AND peer_key=?', [$uid, $peerKey]) > 0;
+        if ($has) {
+            DB::run('DELETE FROM conversation_pins WHERE user_id=? AND peer_key=?', [$uid, $peerKey]);
+            return [true, '已取消置顶', false];
+        }
+        DB::run('INSERT OR REPLACE INTO conversation_pins (user_id, peer_key, created_at) VALUES (?,?,?)',
+            [$uid, $peerKey, time()]);
+        return [true, '已置顶', true];
+    }
+
+    /**
+     * 清空私聊的**本机视图**（v1.2.28）。
+     *
+     * 语义与 v1.2.4 的「删除」完全一致：只写 message_hides，**对方照常能看到**，
+     * 服务器上的消息一行不删。可逆（清掉 message_hides 即可恢复），不误伤对方。
+     *
+     * @return array [ok, msg, 隐藏条数]
+     */
+    public static function clearDmForMe(array $actor, array $peer): array
+    {
+        if (($actor['kind'] ?? '') !== 'user') return [false, '游客没有聊天记录可清', 0];
+        [$pk, $pid] = $peer;
+        // 与 dmHistory 同一对 SQL 口径，保证「我发的 + 他发的」都覆盖到
+        [$cond, $args] = self::dmPairSql($actor, $pk, $pid, '', []);
+        $rows = DB::all("SELECT id FROM messages WHERE room_id=0 AND to_user_id > 0 AND $cond", $args);
+        if (!$rows) return [true, '没有可清空的聊天记录', 0];
+        $uid = (int)$actor['id'];
+        $now = time();
+        foreach ($rows as $r) {
+            DB::run('INSERT OR REPLACE INTO message_hides (user_id, message_id, created_at) VALUES (?,?,?)',
+                [$uid, (int)$r['id'], $now]);
+        }
+        return [true, '已清空 ' . count($rows) . ' 条聊天记录', count($rows)];
+    }
+
     /**
      * 会话列表：群聊 + 私聊聚合，统一按最后活跃时间倒序（无消息的群聊排最后）。
      * @return array 每个项：{conv:'room'|'dm', id, peer, name, avatar, last_at, last_text, need_password, can_edit, mine}
@@ -808,6 +875,7 @@ class Chat
     {
         $out = [];
         $hidden = self::hiddenIds($actor);   // v1.1.14：摘要也不能漏，漏了就等于没隐藏
+        $pins = self::pinnedKeys($actor);    // v1.2.28：置顶是个人偏好，随会话一起下发
 
         // 群聊：各房间最后一条消息（一条 GROUP BY 取回，避免逐房间查询）
         $last = [];
@@ -824,13 +892,15 @@ class Chat
         }
         foreach (self::rooms($actor) as $r) {
             $meta = $last[$r['id']] ?? ['at' => 0, 'id' => 0];
+            $key = self::convKey('room', '', (int)$r['id']);
             $out[] = [
-                'conv' => 'room', 'id' => $r['id'], 'peer' => '',
+                'conv' => 'room', 'id' => $r['id'], 'peer' => '', 'peer_key' => $key,
                 'name' => $r['name'], 'avatar' => $r['avatar'],
                 'last_at' => $meta['at'],
                 // 末条被我隐藏过 → 摘要置空（但时间戳照旧，列表排序不受影响）
                 'last_text' => isset($hidden[$meta['id']]) ? '' : ($lastText[$meta['id']] ?? ''),
                 'need_password' => $r['need_password'], 'can_edit' => $r['can_edit'], 'mine' => $r['mine'],
+                'pinned' => isset($pins[$key]),
             ];
         }
 
@@ -869,18 +939,28 @@ class Chat
             if (!$info) continue;              // 对方已注销
             $out[] = [
                 'conv' => 'dm', 'id' => $pId, 'peer' => $key,
+                'peer_key' => self::convKey('dm', $key, $pId),
                 'name' => $info['name'], 'avatar' => $info['avatar'],
                 'last_at' => (int)$m['created_at'], 'last_text' => self::convText($m),
                 'need_password' => false, 'can_edit' => false, 'mine' => false,
+                'pinned' => isset($pins[self::convKey('dm', $key, $pId)]),
+                // v1.2.28：右侧栏「删除好友」只在对方确实是好友时才渲染，
+                // 不然点了必然被服务端拒（先查一次 friends，比让用户试错好）
+                'is_friend' => (int)DB::val('SELECT 1 FROM friends WHERE user_id=? AND friend_id=?',
+                    [$mineUser, $pId]) > 0,
             ];
         }
         return self::sortConversations($out);
     }
 
-    /** 会话排序：按最后活跃时间倒序；无消息（at=0）的沉底，其内按群聊 id 升序 */
+    /** 会话排序：**置顶优先**，组内按最后活跃时间倒序；无消息（at=0）的沉底，其内按 id 升序 */
     private static function sortConversations(array $list): array
     {
         usort($list, function ($a, $b) {
+            // v1.2.28：置顶的会话整体排在最前，其余相对顺序完全不变
+            $pa = !empty($a['pinned']) ? 1 : 0;
+            $pb = !empty($b['pinned']) ? 1 : 0;
+            if ($pa !== $pb) return $pb <=> $pa;
             if ($a['last_at'] !== $b['last_at']) return $b['last_at'] <=> $a['last_at'];
             return $a['id'] <=> $b['id'];
         });

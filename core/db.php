@@ -248,6 +248,13 @@ class DB
             "CREATE TABLE IF NOT EXISTS friends (
                 id $id, user_id $int NOT NULL, friend_id $int NOT NULL,
                 created_at $ts NOT NULL)",
+            // 会话置顶（v1.2.28）：**按用户**生效，不是全局状态。
+            // 私聊置顶只影响自己的列表顺序（peer_key 形如 'dm:user:20'）；
+            // key 统一带前缀，为以后群聊置顶（'room:5'）留位，不用改表。
+            // 为什么不用 rooms/messages 上的字段：置顶是**个人偏好**，
+            // 放业务表上会让「A 置顶」影响 B 的列表。
+            "CREATE TABLE IF NOT EXISTS conversation_pins (
+                id $id, user_id $int NOT NULL, peer_key $str NOT NULL, created_at $ts NOT NULL)",
         ];
         foreach ($tables as $sql) self::$pdo->exec($sql);
 
@@ -261,6 +268,8 @@ class DB
             'CREATE UNIQUE INDEX IF NOT EXISTS idx_msg_hides_key ON message_hides (user_id, message_id)',
             // 同一人重复加同一好友必须幂等（否则联系人列表出现重名行）
             'CREATE UNIQUE INDEX IF NOT EXISTS idx_friends_pair ON friends (user_id, friend_id)',
+            // 同一用户对同一会话只能置顶一次，重复点由代码先查后写，这里兜底防重行
+            'CREATE UNIQUE INDEX IF NOT EXISTS idx_conv_pins_key ON conversation_pins (user_id, peer_key)',
         ] as $sql) {
             try { self::$pdo->exec($sql); } catch (Throwable $e) { /* MySQL 8 不支持 IF NOT EXISTS，忽略 */ }
         }
