@@ -227,8 +227,25 @@ class Admin
             // ---------- 系统公告（v1.0.102）已剥离为 announcements 插件（群公告体系） ----------
 
             // ---------- 安全日志 ----------
+            // v1.2.51：改服务端分页 + 动作筛选（原来一次 LIMIT 200 全量吐给前端，
+            // 日志一多页面又长又卡，且没有筛选能力）。前端用通用分页轮子 uiPager 渲染。
             case 'admin_logs':
-                Api::json(['ok' => true, 'data' => DB::all('SELECT * FROM security_logs ORDER BY id DESC LIMIT 200')]);
+                $page  = max(1, (int)$p('page'));
+                $psize = max(5, min(100, (int)($p('psize') ?: 30)));
+                $act   = trim((string)$p('action'));          // 按动作筛选，空 = 全部
+                $where = ''; $args = [];
+                if ($act !== '') { $where = 'WHERE action=?'; $args = [$act]; }
+                $total = (int)DB::val("SELECT COUNT(*) FROM security_logs $where", $args);
+                Api::json([
+                    'ok'      => true,
+                    'data'    => DB::all("SELECT * FROM security_logs $where ORDER BY id DESC LIMIT $psize OFFSET " . (($page - 1) * $psize), $args),
+                    'total'   => $total,
+                    'page'    => $page,
+                    'psize'   => $psize,
+                    'pages'   => max(1, (int)ceil($total / $psize)),
+                    // 动作清单 + 计数，供筛选下拉展示「登录成功（12）」这类带量的选项
+                    'actions' => DB::all('SELECT action, COUNT(*) AS n FROM security_logs GROUP BY action ORDER BY n DESC, action ASC'),
+                ]);
 
             // ---------- 站点设置 ----------
             case 'admin_settings_get':
@@ -256,7 +273,9 @@ class Admin
                           'login_fail_captcha', 'login_fail_lock', 'login_lock_minutes', 'min_register_age',
                           'room_create_allow',
                           // v1.1.14：普通用户能否创建不公开群聊（管理员始终可）
-                          'room_private_create_allow'];
+                          'room_private_create_allow',
+                          // v1.2.51 调试模式：开 = 记录 debug 级日志 + 出错页显示详细报错（排错用，勿常开）
+                          'debug_mode'];
                 // 数值型设置统一收敛为非负整数：负数会让间隔/保留期这类
                 // 「窗口秒数」「天数」直接失效或行为诡异，前端输入框挡不住。
                 $intKeys = ['guest_msg_interval', 'msg_retain_days'];

@@ -4569,6 +4569,119 @@
             return n;
         },
 
+        /* ---------- 安全日志：动作/字段中文表 + 详情解析 + 筛选加载（v1.2.51） ----------
+           原来一次拉 200 条裸行：action 是英文 slug、data 是原始 JSON，基本看不懂。
+           现在服务端分页 + 按动作筛选，动作/字段都翻成中文，data 拼成一句人话。
+           ⚠️ 这些方法必须在 HaAdmin **顶层**：筛选下拉的 onchange 直接引用
+           HaAdmin.logAct / HaAdmin.logLoad；pages 表里的 logs 只是渲染壳。
+           动作表覆盖核心与全部内置插件；新动作没进表也不出错 —— 回退显示英文 slug。 */
+        _logActs: {
+            login: '登录成功', login_fail: '登录失败', login_locked: '账号锁定',
+            session_fingerprint_mismatch: '会话指纹异常（Cookie 在别的浏览器/网络被重放，会话已销毁）',
+            logout: '退出登录', register: '注册账号', reset_password: '重置密码',
+            admin_settings: '保存系统设置',
+            admin_ban: '后台封禁', ban_quick: '快捷封禁',
+            admin_user_set: '后台设置用户', admin_user_lock: '后台锁定用户',
+            admin_user_points: '调整积分', admin_user_level: '调整等级',
+            cron_toggle: '计划任务启停', cron_run: '手动执行任务', cron_token: '重置任务令牌', cron_error: '任务执行异常',
+            room_create: '创建群聊', room_update: '更新群资料', room_review: '群聊处置', room_undo: '撤销处置',
+            room_invite: '邀请入群', room_member_del: '移出成员', room_invite_code: '生成邀请链接', room_pass_fail: '房间密码错误',
+            msg_recall: '撤回消息', msg_hide: '隐藏消息', msg_expire: '保留期清理',
+            dm_compliance_read: '私聊合规查阅',
+            plugin_install: '安装插件', plugin_uninstall: '卸载插件', plugin_error: '插件加载出错', plugin_page_error: '插件页面出错',
+            sensitive_reject: '敏感词拦截',
+            sensitive_word_add: '添加敏感词', sensitive_word_del: '删除敏感词', sensitive_word_batch_del: '批量删除敏感词',
+            nickname_reserve_block: '保留昵称拦截', nickname_reserve_save: '保存保留昵称',
+            upload_file: '上传附件', admin_attachment_delete: '删除附件',
+            group_ann_add: '发布群公告', group_ann_del: '删除群公告', group_ann_batch_del: '批量删除群公告',
+            twofa_enable: '开启两步验证', twofa_disable: '关闭两步验证', twofa_login_ok: '两步验证登录',
+            twofa_verify_fail: '两步验证失败', twofa_reset_codes: '重置恢复码',
+            header_footer_save: '保存页头页脚',
+            level_cfg_save: '保存等级参数',
+            content_report_config: '保存举报设置', content_report_handle: '处理举报',
+            user_block_add: '拉黑用户', user_block_remove: '取消拉黑',
+            admin_login_logs_clear: '清理登录日志', plugin_login_logs_err: '登录日志插件异常'
+        },
+        /* data 字段 → 中文标签（没进表的键直接显示原键名） */
+        _logKeys: {
+            act: '操作', room: '群聊', id: 'ID', name: '名称', uid: '用户', target: '目标', to: '对象',
+            count: '数量', fail: '失败', err: '错误', error: '错误', days: '天数', deleted: '删除数',
+            points: '积分', level: '等级', role: '角色', type: '类型', hours: '小时', size: '大小',
+            ext: '扩展名', method: '方式', msgs: '消息数', files: '文件数', retain_days: '保留期',
+            trash: '回收站ID', cost: '扣除积分', items: '保存项', scene: '场景', interval: '间隔',
+            desc_limit: '简介字数', status: '状态', word: '词条', email: '邮箱', ip: 'IP',
+            fails: '失败次数', minutes: '锁定分钟', reason: '原因', expires: '时长'
+        },
+        /* room_review 的 act 子类型 */
+        _logReviewAct: { reset_name: '重置名称', reset_avatar: '重置头像', ban: '封禁', unban: '解封', delete: '删除' },
+
+        _logActName: function (a) { return this._logActs[a] || a; },
+        /** 时间戳 → 本地 Y-m-d H:i:s（旧实现 toLocaleString 带多余段落，且 ISO 是 UTC 会差 8 小时） */
+        _logTs: function (ts) {
+            var t = new Date(parseInt(ts, 10) * 1000);
+            function p(n) { return (n < 10 ? '0' : '') + n; }
+            return t.getFullYear() + '-' + p(t.getMonth() + 1) + '-' + p(t.getDate())
+                + ' ' + p(t.getHours()) + ':' + p(t.getMinutes()) + ':' + p(t.getSeconds());
+        },
+        /** data JSON → 「操作 封禁，群聊 5」式的一句话；解析失败回退原文 */
+        _logDetail: function (d) {
+            var o = null;
+            try { o = JSON.parse(d.data || '{}'); } catch (e) {}
+            if (!o || typeof o !== 'object') return esc(d.data || '') || '—';
+            var keys = this._logKeys, parts = [];
+            for (var k in o) {
+                if (!Object.prototype.hasOwnProperty.call(o, k)) continue;
+                var v = o[k];
+                if (v === '' || v === null || v === undefined) continue;
+                if (k === 'act' && d.action === 'room_review') v = this._logReviewAct[v] || v;
+                parts.push('<b>' + esc(keys[k] || k) + '</b> ' + esc(String(v)));
+            }
+            return parts.length ? parts.join('，') : '—';
+        },
+        logAct: function (a) {
+            HaAdmin._logAct = a || '';
+            HaAdmin.logLoad(1);
+        },
+        logLoad: function (page) {
+            HaAdmin._logPage = Math.max(1, page || 1);
+            HaApi.post('admin_logs', { page: HaAdmin._logPage, psize: 30, action: HaAdmin._logAct }, function (r) {
+                var main = $('haAdminMain');
+                if (!r.ok) { main.innerHTML = '<div class="ha-card">' + esc(r.msg || '加载失败') + '</div>'; return; }
+
+                // 筛选下拉：全部 + 各动作（带计数）。每次重绘以保住计数最新，
+                // 选中态跟随 _logAct，翻页不丢筛选。
+                var sel = $('haLogAct');
+                if (sel) {
+                    var oh = '<option value="">全部动作（' + r.total + '）</option>';
+                    for (var a = 0; a < r.actions.length; a++) {
+                        var it = r.actions[a];
+                        oh += '<option value="' + esc(it.action) + '"' + (it.action === HaAdmin._logAct ? ' selected' : '') + '>'
+                            + esc(HaAdmin._logActName(it.action)) + '（' + it.n + '）</option>';
+                    }
+                    sel.innerHTML = oh;
+                }
+                var stat = $('haLogStat');
+                if (stat) stat.textContent = '共 ' + r.total + ' 条';
+
+                var h = '<tr><th>时间</th><th>动作</th><th>操作者</th><th>IP</th><th>详情</th></tr>';
+                if (!r.data.length) {
+                    h += '<tr><td colspan="5" style="color:#5C5C5C">当前筛选下暂无日志。</td></tr>';
+                }
+                for (var i = 0; i < r.data.length; i++) {
+                    var x = r.data[i];
+                    h += '<tr><td style="white-space:nowrap">' + esc(HaAdmin._logTs(x.created_at)) + '</td>'
+                       + '<td><b>' + esc(HaAdmin._logActName(x.action)) + '</b>'
+                       + '<div style="color:#8A8A8A;font-size:11px">' + esc(x.action) + '</div></td>'
+                       + '<td>' + esc(x.actor || '—') + '</td>'
+                       + '<td>' + esc(x.ip || '—') + '</td>'
+                       + '<td style="max-width:420px">' + HaAdmin._logDetail(x) + '</td></tr>';
+                }
+                var tb = $('haLogTable');
+                if (tb) tb.innerHTML = h;
+                HaAdmin.uiPager('haLogPager', r.page, r.total, r.psize || 30, function (pg) { HaAdmin.logLoad(pg); });
+            });
+        },
+
         confirm: function (text, onOk) {
             var mask = document.createElement('div');
             mask.className = 'ha-modal-mask';
@@ -4779,19 +4892,24 @@
                 HaAdmin.roomLoad(1);
                 HaAdmin.roomTrashLoad(1);
             },
-logs: function (main) {
-                HaApi.post('admin_logs', {}, function (r) {
-                    var h = '<h2>安全日志</h2><p class="ha-admin-desc">记录登录、注册等关键操作的 IP 与请求数据（已脱敏）。</p>'
-                        + '<div class="ha-card"><table class="ha-table"><tr><th>ID</th><th>动作</th><th>操作者</th><th>IP</th><th>数据</th><th>时间</th></tr>';
-                    for (var i = 0; i < r.data.length; i++) {
-                        var d = r.data[i];
-                        h += '<tr><td>' + d.id + '</td><td>' + esc(d.action) + '</td><td>' + esc(d.actor || '') + '</td><td>' + esc(d.ip || '') + '</td>'
-                           + '<td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(d.data || '') + '</td>'
-                           + '<td>' + new Date(d.created_at * 1000).toLocaleString() + '</td></tr>';
-                    }
-                    main.innerHTML = h + '</table></div>';
-                });
-            },
+        /* ⚠️ 动作/字段中文表与详情解析挂在 HaAdmin **顶层**（_logActs 等），不在这里 ——
+           pages 表成员只能被 page(ap) 分发调用，而筛选下拉的 onchange 直接引用
+           HaAdmin.logAct / HaAdmin.logLoad，必须放顶层才可达。 */
+        logs: function (main) {
+            HaAdmin._logPage = 1;
+            HaAdmin._logAct = '';
+            main.innerHTML = '<h2>安全日志</h2>'
+                + '<p class="ha-admin-desc">记录登录、封禁、群聊处置、插件安装等关键安全事件（IP 与数据已脱敏）。'
+                + '「详情」列是事件的可读说明；动作多时用顶部下拉筛选定位。</p>'
+                + '<div class="ha-card"><div class="ha-form-row" style="align-items:center">'
+                + '<div class="ha-form-item" style="min-width:240px"><label>按动作筛选</label>'
+                + '<select class="ha-input" id="haLogAct" onchange="HaAdmin.logAct(this.value)"></select></div>'
+                + '<span id="haLogStat" style="margin-left:auto;color:var(--ha-text-sub);font-size:12px"></span>'
+                + '</div></div>'
+                + '<div class="ha-card"><div class="ha-table-wrap"><table class="ha-table" id="haLogTable"></table></div>'
+                + '<div id="haLogPager" style="margin-top:10px"></div></div>';
+            HaAdmin.logLoad(1);
+        },
             /* 计划任务（v1.1.13）：插件通过 Plugin::cron() 声明式注册的任务。
                与旧的 cron.minute 钩子不同——那些任务在这里不可见、不可控。
                任务表只显示「已注册」的：插件停用后其任务仍在表里但每次都会被跳过，
@@ -4854,6 +4972,11 @@ logs: function (main) {
                         + '<p style="font-size:12px;color:#5C5C5C;margin:4px 0 12px">超过本期限的消息会被<b>物理删除</b>，其附件文件（uploads/file/）一并删除，<b>删除后无法恢复</b>。默认 90 天（约三个月）。填 0 表示永久保留。<br>'
                         + '「<b>删除</b>」只在本机生效（仅你看不到，别人照常看得到）；「<b>撤回</b>」才是全局删除，所有人都不再显示且不可恢复。</p>'
                         + '<div class="ha-form-item"><label>新消息提示音默认</label>' + sel('sound_default', { '1': '开', '0': '关' }) + '</div>'
+                        // v1.2.51 调试模式：排错开关，默认关
+                        + '<div class="ha-form-item"><label>调试模式</label>' + sel('debug_mode', { '1': '开启', '0': '关闭' }) + '</div>'
+                        + '<p style="font-size:12px;color:#B06000;background:#FFF6E5;border:1px solid #FFE1B0;border-radius:4px;padding:8px 10px;margin:4px 0 12px">'
+                        + '开启后记录 debug 级日志、出错页显示详细报错。仅用于排错，用完请及时关闭 —— 报错细节可能暴露路径、SQL 与配置信息。<br>'
+                        + '日志文件：data/logs/debug.log（页面报错实时显示；接口请求只落日志、不回显，避免破坏前端数据）。</p>'
                         + '<button class="ha-btn ha-btn-primary" onclick="HaAdmin.settingsSave()">保存设置</button></div>';
                 });
             },
@@ -5108,17 +5231,12 @@ logs: function (main) {
                        + '<td>' + esc(new Date(parseInt(g.created_at, 10) * 1000).toISOString().slice(0, 19).replace('T', ' ')) + '</td></tr>';
                 }
                 h += '</table>';
-                if (r.pages > 1) {
-                    h += '<div class="ha-form-row" style="margin-top:10px;justify-content:center;gap:8px">'
-                       + '<button class="ha-btn ha-btn-ghost ha-btn-mini" ' + (page <= 1 ? 'disabled' : '')
-                       + ' onclick="HaAdmin.cronPage(' + (page - 1) + ')">上一页</button>'
-                       + '<span style="font-size:12px;color:#5C5C5C">第 ' + page + ' / ' + r.pages + ' 页 · 共 ' + r.log_total + ' 条</span>'
-                       + '<button class="ha-btn ha-btn-ghost ha-btn-mini" ' + (page >= r.pages ? 'disabled' : '')
-                       + ' onclick="HaAdmin.cronPage(' + (page + 1) + ')">下一页</button></div>';
-                }
-                h += '</div>';
+                // v1.2.51：执行日志换通用分页轮子 uiPager（原来只有「上一页/下一页」，
+                // 与群聊审核等页的数字页码+跳页不一致，也没法直接跳页）
+                h += '<div id="haCronLogPager" style="margin-top:10px"></div></div>';
 
                 main.innerHTML = h;
+                HaAdmin.uiPager('haCronLogPager', page, r.log_total, 30, function (pg) { HaAdmin.cronPage(pg); });
             });
         },
 
@@ -5215,7 +5333,9 @@ logs: function (main) {
                 login_fail_captcha: $('haS_login_fail_captcha') ? $('haS_login_fail_captcha').value : '',
                 login_fail_lock: $('haS_login_fail_lock') ? $('haS_login_fail_lock').value : '',
                 login_lock_minutes: $('haS_login_lock_minutes') ? $('haS_login_lock_minutes').value : '',
-                sound_default: $('haS_sound_default').value
+                sound_default: $('haS_sound_default').value,
+                // v1.2.51 调试模式
+                debug_mode: $('haS_debug_mode') ? $('haS_debug_mode').value : ''
             }, function (r) { toast(r.msg); });
         }
     };

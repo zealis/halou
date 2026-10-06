@@ -6,10 +6,10 @@
 
 .ha-lt-badge {
     display: inline-block;
-    padding: 1px 7px;
+    padding: 0 6px;
     border-radius: 3px;
-    font-size: 12px;
-    line-height: 18px;
+    font-size: 11px;
+    line-height: 16px;
     font-weight: 600;
     color: #FFFFFF;
     background: #8E8EA0;                 /* 兜底（未知阶段） */
@@ -149,9 +149,11 @@
 
 /* 侧栏底部资料区里的等级徽章（v1.2.46）
    比资料卡里的小一号：侧栏那行本来就窄（昵称 + 头衔 + 徽章），
-   用资料卡的 12px/18px 会把昵称挤没。 */
+   用资料卡的大号会把昵称挤没。
+   v1.2.50 后微调：资料卡的基础徽章已由 12/18 收到 11/16，这里相应再收一档到 10/14，
+   保持「侧栏比资料卡小一号」的相对关系。 */
 .ha-me-line .ha-lt-badge.ha-lt-badge-sm {
-    font-size: 11px; line-height: 15px; padding: 0 5px; border-radius: 3px;
+    font-size: 10px; line-height: 14px; padding: 0 4px; border-radius: 3px;
     margin-left: 0; flex-shrink: 0; -webkit-flex-shrink: 0;
     vertical-align: middle; cursor: default;
 }

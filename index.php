@@ -109,6 +109,34 @@ if ($installed && $dbOk && ($actor['kind'] ?? '') === 'user') {
 $action = $_GET['action'] ?? '';
 $page = $_GET['page'] ?? 'chat';
 
+// ---------- 调试模式（v1.2.51） ----------
+// 后台「系统设置 → 调试模式」开启后生效，仅用于排错：
+//   ① 所有 PHP 报错（含 notice/warning）落 data/logs/debug.log；
+//   ② 页面请求回显详细报错 + 致命错误兜底渲染（AJAX 请求只落日志不回显，
+//      否则一段 PHP 报错混进 JSON 会把前端接口全部打挂，比不看报错更糟）；
+//   ③ 出错细节可能暴露路径 / SQL / 配置，用完请及时在后台关闭。
+if ($installed && $dbOk && DB::setting('debug_mode', '0') === '1') {
+    define('HALOU_DEBUG', true);
+    error_reporting(E_ALL);
+    ini_set('log_errors', '1');
+    @mkdir($CFG['data_dir'] . '/logs', 0775, true);
+    ini_set('error_log', $CFG['data_dir'] . '/logs/debug.log');
+    if ($action === '') ini_set('display_errors', '1');
+    // 兜底：display_errors 接不住的致命错误（内存耗尽 / 解析错误等）在此补一刀，
+    // 保证「出错页显示详细报错」在页面请求下一定成立。
+    if ($action === '') {
+        register_shutdown_function(function () {
+            $e = error_get_last();
+            if (!$e || !in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) return;
+            if (!headers_sent()) http_response_code(500);
+            echo '<div style="margin:20px;padding:14px 16px;border:2px solid #C41D1F;border-radius:6px;'
+               . 'font:13px/1.7 Consolas,monospace;background:#FFF5F5;color:#8A1F1F;white-space:pre-wrap;word-break:break-all">'
+               . '【调试模式 · 致命错误】' . htmlspecialchars($e['message'], ENT_QUOTES, 'UTF-8') . "\n"
+               . '位置：' . htmlspecialchars($e['file'], ENT_QUOTES, 'UTF-8') . ' 第 ' . (int)$e['line'] . ' 行</div>';
+        });
+    }
+}
+
 // ================= 安装向导 =================
 if (!$installed) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'install') {
