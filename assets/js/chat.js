@@ -4942,54 +4942,90 @@
                        缺键时浏览器会选中第一项 → 显示「开启」但实际是关的。 */
                     function sw(k, label, def) {
                         var v = (d[k] === undefined || d[k] === null || d[k] === '') ? def : d[k];
-                        return '<div class="ha-form-item" style="flex:1;min-width:240px">'
-                            + switchHtml('haS_' + k, label, v === '1') + '</div>';
+                        // v1.2.53：开关**不要包 .ha-form-item** —— 包了会被 .ha-form-row 的
+                        // min-width 卡成窄列，轨道被推到列最右侧，与文字隔一大片空白
+                        //（用户报的「样式错乱」）。开关行自带 flex 布局，直接平铺即可。
+                        return switchHtml('haS_' + k, label, v === '1');
                     }
-                    function swRow(items) { return '<div class="ha-form-row">' + items + '</div>'; }
-                    main.innerHTML = '<h2>系统设置</h2><p class="ha-admin-desc">站点、注册控制、游客与发言限制、存储方式。</p><div class="ha-card">'
-                        + '<div class="ha-form-item"><label>站点名称</label><input class="ha-input" id="haS_site_name" value="' + esc(d.site_name || '') + '"></div>'
-                        + '<div class="ha-form-item"><label>固定网站地址</label><input class="ha-input" id="haS_site_url" value="' + esc(d.site_url || '') + '" placeholder="留空自动识别"></div>'
-                        + swRow(sw('allow_register', '开放注册', '1') + sw('reg_email_verify', '注册需邮箱验证', '1')
-                              + sw('guest_browse', '游客可浏览', '1') + sw('guest_chat', '游客可发言', '1'))
-                        + '</div><div class="ha-form-row">'
-                        + '<div class="ha-form-item"><label>游客发言间隔(秒)</label><input class="ha-input" id="haS_guest_msg_interval" value="' + esc(d.guest_msg_interval || '30') + '"></div>'
-                        + '<div class="ha-form-item"><label>发言频率窗口(秒)</label><input class="ha-input" id="haS_msg_rate_window" value="' + esc(d.msg_rate_window || '10') + '"></div>'
-                        + '<div class="ha-form-item"><label>窗口内最大条数</label><input class="ha-input" id="haS_msg_rate_max" value="' + esc(d.msg_rate_max || '8') + '"></div>'
-                        + '<div class="ha-form-item"><label>邮件发送间隔(秒)</label><input class="ha-input" id="haS_mail_rate_limit" value="' + esc(d.mail_rate_limit || '60') + '"></div>'
-                        + '</div>'
-                        + '<div class="ha-form-item"><label>密码房通行缓存(秒)</label><input class="ha-input" id="haS_room_pass_ttl" value="' + esc(d.room_pass_ttl || '1800') + '">'
-                        + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">验证一次密码后，该时间内进入同一房间无需重复输入；填 0 表示每次进入都要输入。</p></div>'
-                        + '<div class="ha-form-row">'
-                        + '<div class="ha-form-item"><label>登录失败几次后要求验证码</label><input class="ha-input" id="haS_login_fail_captcha" value="' + esc(d.login_fail_captcha || '3') + '"></div>'
-                        + '<div class="ha-form-item"><label>登录失败几次后锁定</label><input class="ha-input" id="haS_login_fail_lock" value="' + esc(d.login_fail_lock || '10') + '"></div>'
-                        + '<div class="ha-form-item"><label>锁定时长(分钟)</label><input class="ha-input" id="haS_login_lock_minutes" value="' + esc(d.login_lock_minutes || '15') + '"></div>'
-                        + '</div>'
-                        + '<div class="ha-form-item"><label>注册最低年龄(周岁)</label><input class="ha-input" id="haS_min_register_age" value="' + esc(d.min_register_age || '0') + '">'
-                        + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">填 0 表示不限制；填 18 则注册时必须选择出生日期且年满 18 周岁（按日期精确计算）。</p></div>'
+                    /* 输入框（文本 / 数值） */
+                    function fld(k, label, def, placeholder) {
+                        return '<div class="ha-form-item"><label>' + esc(label) + '</label>'
+                            + '<input class="ha-input" id="haS_' + k + '" value="'
+                            + esc((d[k] === undefined || d[k] === null || d[k] === '') ? def : d[k]) + '"'
+                            + (placeholder ? ' placeholder="' + esc(placeholder) + '"' : '') + '></div>';
+                    }
+                    function row(items) { return '<div class="ha-form-row">' + items + '</div>'; }
+                    function note(html) {
+                        return '<p style="font-size:12px;color:#5C5C5C;margin:4px 0 12px">' + html + '</p>';
+                    }
+                    /* v1.2.53：折叠分组（.ha-fold，样式见 halou.css）——与插件后台的
+                       分组同一思路，点标题展开 / 收起。默认**全部展开**：表单只有一屏多，
+                       默认收起会让人以为设置丢了。收起时输入框仍在 DOM 里，保存照常提交全部分组。 */
+                    function sec(title, body) {
+                        return '<div class="ha-fold is-open">'
+                            + '<div class="ha-fold-hd" onclick="HaAdmin.foldToggle(this)">' + esc(title)
+                            + '<span class="ha-fold-arrow">&#9656;</span></div>'
+                            + '<div class="ha-fold-bd">' + body + '</div></div>';
+                    }
+                    main.innerHTML = '<h2>系统设置</h2><p class="ha-admin-desc">站点、注册控制、游客与发言限制、存储方式。点分组标题可展开 / 收起。</p>'
+
+                        /* ---------- ① 基本信息 ---------- */
+                        + sec('基本信息',
+                              fld('site_name', '站点名称', '')
+                            + fld('site_url', '固定网站地址', '', '留空自动识别')
+                            + sw('allow_register', '开放注册', '1')
+                            + sw('reg_email_verify', '注册需邮箱验证', '1')
+                            + fld('min_register_age', '注册最低年龄(周岁)', '0')
+                            + note('填 0 表示不限制；填 18 则注册时必须选择出生日期且年满 18 周岁（按日期精确计算）。'))
+
+                        /* ---------- ② 群聊 ---------- */
+                        + sec('群聊',
+                              sw('room_create_allow', '允许用户创建群聊', '1')
+                            // v1.1.14 仅邀请群总闸：与「允许用户创建群聊」正交 ——
+                            // 那个管能不能建群，这个管建出来的群能不能藏起来。
+                            + sw('room_private_create_allow', '允许用户创建仅邀请群聊', '1')
+                            + fld('room_pass_ttl', '密码房通行缓存(秒)', '1800')
+                            + note('验证一次密码后，该时间内进入同一房间无需重复输入；填 0 表示每次进入都要输入。')
+                            + note('创建群聊：管理员创建始终免费。用户创建的群聊 owner 归属创建者，可在群聊管理中调整。<br>'
+                                // v1.1.18：这里原本写「只能创建普通群聊」，指的是**公开性**
+                                // （is_public），不是房间类型，已改为「公开群聊」。
+                                // 教训：公开性的中文不能叫「普通」，会与 type=public 的「普通」撞词。
+                                + '仅邀请群聊只靠邀请链接传播，不出现在任何列表里。关闭后普通用户只能创建公开群聊，'
+                                + '已存在的仅邀请群仍可正常改名、改简介（仅禁止把公开群改成仅邀请）；管理员始终不受此限制。'))
+
+                        /* ---------- ③ 游客、存储 ---------- */
                         // v1.2.41：「允许上传文件 / 单文件大小上限(MB) / 允许的文件扩展名」
                         //   三项已移入**附件上传插件**的后台页（插件管理 → 附件上传），
                         //   核心设置页不再出现，也不再读这三个键。
-                        + '<p style="font-size:12px;color:#5C5C5C;margin-bottom:12px">登录保护：验证码填错也计入失败次数（保证锁定可达），锁定按「账号+IP」记录，成功后清零。全部填 0 表示关闭对应保护。</p>'
-                        + swRow(sw('room_create_allow', '允许用户创建群聊', '1') + sw('room_private_create_allow', '允许用户创建仅邀请群聊', '1'))
-                        // v1.1.14 仅邀请群总闸：与「允许用户创建群聊」正交 ——
-                        // 那个管能不能建群，这个管建出来的群能不能藏起来。
-                        + '<p style="font-size:12px;color:#5C5C5C;margin-bottom:12px">创建群聊：填 0 表示免费创建；管理员创建始终免费。用户创建的群聊 owner 归属创建者，可在群聊管理中调整。<br>'
-                        // v1.1.18：这里原本写「只能创建普通群聊」，指的是**公开性**
-                        // （is_public），不是房间类型，已改为「公开群聊」。
-                        // 教训：公开性的中文不能叫「普通」，会与 type=public 的「普通」撞词。
-                        + '仅邀请群聊只靠邀请链接传播，不出现在任何列表里。关闭后普通用户只能创建公开群聊，'
-                        + '已存在的仅邀请群仍可正常改名、改简介（仅禁止把公开群改成仅邀请）；管理员始终不受此限制。</p>'
-                        // v1.2.2 消息服务器保留期：到期即物理清除（附件同步删），无法恢复
-                        + '<div class="ha-form-item"><label>消息服务器保留期(天)</label><input class="ha-input" id="haS_msg_retain_days" value="' + esc(d.msg_retain_days || '90') + '"></div>'
-                        + '<p style="font-size:12px;color:#5C5C5C;margin:4px 0 12px">超过本期限的消息会被<b>物理删除</b>，其附件文件（uploads/file/）一并删除，<b>删除后无法恢复</b>。默认 90 天（约三个月）。填 0 表示永久保留。<br>'
-                        + '「<b>删除</b>」只在本机生效（仅你看不到，别人照常看得到）；「<b>撤回</b>」才是全局删除，所有人都不再显示且不可恢复。</p>'
-                        + swRow(sw('sound_default', '新消息提示音默认', '1')
-                              // v1.2.51 调试模式：排错开关，默认关（后端 DB::setting 默认也是 0）
-                              + sw('debug_mode', '调试模式', '0'))
-                        + '<p style="font-size:12px;color:#B06000;background:#FFF6E5;border:1px solid #FFE1B0;border-radius:4px;padding:8px 10px;margin:4px 0 12px">'
-                        + '开启后记录 debug 级日志、出错页显示详细报错。仅用于排错，用完请及时关闭 —— 报错细节可能暴露路径、SQL 与配置信息。<br>'
-                        + '日志文件：data/logs/debug.log（页面报错实时显示；接口请求只落日志、不回显，避免破坏前端数据）。</p>'
-                        + '<button class="ha-btn ha-btn-primary" onclick="HaAdmin.settingsSave()">保存设置</button></div>';
+                        + sec('游客、存储',
+                              sw('guest_browse', '游客可浏览', '1')
+                            + sw('guest_chat', '游客可发言', '1')
+                            + row(fld('guest_msg_interval', '游客发言间隔(秒)', '30')
+                                + fld('msg_rate_window', '发言频率窗口(秒)', '10')
+                                + fld('msg_rate_max', '窗口内最大条数', '8')
+                                + fld('mail_rate_limit', '邮件发送间隔(秒)', '60'))
+                            // v1.2.2 消息服务器保留期：到期即物理清除（附件同步删），无法恢复
+                            + fld('msg_retain_days', '消息服务器保留期(天)', '90')
+                            + note('超过本期限的消息会被<b>物理删除</b>，其附件文件（uploads/file/）一并删除，'
+                                + '<b>删除后无法恢复</b>。默认 90 天（约三个月）。填 0 表示永久保留。<br>'
+                                + '「<b>删除</b>」只在本机生效（仅你看不到，别人照常看得到）；'
+                                + '「<b>撤回</b>」才是全局删除，所有人都不再显示且不可恢复。'))
+
+                        /* ---------- ④ 系统与维护 ---------- */
+                        + sec('系统与维护',
+                              row(fld('login_fail_captcha', '登录失败几次后要求验证码', '3')
+                                + fld('login_fail_lock', '登录失败几次后锁定', '10')
+                                + fld('login_lock_minutes', '锁定时长(分钟)', '15'))
+                            + note('登录保护：验证码填错也计入失败次数（保证锁定可达），'
+                                + '锁定按「账号+IP」记录，成功后清零。全部填 0 表示关闭对应保护。')
+                            + sw('sound_default', '新消息提示音默认', '1')
+                            // v1.2.51 调试模式：排错开关，默认关（后端 DB::setting 默认也是 0）
+                            + sw('debug_mode', '调试模式', '0')
+                            + '<p style="font-size:12px;color:#B06000;background:#FFF6E5;border:1px solid #FFE1B0;border-radius:4px;padding:8px 10px;margin:4px 0 12px">'
+                            + '开启后记录 debug 级日志、出错页显示详细报错。仅用于排错，用完请及时关闭 —— 报错细节可能暴露路径、SQL 与配置信息。<br>'
+                            + '日志文件：data/logs/debug.log（页面报错实时显示；接口请求只落日志、不回显，避免破坏前端数据）。</p>')
+
+                        + '<button class="ha-btn ha-btn-primary" onclick="HaAdmin.settingsSave()">保存设置</button>';
                     // 开关视觉同步（is-on 类）：新增 DOM 后必须调，轨道才有开/关配色
                     bindSwitches(main);
                     if (w.HaTip && typeof w.HaTip.scan === 'function') w.HaTip.scan(main);
@@ -5326,6 +5362,18 @@
             var f = $('haPluginZip');
             if (!f.files || !f.files[0]) { toast('请选择 zip 文件'); return; }
             HaApi.upload('admin_plugin_install', f.files[0], {}, function (r) { toast(r.msg); if (r.ok) HaAdmin.page('plugins'); });
+        },
+        /**
+         * 折叠分组开关（v1.2.53，配合 .ha-fold 样式）。
+         * 只切 is-open 类，内容始终留在 DOM 里 —— 收起状态下表单值照样被 settingsSave 读到。
+         * @param {Element} hd 被点的 .ha-fold-hd（标题条）
+         */
+        foldToggle: function (hd) {
+            var box = hd && hd.parentNode;
+            if (!box || box.className.indexOf('ha-fold') < 0) return;
+            box.className = box.className.indexOf('is-open') >= 0
+                ? box.className.replace(/\bis-open\b/g, '')
+                : box.className + ' is-open';
         },
         settingsSave: function () {
             /** 开关取值：checked → '1'/'0'；元素不存在 → ''（后端跳过该键） */

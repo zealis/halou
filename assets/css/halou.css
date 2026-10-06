@@ -173,7 +173,10 @@ button { font-family: inherit; cursor: pointer; }
 }
 .ha-switch-row.is-disabled { cursor: not-allowed; opacity: .5; }
 .ha-switch-label {
-    flex: 1; -webkit-flex: 1;
+    /* v1.2.53：不再 `flex:1` 撑满整行 —— 原来标签吃掉全部剩余宽度，把轨道顶到最右，
+       开关与文字隔着一整行空白（用户报的「样式错乱」）。
+       改成「按内容宽度、空间不足才收缩」，轨道就紧跟在文字后面（间距由行的 gap:12px 给）。 */
+    flex: 0 1 auto; -webkit-flex: 0 1 auto;
     min-width: 0; -webkit-min-width: 0;
     font-size: 13px;
     color: var(--ha-text);
@@ -204,6 +207,48 @@ button { font-family: inherit; cursor: pointer; }
 .ha-switch.is-on::after { transform: translateX(18px); -webkit-transform: translateX(18px); }
 /* 禁用态：整行半透明由 .ha-switch-row.is-disabled 管，这里只补「轨道不该是手型」 */
 .ha-switch-row.is-disabled .ha-switch { cursor: not-allowed; }
+
+/* ---------- 折叠分组（v1.2.53，通用轮子）----------
+   后台「系统设置」按主题分成若干组（基本信息 / 群聊 / 游客、存储 / 系统与维护），
+   每组可点标题展开收起 —— 表单项一多时不用拖长条滚动找。
+   结构（与开关一样，前后台与插件共用）：
+     <div class="ha-fold is-open">
+       <div class="ha-fold-hd" onclick="...">标题<span class="ha-fold-arrow">▸</span></div>
+       <div class="ha-fold-bd">…内容…</div>
+     </div>
+   展开状态由 is-open 表达（**不用** :nth-child / 内联样式）。 */
+.ha-fold {
+    border: 1px solid var(--ha-border);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    background: #FFFFFF;
+    overflow: hidden;
+}
+.ha-fold-hd {
+    display: flex; display: -webkit-flex;
+    align-items: center; -webkit-align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ha-text-title);
+    cursor: pointer;
+    user-select: none; -webkit-user-select: none;
+}
+.ha-fold-hd:hover { background: var(--ha-bg-sub); }
+.ha-fold-arrow {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--ha-text-sub);
+    transition: transform .2s; -webkit-transition: transform .2s;
+}
+.ha-fold.is-open .ha-fold-arrow { transform: rotate(90deg); -webkit-transform: rotate(90deg); }
+.ha-fold-bd {
+    display: none;
+    padding: 12px;
+    border-top: 1px solid var(--ha-border);
+}
+.ha-fold.is-open .ha-fold-bd { display: block; }
 .ha-switch-hint {
     flex-basis: 100%; -webkit-flex-basis: 100%;
     margin: -6px 0 0;                     /* 紧贴开关行，不额外撑高 */
@@ -212,8 +257,10 @@ button { font-family: inherit; cursor: pointer; }
     line-height: 1.5;
 }
 /* 提示要换行到下一行：把行改成可换行容器，标签与开关保持一行 */
+/* v1.2.53：删掉 `.ha-switch-row > .ha-switch { margin-left:auto }`。
+   它和上面的 flex:1 是同一套「轨道靠右」设计，用户要求开关紧跟文字后一并去掉。
+   行的 gap:12px 已经保证文字与轨道的间距。hint 依旧 flex-basis:100% 换行到下一行。 */
 .ha-switch-row { flex-wrap: wrap; -webkit-flex-wrap: wrap; }
-.ha-switch-row > .ha-switch { margin-left: auto; -webkit-margin-left: auto; }
 /* 无障碍：键盘可达。原生 checkbox 视觉隐藏但保留在 DOM 与 tab 序列里 */
 .ha-switch-input { position: absolute; opacity: 0; width: 0; height: 0; }
 .ha-switch-input:focus-visible + .ha-switch { outline: 2px solid var(--ha-primary-strong); outline-offset: 2px; }
