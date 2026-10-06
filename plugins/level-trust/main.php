@@ -982,6 +982,32 @@ Plugin::page('level', '等级', function (array $actor, $user = null) {
     }
     $h .= '</div>';
 
+    /* ---------- 阶段总览（v1.2.59）---------- */
+    $b = haLTStageBounds();
+    $gm = haLTStageGm();
+    $stageDefs = [
+        [1, '新手阶段', 1, $b[0] - 1],
+        [2, '日常阶段', $b[0], $b[1] - 1],
+        [3, '活跃阶段', $b[1], $b[2] - 1],
+        [4, '核心阶段', $b[2], $b[3] - 1],
+        [5, '荣誉阶段', $b[3], 0],
+    ];
+    $h .= '<div class="ha-card"><h3 class="ha-lv-h3">阶段总览</h3>'
+        . '<div class="ha-lv-stages"><div class="ha-lv-stage-connector"></div>';
+    foreach ($stageDefs as $sd) {
+        $sno = $sd[0];
+        $isCur = $stageNo === $sno;
+        $isPast = $stageNo > $sno;
+        $cls = 'ha-lv-stage-item' . ($isCur ? ' is-cur' : ($isPast ? ' is-past' : ' is-future'));
+        $range = $sd[3] > 0 ? ($sd[2] === $sd[3] ? (string)$sd[2] : ($sd[2] . '~' . $sd[3])) : ($sd[2] . ' 及以上');
+        $h .= '<div class="' . $cls . '" style="--stage-color:' . haLTStageColor($sno) . '">'
+            . '<div class="ha-lv-stage-dot-wrap"><div class="ha-lv-stage-dot"></div></div>'
+            . '<div class="ha-lv-stage-name">' . Sec::e($sd[1]) . '</div>'
+            . '<div class="ha-lv-stage-range">Lv.' . Sec::e($range) . '</div>'
+            . '</div>';
+    }
+    $h .= '</div></div>';
+
     /* ---------- 今日任务 ---------- */
     if ($isUser) {
         $h .= '<div class="ha-card"><h3 class="ha-lv-h3">今日任务</h3>';
@@ -1035,8 +1061,6 @@ Plugin::page('level', '等级', function (array $actor, $user = null) {
         . '</div>';
 
     /* ---------- 各等级条件一览 ---------- */
-    $b = haLTStageBounds();
-    $gm = haLTStageGm();
     $h .= '<div class="ha-card"><h3 class="ha-lv-h3">各阶段任务一览</h3><table class="ha-lv-table">'
         . '<tr><th>阶段</th><th>等级</th><th>保底任务</th><th>挑战任务</th></tr>';
     $defs = [

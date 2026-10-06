@@ -98,10 +98,59 @@
 .ha-lv-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 .ha-lv-yes { color: #237804; font-weight: 700; }
 .ha-lv-no { color: #C4C8CE; }
+
+/* ---------- 阶段总览（v1.2.59）---------- */
+.ha-lv-stages {
+    display: flex; display: -webkit-flex;
+    justify-content: space-between; -webkit-justify-content: space-between;
+    position: relative;
+    margin-top: 8px;
+}
+.ha-lv-stage-connector {
+    position: absolute;
+    top: 16px; left: 8%; right: 8%; height: 2px;
+    background: var(--ha-border);
+    z-index: 0;
+}
+.ha-lv-stage-item {
+    flex: 1; text-align: center;
+    position: relative; z-index: 1;
+    padding: 0 2px;
+}
+.ha-lv-stage-dot-wrap {
+    height: 32px;
+    display: flex; display: -webkit-flex;
+    align-items: center; -webkit-align-items: center;
+    justify-content: center; -webkit-justify-content: center;
+}
+.ha-lv-stage-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--stage-color, #9AA5B1);
+    box-shadow: 0 0 0 2px #FFFFFF;
+}
+.ha-lv-stage-item.is-cur .ha-lv-stage-dot {
+    width: 18px; height: 18px;
+    box-shadow: 0 0 0 3px #FFFFFF, 0 0 0 5px var(--stage-color, #9AA5B1);
+}
+.ha-lv-stage-item.is-future .ha-lv-stage-dot {
+    background: #FFFFFF;
+    box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 3px var(--stage-color, #9AA5B1);
+}
+.ha-lv-stage-name { font-size: 13px; color: var(--ha-text-title); line-height: 1.4; }
+.ha-lv-stage-item.is-future .ha-lv-stage-name,
+.ha-lv-stage-item.is-past .ha-lv-stage-name { color: var(--ha-text-sub); }
+.ha-lv-stage-item.is-cur .ha-lv-stage-name { font-weight: 700; color: var(--ha-text-title); }
+.ha-lv-stage-range { font-size: 11px; color: var(--ha-text-sub); margin-top: 2px; }
 @media (max-width: 640px) {
     /* 窄屏表格横向滚动，不硬压列宽（压了中文会挤成两行更难读） */
     .ha-lv-card-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .ha-lv-task-k { width: 96px; }
+    .ha-lv-stage-connector { top: 13px; left: 4%; right: 4%; }
+    .ha-lv-stage-dot-wrap { height: 26px; }
+    .ha-lv-stage-dot { width: 10px; height: 10px; }
+    .ha-lv-stage-item.is-cur .ha-lv-stage-dot { width: 16px; height: 16px; }
+    .ha-lv-stage-name { font-size: 12px; }
+    .ha-lv-stage-range { font-size: 10px; }
 }
 
 /* 资料卡里的等级行：整行可点 */
