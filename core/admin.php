@@ -384,7 +384,14 @@ class Admin
 
             // ---------- 插件管理 ----------
             case 'admin_plugins':
-                Api::json(['ok' => true, 'data' => Plugin::listAll()]);
+                // v1.2.57：额外下发**已注册后台页的 slug 清单**，供列表点标题直达。
+                // 只给数量（listAll 的 pages）不够：那只是「注册了几个」，
+                // 而 slug 由插件自定（惯例等于目录名，但不强制）——以注册表为准最稳。
+                Api::json([
+                    'ok'          => true,
+                    'data'        => Plugin::listAll(),
+                    'admin_pages' => array_keys(Plugin::adminPages()),
+                ]);
 
             case 'admin_plugin_toggle':
                 Plugin::toggle($p('name'), $p('enabled') === '1');

@@ -1309,13 +1309,14 @@ function renderAdmin(array $actor): void
         . ($pluginPages ? '<span class="ha-admin-tog">' . ow_icon('chevron', 14) . '</span>' : '')
         . '</li>';
     foreach ($pluginPages as $slug => $pg) {
+        // v1.2.57：子菜单不再重复放 puzzle 图标 —— 每个插件都是同一个图标，
+        // 一排下来像一串无意义的方块，去掉后名称更清爽（缩进 padding-left:34px 不变，
+        // 仍与父级「插件管理」的文字起始位置对齐）。
         $pluginMenu .= '<li class="ha-admin-sub" data-apage="plugin:' . Sec::e($slug) . '">'
-            . '<span class="ha-admin-ico">' . ow_icon('puzzle', 14) . '</span>'
             . '<span class="ha-admin-label">' . Sec::e($pg['title']) . '</span></li>';
     }
     foreach ($offPlugins as $offName) {
         $pluginMenu .= '<li class="ha-admin-sub ha-admin-off" data-apage="plugin:' . Sec::e($offName) . '">'
-            . '<span class="ha-admin-ico">' . ow_icon('puzzle', 14) . '</span>'
             . '<span class="ha-admin-label">' . Sec::e($offName) . '（未启用）</span></li>';
     }
     // ⚠️ 同 renderChat()：标记「合并资源已输出」，阻止插件在 page.footer 里再补一份

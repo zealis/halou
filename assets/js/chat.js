@@ -4840,10 +4840,19 @@
                         + '<button type="button" class="ha-btn ha-btn-primary" style="margin-left:auto" onclick="HaAdmin.pluginInstall()">上传安装</button>'
                         + '</div>'
                         + '<div class="ha-plugin-list">';
+                    // v1.2.57：点标题直达该插件的后台页。
+                    // 条件：已启用 **且** slug 在服务端下发的 admin_pages 清单里
+                    // ——没后台页的插件（如 signature）保持普通文字，不给「点了没反应」的假链接。
+                    var slugs = r.admin_pages || [];
                     for (var i = 0; i < r.data.length; i++) {
                         var d = r.data[i];
+                        var canOpen = d.enabled && slugs.indexOf(d.id) >= 0;
                         h += '<div class="ha-plugin-card">'
-                           + '<div class="ha-plugin-head"><b>' + esc(d.name) + '</b>'
+                           + '<div class="ha-plugin-head">'
+                           + (canOpen
+                               ? '<b class="ha-plugin-title-link" title="打开「' + esc(d.name) + '」设置页"'
+                                 + ' onclick="HaAdmin.pluginOpen(\'' + esc(d.id) + '\')">' + esc(d.name) + '</b>'
+                               : '<b>' + esc(d.name) + '</b>')
                            + (d.enabled ? '<span class="ha-tag ha-tag-green">启用</span>' : '<span class="ha-tag ha-tag-guest">未启用</span>') + '</div>'
                            + '<div class="ha-plugin-meta">' + esc(d.id) + ' · v' + esc(d.version) + ' · ' + esc(d.source || '本地')
                            // 计划任务数放在最前：它是「这个插件会自己在后台动什么」的规模指标，
@@ -5349,6 +5358,15 @@
         /* ---------- 其他动作（banAdd/banDel 已随 v1.0.52 剥离为插件 ban-manager；
            wordAdd/wordToggle/wordDel 已随 v1.0.104 剥离为插件 sensitive-words） ---------- */
         /* 系统公告管理（v1.0.102）已随公告剥离为 announcements 插件 */
+        /**
+         * 插件列表 → 点标题直达插件后台页（v1.2.57）。
+         * 走菜单同一套分发（'plugin:<slug>'），不另写一套渲染逻辑；
+         * 只有服务端确认注册过后台页的插件才会出现可点标题（见 plugins 页）。
+         */
+        pluginOpen: function (id) {
+            if (!id) return;
+            this.page('plugin:' + id);
+        },
         pluginToggle: function (name, en) {
             HaApi.post('admin_plugin_toggle', { name: name, enabled: en }, function (r) {
                 toast(r.msg);
