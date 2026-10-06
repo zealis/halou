@@ -99,15 +99,27 @@
      * 开关（State 按钮）HTML 生成器 —— 通用样式轮子（v1.1.5）。
      *
      * 前后台与插件共用同一套结构与样式，勿各处手写：
-     *   <label class="ha-switch-row">
-     *     <input type="checkbox" class="ha-switch-input" id="...">   ← 真实状态载体，可被表单直接读取
+     *   <div class="ha-switch-row">
      *     <span class="ha-switch-label">标签文字</span>
-     *     <span class="ha-switch is-on"></span>                        ← 视觉轨道
+     *     <input type="checkbox" class="ha-switch-input" id="...">   ← 真实状态载体，可被表单直接读取
+     *     <label class="ha-switch is-on" for="..."></label>            ← 视觉轨道（唯一可点区域）
      *     <p class="ha-switch-hint">提示文字（可省略）</p>
-     *   </label>
+     *   </div>
      *
-     * 用原生 checkbox 承载状态：可被 FormData 收集、可 Tab 聚焦、点击整行都能切换，
-     * 视觉完全交给 .ha-switch，不需要额外同步逻辑。
+     * 用原生 checkbox 承载状态：可被 FormData 收集、可 Tab 聚焦，
+     * 视觉完全交给 .ha-switch（bindSwitches 只做 class 同步）。
+     *
+     * v1.2.52：⚠️ **只有 .ha-switch（轨道本身）可点**。
+     *   之前整行是 `<label for=id>` —— 浏览器原生行为会让「点击行内任何位置
+     *   （标签文字、右边空白、甚至 hint）」都切换开关，与「看起来只有那个
+     *   44×26 的轨道能点」的预期不符：用户想在空白处点一下什么也不做，却把开关拨了。
+     *   现在行容器改成 div（不再关联 for），for 只挂在轨道上：
+     *     · 点轨道 → 切换（label for 生效）
+     *     · 点文字 / 行空白 / hint → 无反应
+     *     · 键盘：Tab 到 checkbox + 空格仍可切换（focus-visible 描边靠
+     *       `.ha-switch-input:focus-visible + .ha-switch`，所以 input 必须**紧跟在轨道之前**）
+     *   改结构时千万别把 input 挪进 .ha-switch 里面 —— 上面那条相邻选择器会失效，
+     *   而旧内核不支持 :has()，没有等价写法。
      *
      * @param {string} id      input 的 id，绑定与读取都用它
      * @param {string} label   左侧标签文字
@@ -116,12 +128,12 @@
      * @param {boolean} [disabled] 是否禁用
      */
     function switchHtml(id, label, on, hint, disabled) {
-        return '<label class="ha-switch-row' + (disabled ? ' is-disabled' : '') + '" for="' + esc(id) + '">'
-            + '<input type="checkbox" class="ha-switch-input" id="' + esc(id) + '"' + (on ? ' checked' : '') + (disabled ? ' disabled' : '') + '>'
+        return '<div class="ha-switch-row' + (disabled ? ' is-disabled' : '') + '">'
             + '<span class="ha-switch-label">' + esc(label) + '</span>'
-            + '<span class="ha-switch' + (on ? ' is-on' : '') + '"></span>'
+            + '<input type="checkbox" class="ha-switch-input" id="' + esc(id) + '"' + (on ? ' checked' : '') + (disabled ? ' disabled' : '') + '>'
+            + '<label class="ha-switch' + (on ? ' is-on' : '') + '" for="' + esc(id) + '"></label>'
             + (hint ? '<p class="ha-switch-hint">' + esc(hint) + '</p>' : '')
-            + '</label>';
+            + '</div>';
     }
 
     /* ==================================================================
@@ -4922,19 +4934,23 @@
             settings: function (main) {
                 HaApi.post('admin_settings_get', {}, function (r) {
                     var d = r.data;
-                    function sel(k, opts) {
-                        var h = '<select class="ha-input" id="haS_' + k + '">';
-                        for (var v in opts) h += '<option value="' + v + '"' + (d[k] === v ? ' selected' : '') + '>' + opts[v] + '</option>';
-                        return h + '</select>';
+                    /* v1.2.52：布尔类设置全部改用通用开关轮子（原来是一排下拉）。
+                       d[k] 是 DB setting 的字符串 '1'/'0'；缺键时用与 core/db.php
+                       DB::defaults 一致的默认值，避免「库里没值 → 开关显示关、实际按默认开」。
+                       ⚠️ debug_mode 默认必须给 '0'：它不在 defaults 里（后端读
+                       DB::setting('debug_mode','0')），而旧的下拉把「开启」写在第一项，
+                       缺键时浏览器会选中第一项 → 显示「开启」但实际是关的。 */
+                    function sw(k, label, def) {
+                        var v = (d[k] === undefined || d[k] === null || d[k] === '') ? def : d[k];
+                        return '<div class="ha-form-item" style="flex:1;min-width:240px">'
+                            + switchHtml('haS_' + k, label, v === '1') + '</div>';
                     }
+                    function swRow(items) { return '<div class="ha-form-row">' + items + '</div>'; }
                     main.innerHTML = '<h2>系统设置</h2><p class="ha-admin-desc">站点、注册控制、游客与发言限制、存储方式。</p><div class="ha-card">'
                         + '<div class="ha-form-item"><label>站点名称</label><input class="ha-input" id="haS_site_name" value="' + esc(d.site_name || '') + '"></div>'
                         + '<div class="ha-form-item"><label>固定网站地址</label><input class="ha-input" id="haS_site_url" value="' + esc(d.site_url || '') + '" placeholder="留空自动识别"></div>'
-                        + '<div class="ha-form-row">'
-                        + '<div class="ha-form-item"><label>开放注册</label>' + sel('allow_register', { '1': '开放', '0': '关闭' }) + '</div>'
-                        + '<div class="ha-form-item"><label>注册需邮箱验证</label>' + sel('reg_email_verify', { '1': '需要', '0': '不需要' }) + '</div>'
-                        + '<div class="ha-form-item"><label>游客可浏览</label>' + sel('guest_browse', { '1': '允许', '0': '禁止' }) + '</div>'
-                        + '<div class="ha-form-item"><label>游客可发言</label>' + sel('guest_chat', { '1': '允许', '0': '禁止' }) + '</div>'
+                        + swRow(sw('allow_register', '开放注册', '1') + sw('reg_email_verify', '注册需邮箱验证', '1')
+                              + sw('guest_browse', '游客可浏览', '1') + sw('guest_chat', '游客可发言', '1'))
                         + '</div><div class="ha-form-row">'
                         + '<div class="ha-form-item"><label>游客发言间隔(秒)</label><input class="ha-input" id="haS_guest_msg_interval" value="' + esc(d.guest_msg_interval || '30') + '"></div>'
                         + '<div class="ha-form-item"><label>发言频率窗口(秒)</label><input class="ha-input" id="haS_msg_rate_window" value="' + esc(d.msg_rate_window || '10') + '"></div>'
@@ -4954,13 +4970,9 @@
                         //   三项已移入**附件上传插件**的后台页（插件管理 → 附件上传），
                         //   核心设置页不再出现，也不再读这三个键。
                         + '<p style="font-size:12px;color:#5C5C5C;margin-bottom:12px">登录保护：验证码填错也计入失败次数（保证锁定可达），锁定按「账号+IP」记录，成功后清零。全部填 0 表示关闭对应保护。</p>'
-                        + '<div class="ha-form-row">'
-                        + '<div class="ha-form-item"><label>允许用户创建群聊</label>' + sel('room_create_allow', { '1': '允许', '0': '仅管理员' }) + '</div>'
-                        + '</div>'
+                        + swRow(sw('room_create_allow', '允许用户创建群聊', '1') + sw('room_private_create_allow', '允许用户创建仅邀请群聊', '1'))
                         // v1.1.14 仅邀请群总闸：与「允许用户创建群聊」正交 ——
                         // 那个管能不能建群，这个管建出来的群能不能藏起来。
-                        + '<div class="ha-form-item"><label>允许用户创建仅邀请群聊</label>'
-                        + sel('room_private_create_allow', { '1': '允许', '0': '仅管理员' }) + '</div>'
                         + '<p style="font-size:12px;color:#5C5C5C;margin-bottom:12px">创建群聊：填 0 表示免费创建；管理员创建始终免费。用户创建的群聊 owner 归属创建者，可在群聊管理中调整。<br>'
                         // v1.1.18：这里原本写「只能创建普通群聊」，指的是**公开性**
                         // （is_public），不是房间类型，已改为「公开群聊」。
@@ -4971,13 +4983,16 @@
                         + '<div class="ha-form-item"><label>消息服务器保留期(天)</label><input class="ha-input" id="haS_msg_retain_days" value="' + esc(d.msg_retain_days || '90') + '"></div>'
                         + '<p style="font-size:12px;color:#5C5C5C;margin:4px 0 12px">超过本期限的消息会被<b>物理删除</b>，其附件文件（uploads/file/）一并删除，<b>删除后无法恢复</b>。默认 90 天（约三个月）。填 0 表示永久保留。<br>'
                         + '「<b>删除</b>」只在本机生效（仅你看不到，别人照常看得到）；「<b>撤回</b>」才是全局删除，所有人都不再显示且不可恢复。</p>'
-                        + '<div class="ha-form-item"><label>新消息提示音默认</label>' + sel('sound_default', { '1': '开', '0': '关' }) + '</div>'
-                        // v1.2.51 调试模式：排错开关，默认关
-                        + '<div class="ha-form-item"><label>调试模式</label>' + sel('debug_mode', { '1': '开启', '0': '关闭' }) + '</div>'
+                        + swRow(sw('sound_default', '新消息提示音默认', '1')
+                              // v1.2.51 调试模式：排错开关，默认关（后端 DB::setting 默认也是 0）
+                              + sw('debug_mode', '调试模式', '0'))
                         + '<p style="font-size:12px;color:#B06000;background:#FFF6E5;border:1px solid #FFE1B0;border-radius:4px;padding:8px 10px;margin:4px 0 12px">'
                         + '开启后记录 debug 级日志、出错页显示详细报错。仅用于排错，用完请及时关闭 —— 报错细节可能暴露路径、SQL 与配置信息。<br>'
                         + '日志文件：data/logs/debug.log（页面报错实时显示；接口请求只落日志、不回显，避免破坏前端数据）。</p>'
                         + '<button class="ha-btn ha-btn-primary" onclick="HaAdmin.settingsSave()">保存设置</button></div>';
+                    // 开关视觉同步（is-on 类）：新增 DOM 后必须调，轨道才有开/关配色
+                    bindSwitches(main);
+                    if (w.HaTip && typeof w.HaTip.scan === 'function') w.HaTip.scan(main);
                 });
             },
             /* 禁言管理自 v1.0.52 起剥离为插件 ban-manager，页面与交互见 plugins/ban-manager/ */
@@ -5313,13 +5328,20 @@
             HaApi.upload('admin_plugin_install', f.files[0], {}, function (r) { toast(r.msg); if (r.ok) HaAdmin.page('plugins'); });
         },
         settingsSave: function () {
+            /** 开关取值：checked → '1'/'0'；元素不存在 → ''（后端跳过该键） */
+            function swv(id) {
+                var el = $(id);
+                return el ? (el.checked ? '1' : '0') : '';
+            }
             HaApi.post('admin_settings_save', {
                 site_name: $('haS_site_name').value,
                 site_url: $('haS_site_url') ? $('haS_site_url').value : '',
-                allow_register: $('haS_allow_register').value,
-                reg_email_verify: $('haS_reg_email_verify').value,
-                guest_browse: $('haS_guest_browse').value,
-                guest_chat: $('haS_guest_chat').value,
+                // v1.2.52：布尔项已从下拉改成开关（原生 checkbox）→ 读 checked 转成 '1'/'0'。
+                // 沿用原来的「元素不存在时给空串」写法：空串后端会跳过该键（不写库）。
+                allow_register: swv('haS_allow_register'),
+                reg_email_verify: swv('haS_reg_email_verify'),
+                guest_browse: swv('haS_guest_browse'),
+                guest_chat: swv('haS_guest_chat'),
                 guest_msg_interval: $('haS_guest_msg_interval') ? $('haS_guest_msg_interval').value : '',
                 // v1.2.2 消息服务器保留期（天），0 = 永久保留
                 msg_retain_days: $('haS_msg_retain_days') ? $('haS_msg_retain_days').value : '',
@@ -5328,14 +5350,14 @@
                 mail_rate_limit: $('haS_mail_rate_limit').value,
                 room_pass_ttl: $('haS_room_pass_ttl') ? $('haS_room_pass_ttl').value : '',
                 min_register_age: $('haS_min_register_age') ? $('haS_min_register_age').value : '',
-                room_create_allow: $('haS_room_create_allow') ? $('haS_room_create_allow').value : '',
-                room_private_create_allow: $('haS_room_private_create_allow') ? $('haS_room_private_create_allow').value : '',
+                room_create_allow: swv('haS_room_create_allow'),
+                room_private_create_allow: swv('haS_room_private_create_allow'),
                 login_fail_captcha: $('haS_login_fail_captcha') ? $('haS_login_fail_captcha').value : '',
                 login_fail_lock: $('haS_login_fail_lock') ? $('haS_login_fail_lock').value : '',
                 login_lock_minutes: $('haS_login_lock_minutes') ? $('haS_login_lock_minutes').value : '',
-                sound_default: $('haS_sound_default').value,
-                // v1.2.51 调试模式
-                debug_mode: $('haS_debug_mode') ? $('haS_debug_mode').value : ''
+                sound_default: swv('haS_sound_default'),
+                // v1.2.51 调试模式（v1.2.52 起也是开关）
+                debug_mode: swv('haS_debug_mode')
             }, function (r) { toast(r.msg); });
         }
     };

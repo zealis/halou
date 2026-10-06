@@ -112,13 +112,14 @@ $crGuard = function (array $ctx): void {
 Plugin::adminPage('content-report', '内容举报', function () {
     $cfg = haCRGetConfig();
     // 开关 HTML（与核心 switchHtml 结构一致，由 admin.js 调 bindSwitches 绑定视觉同步）
+    // v1.2.52：行容器改成 div、for 只挂轨道 —— 与核心同款修复（点文字/空白不再误切换）
     $sw = function (string $id, string $label, bool $on, string $hint = ''): string {
-        return '<label class="ha-switch-row" for="' . Sec::e($id) . '">'
-            . '<input type="checkbox" class="ha-switch-input" id="' . Sec::e($id) . '"' . ($on ? ' checked' : '') . '>'
+        return '<div class="ha-switch-row">'
             . '<span class="ha-switch-label">' . Sec::e($label) . '</span>'
-            . '<span class="ha-switch' . ($on ? ' is-on' : '') . '"></span>'
+            . '<input type="checkbox" class="ha-switch-input" id="' . Sec::e($id) . '"' . ($on ? ' checked' : '') . '>'
+            . '<label class="ha-switch' . ($on ? ' is-on' : '') . '" for="' . Sec::e($id) . '"></label>'
             . ($hint ? '<p class="ha-switch-hint">' . Sec::e($hint) . '</p>' : '')
-            . '</label>';
+            . '</div>';
     };
     $h = '<h2>内容举报</h2><p class="ha-admin-desc">前台用户可通过头像右键菜单或资料卡举报他人，后台可在此配置举报规则并处理举报记录。</p>'
         // ---- 配置区 ----

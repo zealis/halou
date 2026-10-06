@@ -165,7 +165,9 @@ button { font-family: inherit; cursor: pointer; }
     gap: 12px;
     margin-bottom: 14px;
     min-height: 30px;      /* 与 .ha-input 的 9px*2+1px*2+14 ≈ 35px 视觉对齐 */
-    cursor: pointer;
+    /* v1.2.52：整行**不可点**（cursor 默认）。行容器已从 <label for> 改成 div，
+       点击只有 .ha-switch 轨道生效 —— 指针形态必须跟着改，否则「看着能点、点了没反应」。 */
+    cursor: default;
     user-select: none; -webkit-user-select: none;
     font-size: 13px;       /* 同为覆盖 .ha-form-item label 的继承值 */
 }
@@ -181,6 +183,8 @@ button { font-family: inherit; cursor: pointer; }
     /* 尺寸参照 iOS 风格开关：轨道 44×26，滑块 22，位移 18 */
     position: relative;
     flex-shrink: 0; -webkit-flex-shrink: 0;
+    display: inline-block;              /* v1.2.52：轨道本身是 <label>，脱离 flex 容器时也要有盒子 */
+    cursor: pointer;                    /* 只有这里是手型：唯一可点区域 */
     width: 44px; height: 26px;
     border-radius: 13px;
     background: #B8BCC2;                 /* 关：中性灰 */
@@ -198,6 +202,8 @@ button { font-family: inherit; cursor: pointer; }
 }
 .ha-switch.is-on { background: var(--ha-primary-strong); }
 .ha-switch.is-on::after { transform: translateX(18px); -webkit-transform: translateX(18px); }
+/* 禁用态：整行半透明由 .ha-switch-row.is-disabled 管，这里只补「轨道不该是手型」 */
+.ha-switch-row.is-disabled .ha-switch { cursor: not-allowed; }
 .ha-switch-hint {
     flex-basis: 100%; -webkit-flex-basis: 100%;
     margin: -6px 0 0;                     /* 紧贴开关行，不额外撑高 */
