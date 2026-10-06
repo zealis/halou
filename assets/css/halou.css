@@ -1716,12 +1716,17 @@ input[type=range] {
     z-index: 130;
 }
 .ha-tip-box::after {   /* 小箭头，指向 ⓘ */
-    content: ''; position: absolute; left: 50%; bottom: -5px;
+    content: ''; position: absolute;
+    /* v1.2.47：箭头位置由 HaTip.fixEdge() 实测后写入 --ha-tip-arrow（相对气泡左缘），
+       默认退回 50%（无 JS 时也能看）。用 var 就不必为每种对齐再写一套 ::after 规则。 */
+    left: var(--ha-tip-arrow, 50%);
+    bottom: -5px;
     width: 0; height: 0; margin-left: -5px;
     border-left: 5px solid transparent; border-right: 5px solid transparent;
     border-top: 5px solid #2C2C2E;
 }
 .ha-tip:hover > .ha-tip-box, .ha-tip:focus > .ha-tip-box { display: block; }
-/* 贴右边缘的表单项：气泡靠右展开，避免被视口/容器裁掉 */
-.ha-form-row > .ha-form-item:last-child .ha-tip-box { left: auto; right: -6px; -webkit-transform: none; transform: none; }
-.ha-form-row > .ha-form-item:last-child .ha-tip-box::after { left: auto; right: 12px; margin-left: 0; }
+
+/* v1.2.47：气泡宽度上限再钳一道视口 —— 窄屏（手机）下 260px 会超出屏幕。
+   min() 在老内核不生效时忽略整条，退回 halou.css 上方的 max-width:260px，不会更糟。 */
+.ha-tip-box { max-width: min(260px, calc(100vw - 32px)); }

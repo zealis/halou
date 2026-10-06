@@ -145,7 +145,87 @@
             b.setAttribute('aria-label', text);
             b.innerHTML = '<i>i</i><span class="ha-tip-box"></span>';
             b.getElementsByClassName('ha-tip-box')[0].textContent = text;
+            // v1.2.47：真正悬浮的那一刻再判一次越界方向。
+            // 必须用 addEventListener 而不是 CSS —— 气泡 display:none 时量不到宽度，
+            // 而且窗口缩放/滚动/换行后位置会变，绑一次就不准了。
+            if (b.addEventListener) {
+                b.addEventListener('mouseenter', function () { fixEdge(b); }, false);
+            }
             return b;
+        }
+
+        /* ---------- v1.2.47：气泡越界纠正 ----------
+           气泡默认 left:50% + translateX(-50%)（居中在 ⓘ 上方）。
+           ⓘ 一般在 label 文字右侧靠中间，气泡宽 max 260px，向左必然溢出容器。
+
+           之前只用 CSS `.ha-form-row > .ha-form-item:last-child` 靠右兜底，
+           但**独立 .ha-form-item（不在 .ha-form-row 里）走不到那条规则** ——
+           实测「个人设置」的「昵称」气泡 left=463、弹窗左边界 530，**左边被裁掉 67px**，
+           「第三方授权」裁掉 28px。后台多列表单同理。
+
+           为什么必须用 JS：
+             · CSS 拿不到「气泡实际宽度」（max-content 运行时才知道）；
+             · **ⓘ 徽章本身不是 14px 宽** —— label 是 display:flex，
+               .ha-tip  作为 flex 项被拉伸到整行剩余宽度（实测 240px），
+               所以任何 `left/right: %` 或 `right: -6px` 都是相对这个假宽度算的，
+               实测会得到 left=-240px → 气泡跑到 x=346，比不修还糟。
+
+           所以：mouseenter 时量一次真实尺寸，按「容器可用区」算出绝对 left，
+           写进 style.left（px），并把宽度也钳到可用宽度内。
+           · 只在 :hover 时量（display:none 时量不到尺寸）；
+           · 每次 mouseenter 重新判定 —— 窗口缩放/滚动/换行后位置会变；
+           · 写 style.left 而非加类 —— 值本来就是算出来的，类表达不了。 */
+        function fixEdge(b) {
+            var box = b && b.querySelector ? b.querySelector('.ha-tip-box') : null;
+            if (!box) return;
+            // 找最近的裁剪祖先（overflow 非 visible），它才是真正的边界
+            var edge = null, node = b.parentNode;
+            while (node && node.nodeType === 1) {
+                var ov = '';
+                try { ov = w.getComputedStyle(node).overflowX; } catch (e) { ov = ''; }
+                if (ov && ov !== 'visible') { edge = node; break; }
+                node = node.parentNode;
+            }
+            var host = edge || document.body;
+            var hb = host.getBoundingClientRect();
+            var ecs = w.getComputedStyle(host);
+            // 可用区 = 容器内容盒（扣掉 padding），气泡不该压到 padding 上
+            var availL = hb.left + (parseFloat(ecs.paddingLeft) || 0) + 4;
+            var availR = hb.right - (parseFloat(ecs.paddingRight) || 0) - 4;
+            var availW = Math.max(120, availR - availL);
+
+            // 先显示并清掉旧定位，才能量到真实宽度
+            box.style.display = 'block';
+            box.style.left = ''; box.style.right = ''; box.style.maxWidth = ''; box.style.transform = '';
+
+            var bw = box.getBoundingClientRect().width;   // max-content 实宽
+            // 气泡比可用区宽就先收窄（否则再对齐也会溢出）
+            if (bw > availW) { box.style.maxWidth = availW + 'px'; bw = availW; }
+            var bLeft = b.getBoundingClientRect().left;  // ⓘ 左缘（气泡锚点）
+            // 期望：默认左缘对齐 ⓘ，超出左边界就右移，超出右边界再回退
+            var left = bLeft;
+            if (left < availL) left = availL;
+            if (left + bw > availR) left = availR - bw;
+            if (left < availL) left = availL;
+            // 换算回相对 ⓘ 的偏移（ⓘ 是 position:relative 的定位基准）
+            box.style.left = (left - bLeft) + 'px';
+            box.style.right = 'auto';
+            box.style.transform = 'none';
+
+            // 箭头跟着对齐：指向 ⓘ 的中心（相对气泡左缘）
+            var c = bLeft + b.offsetWidth / 2 - left;   // ⓘ 中心 - 气泡左缘
+            c = Math.max(12, Math.min(c, bw - 12));     // 夹在气泡内，别跑到边上
+            box.style.setProperty('--ha-tip-arrow', c + 'px');
+
+            // 离开时清干净，避免下次内容变化/窗口缩放后沿用旧值
+            if (!b.__haTipCleanup) {
+                b.__haTipCleanup = function () {
+                    box.style.display = ''; box.style.left = ''; box.style.right = '';
+                    box.style.maxWidth = ''; box.style.transform = '';
+                    box.style.removeProperty('--ha-tip-arrow');
+                };
+                b.addEventListener('mouseleave', b.__haTipCleanup, false);
+            }
         }
 
         /**
@@ -242,7 +322,7 @@
             }).observe(w.document.body || w.document.documentElement, { childList: true, subtree: true });
         }
 
-        return { scan: scan, add: add, badge: badge };
+        return { scan: scan, add: add, badge: badge, fixEdge: fixEdge };
     })();
 
     /**
