@@ -4,6 +4,14 @@
 > 本文件由 `.tools/gen_changelog.py` 依据提交历史生成，按版本号倒序聚合，
 > 类型：**安全 / 修复 / 新增 / 改进 / 重构 / 移除**。每次发版执行该脚本即可更新。
 
+## v1.2.52（2026-10-06）：修复计划任务列表误判已启用插件为「插件未启用」
+
+- **修复**：`admin_cron_list` 用 `Plugin::crons()`（仅本请求加载过 `main.php` 的插件才入册）判定 `plugin_active`，
+  按需加载下独立的 list 请求把已启用插件误判为「插件未启用」，与 `runCron` 实际能成功执行相互矛盾。
+  改为以 `plugins` 表 `enabled` 为准（新增 `Plugin::enabledPlugins()` 暴露 `self::$order`，与 `runCron` 同源判定），
+  已启用插件的任务不再误显「插件未启用」，状态列与最近执行结果一致。
+  涉及 `core/admin.php` 的 `admin_cron_list`、`core/plugin.php` 新增 `enabledPlugins()`。
+
 ## v1.2.13（2026-10-04）：图片与附件取消白色底座
 
 - **改进**：`type=image` / `type=file` 消息不再套 `.ha-msg-content` 气泡，
