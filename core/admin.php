@@ -295,11 +295,13 @@ class Admin
                 // 描述不进 cron_tasks 表（插件升级改描述时不必改库），
                 // 按「插件::任务名」从注册表补齐；插件停用时注册表无条目，描述留空。
                 $desc = [];
-                $active = [];
                 foreach (Plugin::crons() as $t) {
                     $desc[$t['plugin'] . '::' . $t['name']] = (string)$t['description'];
-                    $active[$t['plugin']] = true;
                 }
+                // 「插件是否启用」以 plugins 表的 enabled 为准（与 runCron 同源），
+                // 不能依赖本请求是否恰好加载过该插件 main.php（按需加载下 list 请求通常不加载，
+                // 会让已启用插件被误判为「插件未启用」）。plugin 为空串表示核心任务，恒视为激活。
+                $enabledPlugins = array_flip(Plugin::enabledPlugins());
                 $rows = DB::all('SELECT * FROM cron_tasks ORDER BY enabled DESC, next_run_at ASC');
                 $now = time();
                 foreach ($rows as &$r) {
@@ -307,7 +309,7 @@ class Admin
                     $r['description'] = $desc[$key] ?? '';
                     // 停用插件的任务仍在表里，但每次执行都会被跳过 →
                     // 对它显示「启用」按钮是误导，前端据此隐藏启停开关。
-                    $r['plugin_active'] = ($r['plugin'] === '') || isset($active[$r['plugin']]);
+                    $r['plugin_active'] = ($r['plugin'] === '') || isset($enabledPlugins[$r['plugin']]);
                     $r['interval_text'] = Admin::intervalText((int)$r['interval']);
                     $r['next_run_text'] = (int)$r['next_run_at'] > 0
                         ? date('Y-m-d H:i:s', (int)$r['next_run_at']) : '—';

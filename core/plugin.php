@@ -352,6 +352,17 @@ class Plugin
     }
 
     /**
+     * 当前已启用（且已安装）的插件名集合，供后台判断「插件是否启用」等场景。
+     * 与 runCron 的判定同源（plugins 表 enabled=1），不依赖本请求是否恰好加载过该插件 main.php——
+     * 按需加载下，独立的 admin_cron_list 请求通常不会去 loadPlugin 插件，
+     * 若用 self::$crons 判定会误把已启用插件认成「未启用」。
+     */
+    public static function enabledPlugins(): array
+    {
+        return self::$order;
+    }
+
+    /**
      * 把已加载插件注册的计划任务同步进 cron_tasks 表。
      *
      * 只在「新增或间隔变化」时改 next_run_at —— 否则每次请求都会把到期时间往后推，
