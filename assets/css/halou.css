@@ -1689,8 +1689,10 @@ input[type=range] {
    插件无需任何改动（按约定写 12px 灰色说明段落即可被自动收走）。
 
    ⚠️ 气泡用纯 CSS 悬浮显示（不靠 JS 算位置）：跟随滚动/缩放不会错位，
-      老内核也不依赖。另外 badge 同时写了 title 属性做兜底 ——
-      万一某个父容器 overflow:hidden 把气泡裁了，浏览器原生提示仍能看。 */
+      老内核也不依赖。
+   v1.2.49：**不再写 title 兜底** —— 兜底与正式气泡同存会导致屏幕上出现两个提示
+      （原生框 + 深灰气泡），鼠标移开还在。越界问题已由 v1.2.48 的
+      HaTip.fixEdge() 实测容器边界解决，不需要原生提示兜底。 */
 .ha-form-label-tip { display: flex !important; align-items: center; gap: 2px; }
 .ha-tip {
     position: relative;

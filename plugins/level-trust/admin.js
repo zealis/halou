@@ -21,9 +21,19 @@
             .replace(/"/g, '&quot;');
     }
     function taskName(k) { return LABEL[k] || k; }
+    /**
+     * 一行「标签 : 值」。
+     * @param {string} k  标签（纯文本，转义）
+     * @param {string} v  值。**若已是 HTML 片段会原样输出**，纯文本请自行先 esc()。
+     *   v1.2.49 改签名：以前这里统一 esc(v)，结果把 HaLevel.badge() 返回的
+     *   HTML 片段（<span class="ha-lt-badge">Lv.N</span>）转义成纯文本，
+     *   后台等级查询里直接打印出标签源码（用户报的 bug）。
+     *   现在与项目其它地方的口径一致：**默认按 HTML 输出，调用方自己转义纯文本**。
+     *   本文件内所有调用点的纯文本都已显式套 esc()。
+     */
     function row(k, v) {
         return '<div class="ha-card-meta-row"><span class="ha-card-meta-k">' + esc(k)
-            + '</span><span class="ha-card-meta-v">' + esc(v) + '</span></div>';
+            + '</span><span class="ha-card-meta-v">' + (v == null ? '' : v) + '</span></div>';
     }
 
     /* ================= 概览 ================= */
@@ -131,8 +141,10 @@
                 if (!r.ok) { box.innerHTML = '<p class="ha-panel-empty">' + esc(r.msg) + '</p>'; return; }
 
                 var html = '<div class="ha-card-meta" style="border-top:0;padding-top:0">'
-                    + row('用户', r.nickname + '（ID ' + r.uid + '）' + (r.role === 'admin' ? ' · 超级管理员' : ''))
-                    + row('等级', (w.HaLevel ? w.HaLevel.badge(r.level) : 'Lv.' + r.level) + ' ' + esc(r.stage))
+                    // ⚠️ nickname 是**用户自己设的**，必须转义 —— row() 现在按 HTML 输出。
+                    // 昵称含 < > & 时不转义就是存储型 XSS（后台管理员打开这页即中招）。
+                    + row('用户', esc(r.nickname) + '（ID ' + r.uid + '）' + (r.role === 'admin' ? ' · 超级管理员' : ''))
+                    + row('等级', (w.HaLevel ? w.HaLevel.badge(r.level) : esc('Lv.' + r.level)) + ' ' + esc(r.stage))
                     + row('累计完成', r.days + ' 天 · 加权 ' + r.weight + ' 天')
                     + row('登录', '连续 ' + r.login_streak + ' 天 · 累计 ' + r.login_days + ' 天')
                     + row('今日', (r.frozen ? '已冻结' : (r.settled ? '已完成并结算' : '进行中'))

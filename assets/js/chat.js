@@ -137,11 +137,21 @@
        ================================================================== */
     var HaTip = (function () {
 
-        /** 造一个圆形 ⓘ 气泡；title 兜底（万一 CSS 气泡被父级 overflow 裁掉仍能看到） */
+        /**
+         * 造一个圆形 ⓘ 气泡。
+         *
+         * v1.2.49：**不再写 title 属性**。
+         *   之前 title 是当「CSS 气泡被父级 overflow 裁掉」的兜底，
+         *   但那是 v1.2.47 之前的困境 —— 兜底和正式气泡同时存在，结果**屏幕上出现两个提示**
+         *   （浏览器原生黄/白框+ 我们的深灰气泡，鼠标移开还在，用户截图报的就是这个）。
+         *   v1.2.48 已用 fixEdge() 实测边界彻底解决裁切，兜底使命完成。
+         *
+         *   保留 aria-label：无障碍语义需要，且**不产生任何视觉提示**。
+         *   真的裁到了（fixEdge 也失效的极端情况），宁可少一个提示也不要两个。
+         */
         function badge(text) {
             var b = document.createElement('span');
             b.className = 'ha-tip';
-            b.setAttribute('title', text);
             b.setAttribute('aria-label', text);
             b.innerHTML = '<i>i</i><span class="ha-tip-box"></span>';
             b.getElementsByClassName('ha-tip-box')[0].textContent = text;
