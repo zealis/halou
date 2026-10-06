@@ -297,6 +297,8 @@ input[type=range] {
     vertical-align: middle;
 }
 .ha-tag-green { background: #f6ffed; color: var(--ha-green); border: 1px solid #b7eb8f; }
+/* v1.2.56：危险/禁用标签（与 ha-tag-green 对称；此前没有红色系标签，禁用态只能用文字） */
+.ha-tag-red { background: #FFF1F0; color: var(--ha-red); border: 1px solid #FFA39E; }
 /* 群主（v1.0.89）：浅棕底 #F4DCCA + 橙字 #F4995D；会员同理去黑字改灰字 */
 .ha-tag-owner { background: #F4DCCA; color: #F4995D; border: 1px solid #E9CDB2; }
 .ha-tag-vip { background: #fff7e6; color: var(--ha-orange); border: 1px solid #ffd591; }

@@ -182,6 +182,7 @@ class Auth
             'email_verified' => DB::setting('reg_email_verify', '1') === '1' ? 1 : 0,
             'birthdate' => $birthdate,
             'created_at' => time(),
+            'reg_ip' => Sec::ip(),   // v1.2.56 用户概览：记录注册来源 IP
         ];
         $attempts = 0;
         while (true) {
@@ -242,7 +243,8 @@ class Auth
         Sec::loginOk($key);
         session_regenerate_id(true);
         $_SESSION['uid'] = $user['id'];
-        DB::run('UPDATE users SET last_login=? WHERE id=?', [time(), $user['id']]);
+        // v1.2.56：连同最后登录 IP 一起回写（用户概览展示用）
+        DB::run('UPDATE users SET last_login=?, last_login_ip=? WHERE id=?', [time(), Sec::ip(), $user['id']]);
         Sec::log('login', $user['nickname']);
         // 登录验证完成钩子：供插件扩展两步验证、登录通知、异地提醒等。
         // $method 为本次通过验证的方式（核心仅有 password；插件实现两步验证时

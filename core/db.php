@@ -279,6 +279,10 @@ class DB
         self::addColumn('rooms', 'avatar', 'text', "''");     // 群聊头像（v1.0.76，uploads/avatar/ 下的相对路径）
         self::addColumn('users', 'points', 'int', '0');   // 用户积分
         self::addColumn('users', 'birthdate', 'varchar(10)', "''");   // 出生日期（年龄限制注册用）
+        // v1.2.56 用户概览：注册 IP 与最后登录 IP（last_login 时间戳建表时就有）。
+        // 存量用户两列为空 → 前端显示「—」；登录成功时由 Auth::login 回写 last_login_ip。
+        self::addColumn('users', 'reg_ip', 'varchar(64)', "''");
+        self::addColumn('users', 'last_login_ip', 'varchar(64)', "''");
         // v1.1.0 软删除：deleted=1 表示「已删除」。行保留（昵称/时间/IP 可审计），
         // content 同步清空（原内容不可恢复），到期由 Chat::purgeExpired() 物理删除。
         // 与 recalled（撤回）区分：撤回是用户自己的动作且不涉及合规留痕。

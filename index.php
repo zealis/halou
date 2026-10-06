@@ -196,6 +196,7 @@ if (!$installed) {
                 'avatar' => '', 'role' => 'admin',
                 'client_key' => Sec::clientKey(), 'status' => 1,
                 'email_verified' => 1, 'created_at' => time(),
+                'reg_ip' => Sec::ip(),   // v1.2.56：与 Auth::register 口径一致，记录安装者 IP
             ]);
                 @mkdir($CFG['data_dir'], 0775, true);
                 $pdo->commit();

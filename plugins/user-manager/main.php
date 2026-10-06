@@ -44,6 +44,23 @@ Plugin::route('plugin_user_manager_search', function (array $ctx) use ($umGuard)
     Api::json(['ok' => true, 'data' => $rows]);
 });
 
+/* ---------- 用户概览（v1.2.56）：详情弹窗数据 ----------
+   与 search 的区别：带 avatar / status / reg_ip / last_login_ip 等概览字段。
+   只读接口，不做任何修改 → 不进 sensitive，不消耗一次性票据。 */
+Plugin::route('plugin_user_manager_detail', function (array $ctx) use ($umGuard) {
+    $umGuard($ctx);
+    $id = (int)($ctx['post']['id'] ?? 0);
+    if ($id <= 0) Api::json(['ok' => false, 'msg' => '非法用户']);
+    $u = DB::one('SELECT id,nickname,email,role,title,status,points,avatar,created_at,reg_ip,last_login,last_login_ip
+        FROM users WHERE id=?', [$id]);
+    if (!$u) Api::json(['ok' => false, 'msg' => '用户不存在'], 404);
+    // 等级：与 search 同一口径 —— 走钩子问「等级信任」插件，-1 = 无等级体系
+    $lv = -1;
+    Plugin::fire('user.level.get', [&$lv, $id]);
+    $u['level'] = $lv;
+    Api::json(['ok' => true, 'data' => $u]);
+});
+
 /* ---------- 保存：角色 / 称号 / 积分（原 admin_user_set） ---------- */
 Plugin::route('plugin_user_manager_save', function (array $ctx) use ($umGuard) {
     $umGuard($ctx);
