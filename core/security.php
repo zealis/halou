@@ -166,7 +166,8 @@ class Sec
     {
         $w = 120; $h = 40;
         $svg = "<svg xmlns='http://www.w3.org/2000/svg' width='$w' height='$h'>"
-             . "<rect width='$w' height='$h' fill='#F5F7FA'/>";
+             // v1.2.55：底纹 #F5F7FA → #F5F5F5，与全站浅灰 --ha-bg-sub 统一
+             . "<rect width='$w' height='$h' fill='#F5F5F5'/>";
         for ($i = 0; $i < 5; $i++) {
             $x1 = random_int(0, $w); $y1 = random_int(0, $h);
             $x2 = random_int(0, $w); $y2 = random_int(0, $h);

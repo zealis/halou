@@ -78,14 +78,14 @@
 
 .ha-lv-formula {
     font-family: Menlo, Consolas, monospace; font-size: 13px;
-    background: #F5F7FA; border: 1px solid var(--ha-border);
+    background: #F5F5F5; border: 1px solid var(--ha-border);
     border-radius: 4px; padding: 10px 12px; margin-bottom: 10px;
     overflow-x: auto; -webkit-overflow-scrolling: touch;
 }
 .ha-lv-ul { margin: 0; padding-left: 20px; font-size: 13px; color: #5C5C5C; line-height: 1.9; }
 .ha-lv-tip {
     margin-top: 10px; font-size: 12px; color: var(--ha-text-sub);
-    background: #F5F7FA; border-radius: 4px; padding: 8px 10px; line-height: 1.8;
+    background: #F5F5F5; border-radius: 4px; padding: 8px 10px; line-height: 1.8;
 }
 
 .ha-lv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -93,7 +93,7 @@
     border: 1px solid var(--ha-border); padding: 7px 8px;
     text-align: left; vertical-align: top; line-height: 1.6;
 }
-.ha-lv-table th { background: #F5F7FA; font-weight: 600; color: var(--ha-text-sub); white-space: nowrap; }
+.ha-lv-table th { background: #F5F5F5; font-weight: 600; color: var(--ha-text-sub); white-space: nowrap; }
 .ha-lv-table tr.is-cur { background: #F0F8FF; }
 .ha-lv-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 .ha-lv-yes { color: #237804; font-weight: 700; }
@@ -134,7 +134,7 @@
 .ha-lt-tname { width: 76px; flex-shrink: 0; font-size: 12px; color: var(--ha-text-sub); }
 .ha-lt-tbars {
     flex: 1; height: 46px; display: flex; align-items: flex-end; gap: 2px;
-    background: #F5F7FA; border-radius: 3px; padding: 3px 4px;
+    background: #F5F5F5; border-radius: 3px; padding: 3px 4px;
 }
 .ha-lt-tbars > i {
     flex: 1; min-width: 2px; border-radius: 1px 1px 0 0; display: block;

@@ -12,12 +12,12 @@
     --ha-primary-strong: #0099FF;   /* 主色蓝（v1.0.122 调整）；实心按钮白字建议配合 hover 深蓝 #00558F 保证对比 */
     --ha-primary-dark: #00558F;     /* 悬停、选中态（白 7.79:1、浅蓝底 7.09:1） */
     --ha-bg: #FFFFFF;
-    --ha-bg-sub: #F5F7FA;
-    /* 聊天区底色（v1.1.4 抽成变量，v1.1.5 改为纯色 #F5F5F5）：
-       原先顶栏 / 消息区 / 公告条 / 输入栏 / 输入框五处各写死一份，右侧栏却用
-       --ha-bg-sub(#F5F7FA) → 与聊天区差 (7,6,5)，移动端浮层更是写死了 #EBF2ED 草绿。
-       现整个聊天界面（两侧栏 + 中间聊天 + 顶栏 + 输入区）统一引用本变量，
-       任何「与聊天区一致」的诉求都只改这一处。 */
+    --ha-bg-sub: #F5F5F5;           /* 次级底色：白卡片内的小块（表头/提示条/禁用输入框） */
+    /* v1.2.55：--ha-bg-sub 由 #F5F7FA 改为 #F5F5F5（用户定版），与聊天区底色
+       --ha-bg-chat 对齐 —— 全站只留这一档浅灰，白色卡片（「内容岛」）浮在它上面，
+       不再出现两种灰。
+       ⚠️ 副作用：本变量同时被若干 hover 复用，落在**灰底区域**（两侧栏 / 顶栏）上的
+       hover 会与底色同色而失效 —— 那些点已改用 --ha-bg-chat-hover(#EBEBEB)，见下方各处注释。 */
     --ha-bg-chat: #F5F5F5;
     --ha-bg-chat-grad: none;             /* 纯色，不需要渐变 */
     --ha-bg-chat-hover: #EBEBEB;         /* hover 反馈：略深一档的同色系灰 */
@@ -126,7 +126,8 @@ button { font-family: inherit; cursor: pointer; }
     border-radius: 6px;
     color: var(--ha-text-sub);
 }
-.ha-icon-btn:hover { background: var(--ha-bg-sub); color: var(--ha-primary-dark); }
+/* v1.2.55：顶栏底色是 --ha-bg-chat(#F5F5F5)，用 --ha-bg-sub 做 hover 会与底色同色 */
+.ha-icon-btn:hover { background: var(--ha-bg-chat-hover); color: var(--ha-primary-dark); }
 .ha-ico { vertical-align: middle; }
 
 /* ---------- 表单 ---------- */
@@ -766,7 +767,8 @@ input[type=range] {
     background: transparent; border: none; cursor: pointer;
     font-size: 14px; color: var(--ha-text-sub); border-radius: 4px;
 }
-.ha-room-more:hover { background: var(--ha-bg-sub); color: var(--ha-text); }
+/* v1.2.55：左侧栏是灰底，hover 用 --ha-bg-chat-hover 才看得见（原 --ha-bg-sub 与底色同色） */
+.ha-room-more:hover { background: var(--ha-bg-chat-hover); color: var(--ha-text); }
 /* 后台群头像预览 */
 .ha-room-avatar-btn { display: inline-block; cursor: pointer; }
 .ha-room-avatar-btn img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 1px solid var(--ha-border); display: block; }
@@ -936,7 +938,8 @@ input[type=range] {
 }
 /* 登录用户的资料区可点击（弹出操作菜单） */
 .ha-me-click { cursor: pointer; transition: background .15s; }
-.ha-me-click:hover { background: var(--ha-bg-sub); }
+/* v1.2.55：资料区在灰底侧栏里，hover 改 --ha-bg-chat-hover（原 --ha-bg-sub 与底色同色） */
+.ha-me-click:hover { background: var(--ha-bg-chat-hover); }
 .ha-me-info { min-width: 0; flex: 1; -webkit-flex: 1; }
 /* 昵称行**不换行**：头衔标签固定在昵称右侧（原来 wrap 会让标签掉到第二行） */
 .ha-me-line {
@@ -1555,7 +1558,10 @@ input[type=range] {
 .ha-admin-layout { display: flex; display: -webkit-flex; min-height: 100vh; }
 .ha-admin-side {
     width: 220px;
-    background: var(--ha-bg);
+    /* v1.2.55：与前台两侧栏（.ha-sidebar / .ha-online）同一底色 --ha-bg-chat(#F5F5F5)。
+       原来是 var(--ha-bg) 纯白 —— 前后台侧栏一白一灰，切过去像换了个站。
+       内容区保持白卡片（「内容岛」浮在灰底上），靠 1px 右边框分界，与前台同款处理。 */
+    background: var(--ha-bg-chat);
     border-right: 1px solid var(--ha-border);
     padding: 16px 12px;
     flex-shrink: 0; -webkit-flex-shrink: 0;
@@ -1576,7 +1582,9 @@ input[type=range] {
     color: var(--ha-text);
     font-size: 14px;
 }
-.ha-admin-menu li:hover { background: var(--ha-bg-sub); }
+/* v1.2.55：侧栏底色改为灰后，--ha-bg-sub(#F5F5F5) 与底色同色 → hover 看不见。
+   灰底区域上的 hover 一律用 --ha-bg-chat-hover(#EBEBEB)，比底色深一档。 */
+.ha-admin-menu li:hover { background: var(--ha-bg-chat-hover); }
 .ha-admin-menu li.active { background: var(--ha-active-bg); color: var(--ha-primary-dark); font-weight: 600; }
 .ha-admin-ico { font-size: 15px; }
 /* 菜单分类：标题占满剩余宽度，使折叠箭头贴右侧 */
