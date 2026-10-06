@@ -238,24 +238,69 @@ function haATStoreFile(array $f, ?array $actor = null): array
         $extIn = $real;
     }
 
-    $cfg = require dirname(__DIR__, 2) . '/core/config.php';
-    $dir = $cfg['upload']['dir'] . '/file/' . date('Ym');
-    if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) return [false, '无法创建上传目录'];
-    if (!is_file($dir . '/index.html')) @file_put_contents($dir . '/index.html', '');
-
-    $name = date('dHis') . '_' . bin2hex(random_bytes(8)) . '.' . $extIn;   // 随机名，杜绝穿越/覆盖
-    $dest = $dir . '/' . $name;
-    if (!move_uploaded_file($tmp, $dest)) return [false, '保存失败'];
-    @chmod($dest, 0644);
+    // v1.2.50：改走核心的「内容哈希落盘」—— 同一份文件重复上传直接引用已有副本，
+    //   不再写第二份。原来的 `date('Ym')` 月份目录 +随机名改为
+    //   `file/<哈希前2位>/<哈希前32位>.<ext>`（由 Upload::storeFile 负责）。
+    //   月份目录的旧结构仍在磁盘上，存量消息的 path 不变，无需迁移。
+    [$ok, $rel] = Upload::storeFile($tmp, $extIn);
+    if (!$ok) return [false, '保存失败'];
 
     $safeName = preg_replace('/[\\\\\/\x00-\x1F\x7F]/u', '', $orig) ?: 'file';
     return [true, [
         'name' => mb_substr($safeName, 0, 120),
         'ext'  => $extIn,
         'size' => $size,
-        'path' => 'file/' . date('Ym') . '/' . $name,
+        'path' => $rel,
         'mime' => $mime,
     ]];
+}
+
+/* ---------- v1.2.50：删除前查引用（去重的必要配套） ----------
+   去重后，同一份物理文件可能被**多条消息**共用。
+   旧实现直接 unlink —— 那时每条消息一个独立文件，删了没影响；
+   现在如果还那么删，管理员删掉 A 的附件消息，B 的同一个附件就变404 了。
+
+   所以删除前必须数一下「除本条外还有几条消息在用这个文件」，
+   为 0 才真正unlink，否则只删消息记录（这是「引用计数」，
+   不需要新建表 —— messages 里本来就有 path，直接查即可）。 */
+function haAM_refCount(string $pathOrUrl, int $excludeMsgId = 0): int
+{
+    // ⚠️ 这里**必须匹配「哈希主体」而不是完整 path**，有两个坑：
+    //
+    //  ① JSON 里斜杠被转义成 `\/` —— messages.content 存的是
+    //     {"path":"file\/8f\/8ffb...txt"}，所以拿 `file/8f/8ffb...txt`
+    //     去 LIKE 匹配 **一条都命中不了**，计数恒为 0 →
+    //     删消息时误判成「没人用这个文件」→ 把别人也在用的附件删掉。
+    //     （这是实测踩到的：ref 少算，文件被误删。）
+    //  ② 只取 basename 也不够 —— 旧存量是 `日期_16位hex`、新的是 32 位 hex，
+    //     两者长度不同但都唯一，取「去掉扩展名的文件名主体」最稳：
+    //     它不含斜杠，规避 ①；且在 JSON 里原样出现，规避转义问题。
+    //
+    //  不用 LIKE ... ESCAPE：项目里其它 LIKE 查询（Chat::search）都没用，
+    //  SQLite/MySQL/PostgreSQL 对 ESCAPE 的支持与转义写法各不相同，容易踩跨库差异。
+    //  哈希主体固定是 [0-9a-f]{32} 或 日期_hex，通配符意义为零。
+    $key = trim(str_replace('\\', '/', $pathOrUrl));
+    if ($key === '') return 0;
+    $base = basename($key);
+    $stem = preg_replace('/\.[A-Za-z0-9]{1,8}$/', '', $base) ?: $base;
+    if (!preg_match('/^[A-Za-z0-9_\-]{6,80}$/', $stem)) return 0;
+    // needle 形态：`%/<stem>.<ext>` —— 前面那个 `/` 很关键：
+    //   · 它避开 JSON 转义（content 里是 `file\/8f\/...`，斜杠被写成 `\/`，
+    //     所以**绝不能**用带 `/` 的完整 path 去匹配，一条都命中不了）；
+    //   · 它又保证前面必须是「目录分隔符」，即 stem 必须出现在路径末尾的文件名段里，
+    //     不会因为某个文件的 name 恰好等于 stem 而误计。
+    // 实测：`%8ffb25f1...%` 命中 3（对），`%"8ffb25f1...%` 命中 0（错，前导引号假设不成立）。
+    $needle = '%/' . $stem . '.%';
+
+    $n = (int)DB::val(
+        "SELECT COUNT(*) FROM messages WHERE id<>? AND type='file' AND content LIKE ?",
+        [$excludeMsgId, $needle]
+    );
+    $n += (int)DB::val(
+        "SELECT COUNT(*) FROM messages WHERE id<>? AND type='image' AND content LIKE ?",
+        [$excludeMsgId, $needle]
+    );
+    return $n;
 }
 
 /* ============================ 上传路由 ============================ */
@@ -533,25 +578,41 @@ Plugin::route('plugin_attachment_manager_delete', function (array $ctx) use ($am
     if (!$idList) Api::json(['ok' => false, 'msg' => '未选择任何附件']);
 
     $deleted = 0;
+    $keptFiles = 0;   // 因仍被其它消息引用而保留的物理文件数
     foreach ($idList as $mid) {
         $msg = DB::one('SELECT * FROM messages WHERE id=?', [$mid]);
         if (!$msg) continue;
         $type = $msg['type'];
-        if ($type === 'file') {
-            $info = json_decode((string)$msg['content'], true);
-            if (is_array($info) && !empty($info['path'])) {
-                $abs = Upload::fileAbs((string)$info['path']);
-                if ($abs && is_file($abs)) @unlink($abs);
+        // v1.2.50：先算引用（要排除本条自己），再决定要不要删物理文件。
+        // 顺序很重要 —— 先 unlink 再查引用就无从查了。
+        $refKey = $type === 'file'
+            ? (string)((json_decode((string)$msg['content'], true)['path'] ?? ''))
+            : (string)$msg['content'];
+        $stillUsed = $refKey !== '' && haAM_refCount($refKey, (int)$mid) > 0;
+
+        if (!$stillUsed) {
+            if ($type === 'file') {
+                $info = json_decode((string)$msg['content'], true);
+                if (is_array($info) && !empty($info['path'])) {
+                    $abs = Upload::fileAbs((string)$info['path']);
+                    if ($abs && is_file($abs)) @unlink($abs);
+                }
+            } elseif ($type === 'image') {
+                $abs = haAM_image_abs((string)$msg['content']);
+                if ($abs) @unlink($abs);
             }
-        } elseif ($type === 'image') {
-            $abs = haAM_image_abs((string)$msg['content']);
-            if ($abs) @unlink($abs);
+        } else {
+            $keptFiles++;
         }
         DB::run('DELETE FROM messages WHERE id=?', [$mid]);
         $deleted++;
     }
-    Sec::log('admin_attachment_delete', $ctx['actor']['nickname'], ['count' => $deleted]);
-    Api::json(['ok' => true, 'msg' => "已删除 $deleted 个附件", 'deleted' => $deleted]);
+    Sec::log('admin_attachment_delete', $ctx['actor']['nickname'],
+        ['count' => $deleted, 'kept_shared' => $keptFiles]);
+    $msg = "已删除 $deleted 个附件";
+    // 去重后一条消息删掉、文件可能仍被别的消息用着 —— 必须告诉管理员，别让人以为文件丢了
+    if ($keptFiles > 0) $msg .= "（其中 $keptFiles 个文件因仍被其它消息引用已保留）";
+    Api::json(['ok' => true, 'msg' => $msg, 'deleted' => $deleted]);
 });
 Plugin::sensitive('plugin_attachment_manager_delete');   // 删除附件与消息记录：敏感（v1.0.91）
 
