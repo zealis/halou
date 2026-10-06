@@ -1608,14 +1608,13 @@ input[type=range] {
 .ha-plugin-card { background: var(--ha-bg); border: 1px solid var(--ha-border); border-radius: 8px; padding: 12px 14px; }
 .ha-plugin-head { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 8px; }
 .ha-plugin-head b { font-size: 15px; color: var(--ha-text-title); }
-/* v1.2.57：有后台页的插件，标题可点直达设置页。用主色 + 手型 + hover 下划线
-   表达「可点」，与页面里其它链接（a）的观感一致；没有后台页的插件不加这个类。 */
+/* v1.2.57：有后台页的插件，标题可点直达设置页。用主色 + 手型
+   表达「可点」；没有后台页的插件不加这个类。v1.2.58 起取消 hover 下划线（按需求）。 */
 .ha-plugin-head b.ha-plugin-title-link {
     color: var(--ha-primary-dark);
     cursor: pointer;
     text-decoration: none;
 }
-.ha-plugin-head b.ha-plugin-title-link:hover { text-decoration: underline; }
 .ha-plugin-meta { font-size: 12px; color: var(--ha-text-sub); margin-top: 5px; word-break: break-all; }
 .ha-plugin-desc { font-size: 13px; color: var(--ha-text); margin-top: 6px; line-height: 1.6; word-break: break-all; }
 .ha-plugin-actions { display: flex; display: -webkit-flex; gap: 8px; flex-wrap: wrap; -webkit-flex-wrap: wrap; margin-top: 10px; }

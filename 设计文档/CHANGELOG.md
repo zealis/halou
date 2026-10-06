@@ -4,6 +4,11 @@
 > 本文件由 `.tools/gen_changelog.py` 依据提交历史生成，按版本号倒序聚合，
 > 类型：**安全 / 修复 / 新增 / 改进 / 重构 / 移除**。每次发版执行该脚本即可更新。
 
+## v1.2.58（2026-10-06）：取消插件列表标题 hover 下划线
+
+- **改进**：插件管理列表里「已启用且注册后台页」的插件标题（`.ha-plugin-title-link`）原先在悬浮时显示下划线，现取消，仅保留主色 + 手型（`cursor:pointer`）表达「可点」。
+  涉及 `assets/css/halou.css` 删除 `.ha-plugin-head b.ha-plugin-title-link:hover { text-decoration: underline; }`。
+
 ## v1.2.52（2026-10-06）：修复计划任务列表误判已启用插件为「插件未启用」
 
 - **修复**：`admin_cron_list` 用 `Plugin::crons()`（仅本请求加载过 `main.php` 的插件才入册）判定 `plugin_active`，
