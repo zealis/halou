@@ -640,11 +640,15 @@ input[type=range] {
    ⚠️ 登录/安装页那颗 64px 的 logo **没有**加这条 —— 它独占一行、下方是居中的大标题，
    不存在「与文字并排」的对齐诉求，加了反而整体下沉。
    ⚠️ transform 不参与布局，品牌条高度与分隔线位置不受影响。 */
-.ow-brand img { width: 22px; height: 22px; transform: translateY(1.5px); -webkit-transform: translateY(1.5px); }
+/* v1.3.3：22px → 26px。22px 与旁边 16px 的站点名并排时偏小、品牌感弱，
+   26px 仍在「条高支点」（.ow-brand-search 的 28px）之内，不会把品牌条顶高，
+   顶栏与左侧栏的分隔线位置不受影响。
+   光学补偿同步按公式重算：26 × 8.8% × 0.75 ≈ 1.7px（22px 时是 1.5px）。 */
+.ow-brand img { width: 26px; height: 26px; transform: translateY(1.7px); -webkit-transform: translateY(1.7px); }
 /* v1.2.31：站点名右侧的**搜索按钮**（原竖三点菜单已删除）。
    v1.2.32 位置修正：原来用 line-height 顶行 + 继承 .ow-icon-btn 的 padding，
    图标在 28px 方框里偏上、按钮也显得偏左。改为 flex 双向居中 + 加大右间距。
-   ⚠️ 这个 28px 同时是**品牌条高度的支点**：logo 缩到 22px、站点名 16px 之后，
+   ⚠️ 这个 28px 同时是**品牌条高度的支点**：logo 26px（v1.3.3）、站点名 16px 之后，
    整条的高度就靠它撑着（实测 57px）。别再顺手改小，否则品牌条会跟着变矮，
    与顶栏、侧栏第一行的分隔线错位（下方「首行分隔线与顶栏下边框水平对齐」一节有说明）。 */
 .ow-brand .ow-brand-search {
