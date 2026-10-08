@@ -595,7 +595,11 @@ input[type=range] {
    ========================================================================== */
 .ow-chat-body { overflow: hidden; }
 .ow-layout {
+    /* v1.3.6：改为「上下两段」——顶部品牌条横跨全宽，下面才是 rail+侧栏+主区三栏。
+       此前三栏直接铺满 100vh，品牌条锁在侧栏内部，rail 的第一个图标顶在最上面，
+       与右侧的品牌名互相抢「谁是这一行的主角」。 */
     display: flex; display: -webkit-flex;
+    flex-direction: column; -webkit-flex-direction: column;
     height: 100vh;
     height: 100dvh;          /* 移动端浏览器地址栏场景（支持的浏览器生效） */
     /* v1.3.4：去掉 max-width:1440px + margin:0 auto —— 聊天室属于「应用型」界面，
@@ -649,6 +653,16 @@ input[type=range] {
     gap: 4px;
 }
 
+/* v1.3.6：三栏主体容器 —— 品牌条之下的全部横向空间。
+   min-height:0 与 .ow-main 的 min-height:0 是同一条链上的规矩：
+   column 布局里子项默认 min-height:auto，消息一多会把整体撑出 100vh。 */
+.ow-body {
+    display: flex; display: -webkit-flex;
+    flex: 1; -webkit-flex: 1;
+    min-height: 0;
+    width: 100%;
+}
+
 .ow-sidebar {
     width: 240px;
     border-right: 1px solid var(--ow-border);
@@ -665,6 +679,9 @@ input[type=range] {
     padding: 14px 16px;
     border-bottom: 1px solid var(--ow-border);
     font-size: 16px;
+    /* v1.3.6：品牌条移到布局顶层后横跨全宽，防止被 flex 压缩；
+       搜索按钮的负边距上限（-8px）在视口宽度下更是毫无压力。 */
+    flex-shrink: 0; -webkit-flex-shrink: 0;
     font-weight: 600;
     color: var(--ow-text-title);
 }
@@ -1703,7 +1720,7 @@ input[type=range] {
     .ow-mask {
         display: none;
         position: fixed;
-        left: 0; right: 0; top: 52px; bottom: 0;
+        left: 0; right: 0; top: 57px; bottom: 0;
         background: rgba(0, 0, 0, .25);
         z-index: 85;
     }
@@ -1711,7 +1728,7 @@ input[type=range] {
     .ow-online {
         position: fixed;
         /* 顶部留出工具栏高度，避免浮层盖住「群聊信息」按钮导致无法收起 */
-        right: -260px; top: 52px; bottom: 0;
+        right: -260px; top: 57px; bottom: 0;
         z-index: 90;
         transition: right .2s;
         width: 240px;
@@ -1777,7 +1794,7 @@ input[type=range] {
     .ow-sidebar {
         position: fixed;
         /* 顶部留出工具栏高度，避免侧栏盖住「菜单」按钮导致无法收起 */
-        left: -260px; top: 52px; bottom: 0;
+        left: -260px; top: 57px; bottom: 0;
         z-index: 90;
         transition: left .2s;
         width: 250px;

@@ -1207,6 +1207,19 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
     echo '<body class="ow-chat-body">';
     echo '<div class="ow-layout">';
 
+    // ---------- 顶部品牌条（v1.3.6） ----------
+    // 从侧栏内部移到整个布局的顶部：logo + 站点名 + 搜索横跨全宽，
+    // rail 与会话列表从品牌条下方开始 —— rail 的「消息」图标与列表第一行天然对齐，
+    // 也符合「品牌在所有栏目之上」的常规聊天客户端版式。
+    // 类名保持 .ow-brand（样式复用，只把容器从侧栏挪到布局顶层）。
+    echo '<header class="ow-brand">'
+       . '<img src="assets/img/logo.svg" alt="logo"><span>' . Sec::e(DB::setting('site_name', 'Owlsgo-Chat')) . '</span>'
+       . '<button class="ow-icon-btn ow-brand-search" id="owBrandSearch" aria-label="搜索" title="搜索">' . ow_icon('search', 16) . '</button>'
+       . '</header>';
+
+    // 三栏主体：rail + 侧栏 + 主区 + 右侧栏（品牌条不在其中，见上）
+    echo '<div class="ow-body">';
+
     // ---------- 左侧一级导航条 rail（v1.3.4） ----------
     // 取代原先侧栏顶部的横向「消息 / 联系人」标签条（ow-tabs），
     // 变成「图标条 + 列表 + 内容」三段式：rail 只切面板，不承载数据。
@@ -1221,13 +1234,7 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
 
     // 左侧栏
     echo '<aside class="ow-sidebar" id="owSidebar">'
-       // v1.2.31：站点名右侧的**竖三点菜单已删除**（含插件扩展点 OwChat.onBrandMenu，
-       // 全项目零引用；打开自己资料的入口在侧栏底部资料区 #owMe，不受影响），
-       // 改为**搜索图标** → 弹搜索窗，默认搜「当前聊天」，下方可切换
-       // 当前聊天 / 找人·群 / 消息 / 好友。
-       // ⚠️ 服务端只放按钮，弹窗与搜索逻辑全在前端 OwChat.openSearch()。
-       . '<div class="ow-brand"><img src="assets/img/logo.svg" alt="logo"><span>' . Sec::e(DB::setting('site_name', 'Owlsgo-Chat')) . '</span>'
-       . '<button class="ow-icon-btn ow-brand-search" id="owBrandSearch" aria-label="搜索" title="搜索">' . ow_icon('search', 16) . '</button></div>'
+       // v1.3.6：品牌条已上移到整个布局顶部（见 .ow-topbrand 注释），侧栏从列表直接开始。
        // v1.1.0：列表已是「群聊 + 私聊」聚合，标题改为「聊天」；
        // 徽标数字含义同步改为「会话总数」，由 conversations 接口返回的 total 在前端回填
        // v1.3.4：原侧栏顶部的横向「消息 / 联系人」标签条（#owSideTabs）已移除，
@@ -1304,6 +1311,9 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
        . '<ul class="ow-online-list" id="owOnlineList"></ul>'
        . '</div>'
        . '</aside>';
+
+    // v1.3.6：三栏主体（.ow-body）闭合；品牌条在 .ow-layout 顶层、其上方
+    echo '</div>';
     echo '</div>';
 
     // 浮层：资料卡 / 图片预览 / 设置 / 密码房间
