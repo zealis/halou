@@ -671,6 +671,10 @@ input[type=range] {
 .ow-sidebar {
     width: 240px;
     border-right: 1px solid var(--ow-border);
+    /* v1.3.9：顶部留白 12px —— 会话列表不再紧贴品牌条底边（两者底色相邻、视觉上像挤在一起）。
+       ⚠️ 数值必须与 .ow-rail 的 padding-top 一致：这样 rail 的「消息」图标
+       与列表第一行仍然对齐（v1.3.6 定下的对齐关系）。 */
+    padding-top: 12px;
     /* v1.1.4：与聊天区底色一致（原先用 --ow-bg-sub #F5F7FA，差 (7,6,5) 肉眼可辨） */
     background: var(--ow-bg-chat);
     display: flex; display: -webkit-flex;
@@ -1802,40 +1806,14 @@ input[type=range] {
     .ow-table { min-width: 620px; }
     .ow-table th, .ow-table td { padding: 7px 8px; }
     .ow-only-mobile { display: block; }
-    /* v1.3.8：窄屏 rail 沉到屏幕底部，变成微信 / QQ 式标签栏（图标上、文字下）。
-       fixed + 全宽 + 横排，z-index 高于侧栏抽屉(90)；安全区用两段式 padding ——
-       老内核不认 env() 会丢整行声明，所以基础 padding 必须写在前面。 */
-    .ow-rail {
-        position: fixed;
-        left: 0; right: 0; bottom: 0; top: auto;
-        width: 100%;
-        flex-direction: row; -webkit-flex-direction: row;
-        justify-content: space-around; -webkit-justify-content: space-around;
-        align-items: center; -webkit-align-items: center;
-        border-right: none;
-        border-top: 1px solid var(--ow-border);
-        padding: 5px 0 6px;
-        padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
-        z-index: 92;
-    }
-    .ow-rail-btn {
-        flex-direction: column; -webkit-flex-direction: column;
-        gap: 3px;
-        width: auto; height: auto;
-        padding: 4px 12px;
-    }
-    .ow-rail-lb { display: block; font-size: 11px; line-height: 1.2; }
-    /* 主区给底部标签栏让位：否则输入栏会被 fixed 的 rail 盖住 */
-    .ow-main { padding-bottom: 56px; }
-    /* 遮罩与右侧「群聊信息」面板同样止步于标签栏上沿 */
-    .ow-mask { bottom: 56px; }
-    .ow-online { bottom: 56px; }
-    /* 抽屉 / 遮罩同样止步于标签栏上沿 */
+    /* v1.3.9：撤回 v1.3.8 的「沉底标签栏」方案 —— 用户确认窄屏仍用左侧图标条。
+       窄屏只收窄一档，把宽度让给列表与消息区（v1.3.4 的原方案）。 */
+    .ow-rail { width: 52px; }
+    .ow-rail-btn { width: 38px; height: 38px; }
     .ow-sidebar {
         position: fixed;
-        /* 顶部留出品牌条高度，避免侧栏盖住「菜单」按钮导致无法收起；
-           底部给沉底的 rail 标签栏让位（v1.3.8） */
-        left: -260px; top: 57px; bottom: 56px;
+        /* 顶部留出品牌条高度，避免侧栏盖住「菜单」按钮导致无法收起 */
+        left: -260px; top: 57px; bottom: 0;
         z-index: 90;
         transition: left .2s;
         width: 250px;
