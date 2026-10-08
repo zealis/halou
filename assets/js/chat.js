@@ -1040,6 +1040,14 @@
                 //   群级装饰由 openDm 末尾的 _fireViewChange 通知插件清理。
                 return;   // 私聊入口不加载群聊历史、不启动群聊长轮询
             }
+            // v1.3.1：游客未点选任何群时（服务端下发 room=0）不进任何群——
+            // 不发 room_join / history、不拉轮询，输入区保持禁用，等用户自己点一个群。
+            // 以前这里会拿 boot 里的第一个群直接加载，等于「还没点就已经在群里」，能直接发言。
+            if (!this.room) {
+                this.applyInputGate('room');
+                this.renderMembers([], [], null);   // 右侧栏同步回到空态
+                return;
+            }
             this.setRoomUrl(this.room, true);
 
             // 初始加载历史：是否需密码由服务端判定（管理员/已授权会直接放行，不会弹窗）
@@ -2037,6 +2045,10 @@
                 this.pollGen = (this.pollGen || 0) + 1;   // 旧循环醒来即自杀
             }
             this.room = id; this.roomName = name; this.since = 0; this.historyDone = false;
+            // v1.3.1：游客点选群聊本身就算「已进入」，立即解锁输入区。
+            // 游客没有成员关系（applyJoinGate 对它恒放行），这里先解一次闸门，
+            // 免得等 room_members 异步回来才解锁、点完还发不出去。
+            if (this.cfg.actor && this.cfg.actor.kind === 'guest') this.applyInputGate('');
             // ⚠️ 必须重置 loadingHistory：切群时若上一批懒加载还在途，锁会一直卡在 true，
             // 导致新群的懒加载彻底不响应（onscroll 与 fillIfShort 都被它挡住）。
             this.loadingHistory = false;
@@ -2762,6 +2774,7 @@
             if (this._inputGate === 'join') { toast('请先加入该群聊后再发言'); return; }
             if (this._inputGate === 'friend') { toast('请先选择一个联系人'); return; }
             if (this._inputGate === 'conv') { toast('请先选择一个会话'); return; }
+            if (this._inputGate === 'room') { toast('请先从左侧选择一个群聊'); return; }
             var content = opt.content != null ? opt.content : input.value;
             if (!content || !content.replace(/^\s+|\s+$/g, '')) return;
             var self = this;
@@ -3083,6 +3096,9 @@
                 tb = $(tbIds[i]);
                 if (tb) tb.disabled = !!kind;
             }
+            // 顶栏「可发言」标签随闸门联动：禁言时它一直写着「可发言」是自相矛盾的
+            var tag = $('owSpeakTag');
+            if (tag) tag.style.display = kind ? 'none' : '';
             if (!kind) {
                 if (box) { box.style.display = 'none'; box.innerHTML = ''; }
                 input.disabled = false;
@@ -3099,9 +3115,11 @@
                 input.placeholder = '加入群聊后即可发言';
                 return;
             }
-            // 'friend' / 'conv'：没有具体对话对象，只禁用并给一句话提示
+            // 'friend' / 'conv' / 'room'：没有具体对话对象，只禁用并给一句话提示
             if (box) { box.style.display = 'none'; box.innerHTML = ''; }
-            input.placeholder = (kind === 'friend') ? '请先选择一个联系人' : '请先选择一个会话';
+            input.placeholder = (kind === 'friend') ? '请先选择一个联系人'
+                : (kind === 'room') ? '请先从左侧选择一个群聊'
+                : '请先选择一个会话';
         },
 
         /**

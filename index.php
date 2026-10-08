@@ -1180,11 +1180,17 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
     // 地址路由：?page=chat&room=ID 直达指定群聊；id 不存在或未传则回退第一个
     $first = $rooms[0];
     $reqRoom = isset($_GET['room']) ? (int)$_GET['room'] : 0;
+    $directHit = false;
     if ($reqRoom > 0) {
         foreach ($rooms as $r) {
-            if ((int)$r['id'] === $reqRoom) { $first = $r; break; }
+            if ((int)$r['id'] === $reqRoom) { $first = $r; $directHit = true; break; }
         }
     }
+    // v1.3.1：游客不再被自动塞进第一个群聊。
+    // 以前 boot.room 恒为列表首个房间，游客一个群都没点就已经「在里面」、能直接发言。
+    // 游客改为默认不进入任何群（$entered=false）：必须自己点选一个群，或走 ?room=ID 直达。
+    // 注册用户不受影响——他们有成员关系，由「先加入才能发言」那条规则约束。
+    $entered = ($actor['kind'] !== 'guest') || $directHit;
     $settings = [
         'guest_chat' => DB::setting('guest_chat', '1'),
         'sound' => DB::setting('sound_default', '1'),
@@ -1238,7 +1244,8 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
     echo '<main class="ow-main">'
        . '<header class="ow-topbar">'
        . '<button class="ow-icon-btn ow-only-mobile" id="owToggleSide" aria-label="菜单">' . ow_icon('menu') . '</button>'
-       . '<h2 class="ow-room-name" id="owRoomName">' . Sec::e($first['name']) . '</h2>'
+       // v1.3.1：游客未进入任何群时标题给占位，避免顶着一个其实没进去的群名
+       . '<h2 class="ow-room-name" id="owRoomName">' . ($entered ? Sec::e($first['name']) : '请选择一个群聊') . '</h2>'
        . '<span class="ow-tag ow-tag-green" id="owSpeakTag">可发言</span>'
        . '<span class="ow-latency" id="owLatency"></span>'
        // 右侧「竖三点」：打开群聊信息侧栏（v1.1.1 替代原在线成员人形图标）
@@ -1310,7 +1317,8 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
             'nickname' => $actor['nickname'] ?? '', 'role' => $actor['role'] ?? 'guest',
         ],
         'rooms' => $rooms,
-        'room' => $first['id'],
+        // v1.3.1：游客未点选任何群时下发 0，前端据此禁用输入区（进入后才解锁）
+        'room' => $entered ? (int)$first['id'] : 0,
         'site_url' => ow_site_url(),
         'settings' => $settings,
         'me' => $user ? [

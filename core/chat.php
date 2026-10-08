@@ -498,6 +498,16 @@ class Chat
             if ($gap > 0 && !Sec::rateLimit('guest_gap', 'g' . $actor['id'], $gap, 1)) {
                 return [false, "游客发言间隔为 $gap 秒，请稍后再试（登录账号不受此限制）"];
             }
+            // v1.3.1：游客必须先「进入」群聊才能发言。
+            // 旧行为是服务端把游客直接塞进列表第一个群（boot.room = 第一个），
+            // 于是游客一个群都没点也能发言，前端没有可依据的「已选择」事实。
+            // 判定依据取 online 心跳：只有前端真的 switchRoom（拉起轮询）才会写，
+            // 构造请求直接打 send 不会有心跳记录，因此拦得住。
+            // 心跳窗口 45 秒、轮询 ≤20 秒一次，这里放宽到 120 秒避免边界抖动。
+            $seen = (int)DB::val('SELECT last_seen FROM online WHERE room_id=? AND guest_id=?', [$roomId, (int)$actor['id']]);
+            if ($seen <= 0 || $seen < time() - 120) {
+                return [false, '请先进入该群聊后再发言', null];
+            }
         }
         if ($actor['kind'] === 'none') return [false, '请先登录或刷新页面'];
 
