@@ -97,7 +97,12 @@
     /* 后台页 HTML 由 innerHTML 注入（script 不执行）：MutationObserver 检测表格出现后自动加载 */
     var mo = new MutationObserver(function () {
         var t = $('owSWTable');
-        if (t && t.rows.length === 0) w.OwSW.init();
+        // ⚠️ 必须用标记防重入，不能只判「表格是空的」：
+        // init() 里的 OwAdmin.uiBatchBar 会同步写 #owSWBatch 的 innerHTML，
+        // 这次改动立刻再次触发本回调；而此时列表 XHR 还没回来、表格仍是 0 行，
+        // 于是 init 被无限递归调用（每轮还发一个请求），表现就是一进页面浏览器直接卡死。
+        // 标记挂在表格元素上：切走再切回时表格是新元素，仍能重新初始化。
+        if (t && !t._inited) { t._inited = true; w.OwSW.init(); }
     });
     mo.observe(d.documentElement, { childList: true, subtree: true });
 })(window, document);
