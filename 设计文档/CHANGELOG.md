@@ -42,6 +42,19 @@
 - 用最小 DOM 模拟（stub MutationObserver + uiBatchBar 写 DOM）实测：修复前 300ms 内 init 已执行
   22 次且持续增长，修复后稳定 1 次、列表请求 1 次。
 
+## v1.3.4（2026-10-09）：新增左侧一级导航条 rail + 修复全屏两侧留白
+
+- **新增**：聊天页左侧新增一级导航条 `.ow-rail`（竖排图标条），切换控件由侧栏顶部的
+  横向「消息 / 联系人」标签条（`#owSideTabs`）迁移至此，形成「图标条 + 列表 + 内容」三段式。
+  - 先提供两个核心入口：消息、联系人；切换内核 `OwChat.switchTab()` 不变，只换了控件与高亮载体
+  - 新增插件扩展点：服务端 `Plugin::on('sidebar.rail', fn)` 产出入口按钮 HTML，
+    前端 `OwChat.onRail({ id, label, onShow })` 注册面板内容；面板容器复用 `#owSidePanels`
+  - 旧名 `sidebar.tabs` / `OwChat.onSideTabs` / `bindSideTabs` 保留为兼容别名，新代码用 rail
+  - 窄屏（≤720px）rail 收窄到 52px，抽屉式侧栏行为不变
+- **修复**：`.ow-layout` 去掉 `max-width: 1440px` + `margin: 0 auto` —— 聊天室属于应用型界面，
+  超宽屏下原先 1440px 之外是纯留白，两侧空出大片背景，观感像页面没加载完。现改为铺满视口。
+- 侧栏顶部因此省出一行高度；`.ow-tabs` 组件样式保留（搜索窗的范围切换仍在用）。
+
 ## v1.3.3（2026-10-09）：侧栏品牌 logo 放大到 26px
 
 - **改进**：`.ow-brand img` 由 22px 放大到 26px（v1.2.25 曾由 28px 缩到 22px，与 16px 站点名并排时偏小、

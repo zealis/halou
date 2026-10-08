@@ -234,6 +234,37 @@ OwChat.onMsgCtx(function (items, msg, env) {
 - 显示判定只做用户体验过滤，**权限必须在服务端路由内重新校验**（参考 `plugin_ban_manager_quick`：管理员 / 房主守卫、不能禁言自己与管理员、房间归属校验）。
 - 弹窗复用 `OwChat.openModal()` / `OwChat.closeModal()`，与全站确认框同一样式。参考实现：`plugins/ban-manager/chat.js`。
 
+### 侧栏一级导航扩展（sidebar.rail / OwChat.onRail）
+
+聊天页最左侧的一级导航条（`.ow-rail`，竖排图标条）向插件开放入口。
+**v1.3.4 起它取代了原先侧栏顶部的横向「消息 / 联系人」标签条**，插件注册入口请用新名字。
+
+服务端 —— 注册一个入口按钮（记得在 `plugin.json` 的 `hooks` 里声明 `sidebar.rail`，
+否则按需加载不会触发；`ow_icon()` 是核心的线性 SVG 图标函数，**不要用 Emoji 或位图**）：
+
+```php
+Plugin::on('sidebar.rail', function () {
+    return '<button class="ow-rail-btn" data-tab="myplugin" type="button" title="我的页面">'
+         . ow_icon('gear', 20) . '</button>';
+});
+```
+
+前端 —— 为该入口注册面板内容：
+
+```js
+OwChat.onRail({
+    id: 'myplugin',        // 必须与服务端按钮的 data-tab 一致
+    label: '我的页面',
+    onShow: function (panel) {   // panel = 侧栏面板容器；可能被重复调用，回调内需自行幂等
+        panel.innerHTML = '<div>…</div>';
+    }
+});
+```
+
+- 切到插件入口时核心只切换高亮并调用 `onShow`，不碰插件内容，同时隐藏核心会话列表。
+- 面板容器复用 `#owSidePanels`，核心面板与插件面板互斥显示。
+- 旧名 `Plugin::on('sidebar.tabs', …)` / `OwChat.onSideTabs` 仍可用（内部同一条路径），新代码请用 rail。
+
 ## 安全要点
 
 - 插件路由第一步做权限自查（见上）；涉及写操作的只接受 POST + 核心签名（前端经 `OwApi` 自动携带，无需额外处理）。

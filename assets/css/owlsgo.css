@@ -333,14 +333,17 @@ input[type=range] {
      与 .ow-btn-primary / .ow-switch.is-on 统一为「选中 = 主色」。
    实测观感：实色胶囊在 240px 侧栏里更像「当前所在的位置」，而不是一块待点的白块。
 
-   ⚠️ 结构约定（插件扩展必须遵守）：
-   <div class="ow-tabs" id="owSideTabs">
+   ⚠️ v1.3.4：聊天页侧栏顶部的「消息 / 联系人」标签条已移除，切换控件改为最左侧的
+   `.ow-rail` 图标条（见下方 rail 一节）。本组件现在只剩**搜索窗**的内部范围切换在用
+   （`.ow-sr-scope`），因此保留样式、不再承担聊天页的一级导航。
+
+   结构约定（适用范围切换这类分段控件）：
+   <div class="ow-tabs">
      <button class="ow-tab is-active" data-tab="chat"><span class="ow-tab-lb">消息</span></button>
-     <button class="ow-tab" data-tab="friends"><span class="ow-tab-lb">联系人</span></button>
    </div>
    - 选中态由 `is-active` 类表达，**不要**用 :nth-child 或 JS 内联样式 ——
-     插件可在任意位置插入标签，位置会变。
-   - 面板切换由 JS 控制（.ow-tab-panel 的 display），本组件只管标签条外观。 */
+     调用方可在任意位置插入标签，位置会变。
+   - 面板切换由 JS 控制（.ow-tab-panel 的 display），本组件只管控件外观。 */
 .ow-tabs {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
@@ -595,13 +598,57 @@ input[type=range] {
     display: flex; display: -webkit-flex;
     height: 100vh;
     height: 100dvh;          /* 移动端浏览器地址栏场景（支持的浏览器生效） */
-    max-width: 1440px;
-    margin: 0 auto;
+    /* v1.3.4：去掉 max-width:1440px + margin:0 auto —— 聊天室属于「应用型」界面，
+       铺满视口才不会在宽屏上出现两侧空白（原先 1440px 之外的区域是纯留白，
+       左侧栏/消息区被挤在中间，观感像是页面没加载完）。 */
+    width: 100%;
     background: var(--ow-bg);
     overflow: hidden;        /* 任何情况下都不让页面整体横向/纵向滚动，滚动交给消息区 */
 }
 
 /* 左侧栏 */
+/* ---------- 左侧一级导航条 rail（v1.3.4） ----------
+   取代原先侧栏顶部的横向「消息 / 联系人」标签条：切换控件从顶部移到最左侧，
+   变成「图标条 + 列表 + 内容」三段式（与主流聊天客户端的肌肉记忆一致）。
+   rail 只负责切换面板，不含数据；插件用 Plugin::collect('sidebar.rail')
+   或前端 OwChat.onRail({id,label,onShow}) 在此注册自己的入口。
+   ⚠️ 选中态复用主色实心（--ow-primary-strong），与 .ow-btn-primary / .ow-tab.is-active
+   同一套「选中 = 主色」语言。 */
+.ow-rail {
+    width: 56px;
+    flex-shrink: 0; -webkit-flex-shrink: 0;
+    background: var(--ow-bg-chat);
+    border-right: 1px solid var(--ow-border);
+    display: flex; display: -webkit-flex;
+    flex-direction: column; -webkit-flex-direction: column;
+    align-items: center; -webkit-align-items: center;
+    gap: 4px;
+    padding: 8px 0;
+}
+.ow-rail-btn {
+    width: 40px; height: 40px;
+    display: inline-flex; display: -webkit-inline-flex;
+    align-items: center; -webkit-align-items: center;
+    justify-content: center; -webkit-justify-content: center;
+    border: none; background: transparent;
+    border-radius: 8px;
+    padding: 0;
+    color: var(--ow-text-sub);
+    cursor: pointer;
+    flex-shrink: 0; -webkit-flex-shrink: 0;
+}
+.ow-rail-btn:hover { background: var(--ow-bg-chat-hover); color: var(--ow-text-title); }
+.ow-rail-btn.is-active { background: var(--ow-primary-strong); color: #FFFFFF; }
+.ow-rail-btn .ow-ico { display: block; }        /* 消掉 svg 基线间隙 */
+/* 底部区（设置 / 更多一类）：margin-top:auto 沉到 rail 底部 */
+.ow-rail-foot {
+    margin-top: auto;
+    display: flex; display: -webkit-flex;
+    flex-direction: column; -webkit-flex-direction: column;
+    align-items: center; -webkit-align-items: center;
+    gap: 4px;
+}
+
 .ow-sidebar {
     width: 240px;
     border-right: 1px solid var(--ow-border);
@@ -1724,6 +1771,9 @@ input[type=range] {
     .ow-table { min-width: 620px; }
     .ow-table th, .ow-table td { padding: 7px 8px; }
     .ow-only-mobile { display: block; }
+    /* v1.3.4：窄屏 rail 收窄一档，把宽度让给列表与消息区 */
+    .ow-rail { width: 52px; }
+    .ow-rail-btn { width: 38px; height: 38px; }
     .ow-sidebar {
         position: fixed;
         /* 顶部留出工具栏高度，避免侧栏盖住「菜单」按钮导致无法收起 */

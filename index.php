@@ -1205,6 +1205,18 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
     echo '<body class="ow-chat-body">';
     echo '<div class="ow-layout">';
 
+    // ---------- 左侧一级导航条 rail（v1.3.4） ----------
+    // 取代原先侧栏顶部的横向「消息 / 联系人」标签条（ow-tabs），
+    // 变成「图标条 + 列表 + 内容」三段式：rail 只切面板，不承载数据。
+    // 插件注册入口：服务端 Plugin::collect('sidebar.rail')（产出按钮 HTML），
+    //              或前端 OwChat.onRail({ id, label, onShow })。
+    // ⚠️ 按钮的 data-tab 与 switchTab 的面板标识同名；核心只认 chat / friends。
+    echo '<nav class="ow-rail" id="owRail">'
+       . '<button class="ow-rail-btn is-active" data-tab="chat" type="button" title="消息" aria-label="消息">' . ow_icon('chat', 20) . '</button>'
+       . '<button class="ow-rail-btn" data-tab="friends" type="button" title="联系人" aria-label="联系人">' . ow_icon('users', 20) . '</button>'
+       . Plugin::collect('sidebar.rail')
+       . '</nav>';
+
     // 左侧栏
     echo '<aside class="ow-sidebar" id="owSidebar">'
        // v1.2.31：站点名右侧的**竖三点菜单已删除**（含插件扩展点 OwChat.onBrandMenu，
@@ -1216,21 +1228,10 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
        . '<button class="ow-icon-btn ow-brand-search" id="owBrandSearch" aria-label="搜索" title="搜索">' . ow_icon('search', 16) . '</button></div>'
        // v1.1.0：列表已是「群聊 + 私聊」聚合，标题改为「聊天」；
        // 徽标数字含义同步改为「会话总数」，由 conversations 接口返回的 total 在前端回填
-       // v1.2.20：「聊天」标题 + 数量徽标整体**换成 Tabs 标签条**。
-       //   ① 「消息 / 联系人」从「品牌区下拉菜单里的一个菜单项」上移为常驻标签，
-       //      切换路径从「点下拉 → 找菜单项 → 点」缩短为「点标签」，也顺带
-       //      解决了「联系人是菜单里一个不起眼的入口、没人发现」的问题。
-       //   ② 数量徽标（#owRoomCount）**取消**：会话数在列表本身就一目了然，
-       //      这个数字既不稳定也不重要，占着标题行右侧反而抢视线。
-       //   ③ 标签条下方留 #owSideTabs 容器，插件通过 Plugin::fire('sidebar.tabs')
-       //      或前端 OwChat.onSideTabs 追加自己的标签页（见插件文档）。
-       // ⚠️ 标签的 data-tab 值是**面板标识**，JS 侧据此切 .ow-tab-panel 显隐；
-       //    核心只认 chat / friends 两个，插件可加自己的。
-       . '<div class="ow-tabs" id="owSideTabs">'
-       . '<button class="ow-tab is-active" data-tab="chat" type="button"><span class="ow-tab-lb">消息</span></button>'
-       . '<button class="ow-tab" data-tab="friends" type="button"><span class="ow-tab-lb">联系人</span></button>'
-       . Plugin::collect('sidebar.tabs')
-       . '</div>'
+       // v1.3.4：原侧栏顶部的横向「消息 / 联系人」标签条（#owSideTabs）已移除，
+       //   切换控件改为最左侧的 .ow-rail 图标条（见上方 rail 区块）。
+       //   ⚠️ 插件注册入口随之迁移：Plugin::collect('sidebar.tabs') → 'sidebar.rail'，
+       //      OwChat.onSideTabs → OwChat.onRail（旧名保留为兼容别名）。
        // 聊天面板（核心两个面板之一是「消息」，另一个是「联系人」）
        . '<ul class="ow-room-list ow-tab-panel is-active" id="owRoomList" data-panel="chat"></ul>'
        // 插件面板容器：由 OwChat 在切换时创建/复用，插件标签对应的内容挂这里

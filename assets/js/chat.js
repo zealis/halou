@@ -1099,7 +1099,7 @@
         bindEvents: function () {
             var self = this;
             // v1.2.20：侧栏标签条（消息 / 联系人 / 插件标签）
-            self.bindSideTabs();
+            self.bindRail();
             $('owBtnSend').onclick = function () { self.send(); };
             var input = $('owInput');
             // 随内容自动增高；恢复上次手动拖出的高度
@@ -1417,10 +1417,12 @@
              friends → 复用同一个 #owRoomList 容器渲染联系人（ChatList 轮子）
            所以「切面板」= 换数据源重渲染 + 切标签高亮，不涉及容器搬运。
 
-           插件面板：标签由服务端 Plugin::collect('sidebar.tabs') 产出 HTML，
-           或前端 OwChat.onSideTabs 追加；其内容由插件自己往 #owSidePanels 里写。
-           点插件标签时核心只切换标签高亮并触发 'panel' 回调，不碰插件内容。 */
-        view: 'chat',              // 当前标签：'chat' | 'friends' | 插件自定义名
+           插件面板：入口由服务端 Plugin::collect('sidebar.rail') 产出按钮 HTML，
+           或前端 OwChat.onRail 追加；其内容由插件自己往 #owSidePanels 里写。
+           点插件入口时核心只切换高亮并触发 onShow，不碰插件内容。
+           （v1.3.4：入口控件由侧栏顶部横向标签条改为最左侧图标条 rail；
+             onSideTabs / bindSideTabs / Plugin::collect('sidebar.tabs') 为旧名兼容保留） */
+        view: 'chat',              // 当前面板：'chat' | 'friends' | 插件自定义名
         friends: [],               // 好友列表（含签名，签名可能为空串）
         _sigProbe: null,           // signature 批量接口是否可用（探测一次，缓存结果）
         _tabsExt: [],              // 插件扩展：{ id, label, onShow } 数组
@@ -1448,6 +1450,28 @@
             }
             this._tabsExt.push(opt);
         },
+
+        /**
+         * 插件扩展点（v1.3.4，推荐用这个）：往左侧一级导航条 rail 追加一个入口。
+         * 与 onSideTabs 共用同一份注册表与面板容器（#owSidePanels），
+         * 只是控件从侧栏顶部的横向标签条换成了最左侧的图标条。
+         *
+         * 服务端配套：插件在入口 HTML 里输出
+         *   <button class="ow-rail-btn" data-tab="<id>" title="<label>">…svg…</button>
+         * （通常用 Plugin::collect('sidebar.rail') 注册），
+         * 前端再用 onRail 注册同 id 的 onShow 填充面板。
+         *
+         * @param {Object} opt
+         * @param {string}   opt.id      唯一标识（= 按钮的 data-tab）
+         * @param {string}   [opt.label] 文字说明（服务端按钮的 title 用）
+         * @param {Function} opt.onShow  切到该入口时调用，参数为面板容器节点
+         * @example
+         * OwChat.onRail({
+         *     id: 'orders', label: '订单',
+         *     onShow: function (panel) { panel.innerHTML = '<div>我的订单</div>'; }
+         * });
+         */
+        onRail: function (opt) { this.onSideTabs(opt); },
 
         /* ---------- 资料卡 meta 顶部扩展点（v1.2.42） ----------
            需求：等级要**固定在 .ow-card-meta 的最上面**，不能被其它插件的行挤下去。
@@ -1480,10 +1504,14 @@
             return out;
         },
 
-        /** 绑定标签条点击（委托，只绑一次；插件后加的标签也自动生效） */
-        bindSideTabs: function () {
+        /**
+         * 绑定一级导航条 rail 的点击（委托，只绑一次；插件后加的入口也自动生效）。
+         * v1.3.4：控件由侧栏顶部的横向标签条（#owSideTabs）改为最左侧图标条（#owRail），
+         * 面板切换内核 switchTab 不变，所以只换了「点谁」。
+         */
+        bindRail: function () {
             if (this._tabsInited) return;
-            var bar = $('owSideTabs');
+            var bar = $('owRail');
             if (!bar) return;
             var self = this;
             bar.onclick = function (e) {
@@ -1498,6 +1526,9 @@
             };
             this._tabsInited = true;
         },
+
+        /** @deprecated v1.3.4：控件已改为 rail，保留旧名仅为兼容外部/插件调用 */
+        bindSideTabs: function () { this.bindRail(); },
 
         /** 切到指定标签（核心与插件标签统一入口） */
         switchTab: function (tab) {
@@ -1529,16 +1560,16 @@
 
         /** 只更新标签高亮 + 面板显隐（不碰数据） */
         _paintTabs: function () {
-            var bar = $('owSideTabs');
+            var bar = $('owRail');
             if (bar) {
-                var btns = bar.getElementsByClassName('ow-tab'), i;
+                var btns = bar.getElementsByClassName('ow-rail-btn'), i;
                 for (i = 0; i < btns.length; i++) {
                     var on = btns[i].getAttribute('data-tab') === this.view;
                     // ⚠️ 用 classList 逐项增删而不是整体赋值 ——
-                    //   插件可能在自己标签上加了自己的类（如角标定位类），
+                    //   插件可能在自己入口上加了自己的类（如角标定位类），
                     //   整体覆盖 className 会把插件的类一起抹掉。
                     if (btns[i].classList) btns[i].classList[on ? 'add' : 'remove']('is-active');
-                    else btns[i].className = on ? 'ow-tab is-active' : 'ow-tab';
+                    else btns[i].className = on ? 'ow-rail-btn is-active' : 'ow-rail-btn';
                 }
             }
             // 核心面板：只有「消息 / 联系人」两个，共用 #owRoomList
