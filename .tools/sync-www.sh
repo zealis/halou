@@ -37,6 +37,8 @@ done
 echo "核对 $N 个跟踪文件"
 if [ "$FAIL" -eq 0 ]; then echo "SYNC OK：全部一致"; else echo "SYNC FAIL：存在差异，见上"; exit 1; fi
 
-# 同步后重载 Nginx（失败时提示用 phpstudy 面板重启）
-cd "/d/Program Files/phpstudy_pro/Extensions/Nginx1.15.11" || exit 0
-./nginx.exe -t && ./nginx.exe -s reload || echo "提示：Nginx 重载失败（权限不足时请在 phpstudy 面板点「重启」）"
+# ⚠️ 不要在这里做 CLI reload：本机 shell 没有给 nginx 发信号的权限，
+#   `nginx.exe -s reload` 会把整个脚本挂住（实测被 SIGTERM 打断，但前面已同步完成）。
+#   PHP 文件改动不需要重载（PHP-FPM 每次请求读文件）；只有开了 OPcache 且改的是 PHP 逻辑
+#   才可能读到旧编译结果，那种情况在 phpStudy 面板点「重启」即可。
+echo "提示：若改了 PHP 逻辑且开启 OPcache，请在 phpStudy 面板重启 Nginx/PHP（CLI reload 无权限会卡住）"
