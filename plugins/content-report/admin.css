@@ -1,17 +1,17 @@
 /* 内容举报插件 - 后台移动端样式 */
 
 /* 表格外层横向滚动，防止移动端内容挤压 */
-.ha-table-wrap {
+.ow-table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
 }
 
-.ha-table-wrap .ha-table {
+.ow-table-wrap .ow-table {
     white-space: nowrap;
 }
 
 /* 补充说明列：超长省略，固定最大宽度 */
-.ha-cr-desc {
+.ow-cr-desc {
     max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -19,27 +19,27 @@
 }
 
 /* 操作列 */
-.ha-cr-ops a {
+.ow-cr-ops a {
     margin-right: 6px;
 }
 
 /* 移动端：筛选表单纵向堆叠、按钮全宽 */
 @media (max-width: 640px) {
-    .ha-form-row {
+    .ow-form-row {
         flex-direction: column;
         align-items: stretch;
     }
-    .ha-form-row .ha-form-item {
+    .ow-form-row .ow-form-item {
         width: 100%;
     }
-    .ha-form-row .ha-btn {
+    .ow-form-row .ow-btn {
         width: 100%;
         margin-top: 8px;
     }
-    .ha-table-wrap .ha-table {
+    .ow-table-wrap .ow-table {
         font-size: 13px;
     }
-    .ha-cr-desc {
+    .ow-cr-desc {
         max-width: 120px;
     }
 }

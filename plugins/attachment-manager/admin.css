@@ -1,27 +1,27 @@
 /**
  * 附件管理插件 - 后台样式（v1.0.0）
- * 复用主程序 ha- 前缀变量，移动端适配表格横向滚动。
- * 选择器限定 #haAMTable，避免影响其他后台表格。
+ * 复用主程序 ow- 前缀变量，移动端适配表格横向滚动。
+ * 选择器限定 #owAMTable，避免影响其他后台表格。
  */
 
-/* 覆盖主程序 .ha-table{width:100%}，让表格按内容撑开，
+/* 覆盖主程序 .ow-table{width:100%}，让表格按内容撑开，
    外层容器 overflow-x:auto 负责横向滚动 */
-#haAMTable {
+#owAMTable {
     width: auto;
     min-width: 100%;
     table-layout: auto;
 }
 
 /* 单元格不换行，中文不逐字拆分 */
-#haAMTable th,
-#haAMTable td {
+#owAMTable th,
+#owAMTable td {
     white-space: nowrap;
     word-break: keep-all;
     overflow-wrap: normal;
 }
 
 /* 文件名列允许超长省略（第3列） */
-#haAMTable td:nth-child(3) {
+#owAMTable td:nth-child(3) {
     max-width: 240px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -29,11 +29,11 @@
 }
 
 /* 文件名列内的文件名 span 溢出处理
-   v1.2.14：必须限定 #haAMTable —— 主程序聊天气泡的文件卡片也用 .ha-file-name
+   v1.2.14：必须限定 #owAMTable —— 主程序聊天气泡的文件卡片也用 .ow-file-name
    （display:block，文件名与大小分两行）。本插件 CSS 经 ?action=assets&type=css
    在聊天页同样会被加载，裸类名会把聊天的 block 覆盖成 inline-block，
    表现为「文件名240.0 KB」挤成一行。 */
-#haAMTable .ha-file-name {
+#owAMTable .ow-file-name {
     display: inline-block;
     max-width: 220px;
     overflow: hidden;
@@ -44,31 +44,31 @@
 
 /* 移动端：筛选表单纵向堆叠 */
 @media (max-width: 720px) {
-    .ha-form-row {
+    .ow-form-row {
         flex-direction: column;
         -webkit-flex-direction: column;
         align-items: stretch;
         -webkit-align-items: stretch;
     }
-    .ha-form-row .ha-form-item {
+    .ow-form-row .ow-form-item {
         min-width: 0 !important;
         width: 100%;
     }
-    .ha-form-row > .ha-btn {
+    .ow-form-row > .ow-btn {
         width: 100%;
     }
-    #haAMStat {
+    #owAMStat {
         display: block;
         margin-left: 0 !important;
         margin-top: 8px;
     }
-    #haAMBatchDel {
+    #owAMBatchDel {
         width: 100%;
     }
-    #haAMTable td:nth-child(3) {
+    #owAMTable td:nth-child(3) {
         max-width: 160px;
     }
-    #haAMTable .ha-file-name {
+    #owAMTable .ow-file-name {
         max-width: 140px;
     }
 }

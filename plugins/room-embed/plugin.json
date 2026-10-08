@@ -2,5 +2,5 @@
   "name": "群聊嵌入",
   "version": "1.0.0",
   "description": "让用户将自己创建的群聊以 iframe 方式嵌入到博客等网站右下角，作为内置聊天室。",
-  "author": "halou"
+  "author": "owlsgo"
 }

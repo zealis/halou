@@ -3,14 +3,14 @@
  *
  * 职责：
  *   1. 嵌入模式（?embed=1）下做 JS 层的 UI 微调（隐藏音效按钮等）
- *   2. 普通模式下，通过 HaChat.onRoomEdit 在群聊信息面板追加「嵌入代码」入口
+ *   2. 普通模式下，通过 OwChat.onRoomEdit 在群聊信息面板追加「嵌入代码」入口
  *      —— 仅群主/超级管理员可见，点击弹出 iframe 代码
  *
  * 兼容约束：仅用 var / function，无箭头函数、const、let、fetch。
  */
 (function () {
     var w = window;
-    if (!w.HaChat || !w.HaChat.cfg) return;
+    if (!w.OwChat || !w.OwChat.cfg) return;
     if (w.__haRoomEmbedLoaded) return;
     w.__haRoomEmbedLoaded = true;
 
@@ -19,9 +19,9 @@
     /* ---------- 嵌入模式：隐藏音效按钮、隐藏输入框拖拽手柄 ---------- */
     if (isEmbed) {
         function trimEmbedUI() {
-            var sound = document.getElementById('haBtnSound');
+            var sound = document.getElementById('owBtnSound');
             if (sound) sound.style.display = 'none';
-            var resize = document.getElementById('haInputResize');
+            var resize = document.getElementById('owInputResize');
             if (resize) resize.style.display = 'none';
         }
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
@@ -33,34 +33,34 @@
     }
 
     /* ---------- 普通模式：群聊信息面板追加「嵌入代码」入口 ---------- */
-    w.HaRoomEmbed = {
+    w.OwRoomEmbed = {
         /** 生成并展示嵌入代码 */
         showCode: function (roomId, roomName) {
-            var base = (w.HaChat.cfg && w.HaChat.cfg.site_url) ? w.HaChat.cfg.site_url : '';
+            var base = (w.OwChat.cfg && w.OwChat.cfg.site_url) ? w.OwChat.cfg.site_url : '';
             var src = base + '/?page=chat&room=' + roomId + '&embed=1';
             var code = '<iframe src="' + src + '" width="380" height="560" frameborder="0" '
                 + 'style="position:fixed;bottom:20px;right:20px;border:none;border-radius:10px;'
                 + 'box-shadow:0 4px 24px rgba(0,0,0,.18);z-index:99999;overflow:hidden"></iframe>';
 
             var html = '<h3>嵌入代码</h3>'
-                + '<p style="color:var(--ha-text-sub,#999);font-size:13px;margin:0 0 10px">将以下代码粘贴到网站 HTML 的合适位置，右下角即出现聊天室。</p>'
-                + '<div class="ha-form-item">'
+                + '<p style="color:var(--ow-text-sub,#999);font-size:13px;margin:0 0 10px">将以下代码粘贴到网站 HTML 的合适位置，右下角即出现聊天室。</p>'
+                + '<div class="ow-form-item">'
                 + '<label>群聊：' + escHtml(roomName || ('#' + roomId)) + '</label>'
-                + '<textarea id="haEmbedCode" class="ha-input" rows="6" readonly style="width:100%;resize:vertical;font-family:var(--ha-mono,Consolas,monospace);font-size:12px">' + escHtml(code) + '</textarea>'
+                + '<textarea id="owEmbedCode" class="ow-input" rows="6" readonly style="width:100%;resize:vertical;font-family:var(--ow-mono,Consolas,monospace);font-size:12px">' + escHtml(code) + '</textarea>'
                 + '</div>'
-                + '<div class="ha-form-row" style="gap:8px">'
-                + '<button class="ha-btn ha-btn-primary" onclick="HaRoomEmbed.copy()">复制代码</button>'
-                + '<button class="ha-btn ha-btn-ghost" onclick="HaChat.closeModal()">关闭</button>'
+                + '<div class="ow-form-row" style="gap:8px">'
+                + '<button class="ow-btn ow-btn-primary" onclick="OwRoomEmbed.copy()">复制代码</button>'
+                + '<button class="ow-btn ow-btn-ghost" onclick="OwChat.closeModal()">关闭</button>'
                 + '</div>'
-                + '<div id="haEmbedTip" style="margin-top:8px;font-size:12px;color:var(--ha-success,#52c41a)"></div>';
-            w.HaChat.openModal(html, 460);
+                + '<div id="owEmbedTip" style="margin-top:8px;font-size:12px;color:var(--ow-success,#52c41a)"></div>';
+            w.OwChat.openModal(html, 460);
         },
 
         /** 复制嵌入代码到剪贴板 */
         copy: function () {
-            var ta = document.getElementById('haEmbedCode');
+            var ta = document.getElementById('owEmbedCode');
             if (!ta) return;
-            var tip = document.getElementById('haEmbedTip');
+            var tip = document.getElementById('owEmbedTip');
             ta.select();
             try {
                 var ok = document.execCommand('copy');
@@ -77,29 +77,29 @@
         return d.innerHTML;
     }
 
-    w.HaChat.onRoomEdit(function (ctx) {
+    w.OwChat.onRoomEdit(function (ctx) {
         // 仅群主 / 超级管理员可见嵌入入口
         if (!ctx.isOwner && !ctx.isAdmin) return;
-        var extras = document.getElementById('haREExtras');
+        var extras = document.getElementById('owREExtras');
         if (!extras) return;
 
         var name = '';
-        var list = (w.HaChat.cfg && w.HaChat.cfg.rooms) || [];
+        var list = (w.OwChat.cfg && w.OwChat.cfg.rooms) || [];
         for (var i = 0; i < list.length; i++) {
             if (list[i].id === ctx.roomId) { name = list[i].name || ''; break; }
         }
 
         var row = document.createElement('div');
-        row.className = 'ha-panel-entry';
+        row.className = 'ow-panel-entry';
         row.setAttribute('role', 'button');
         row.setAttribute('tabindex', '0');
-        row.innerHTML = '<svg class="ha-ico ha-panel-entry-ico" width="16" height="16" viewBox="0 0 24 24" fill="none"'
+        row.innerHTML = '<svg class="ow-ico ow-panel-entry-ico" width="16" height="16" viewBox="0 0 24 24" fill="none"'
             + ' stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
             + '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>'
             + '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'
-            + '</svg><span class="ha-panel-entry-t">嵌入代码</span>'
-            + '<span class="ha-panel-entry-arrow">›</span>';
-        row.onclick = function () { w.HaRoomEmbed.showCode(ctx.roomId, name); };
+            + '</svg><span class="ow-panel-entry-t">嵌入代码</span>'
+            + '<span class="ow-panel-entry-arrow">›</span>';
+        row.onclick = function () { w.OwRoomEmbed.showCode(ctx.roomId, name); };
         row.onkeydown = function (e) {
             e = e || w.event;
             if (e.keyCode === 13 || e.keyCode === 32) { e.preventDefault ? e.preventDefault() : (e.returnValue = false); row.onclick(); }
@@ -107,8 +107,8 @@
         extras.appendChild(row);
     });
 
-    // ⚠️ 时序修正：核心在 HaChat.init() 内已调用过 renderRoomPanel()，
+    // ⚠️ 时序修正：核心在 OwChat.init() 内已调用过 renderRoomPanel()，
     // 但本脚本在 init 之后才加载，钩子注册时初始渲染已完成。
     // 这里主动重渲染一次，确保「嵌入代码」入口在首屏即出现（无需用户切换群聊/重开面板）。
-    try { w.HaChat.renderRoomPanel(); } catch (e) {}
+    try { w.OwChat.renderRoomPanel(); } catch (e) {}
 })();

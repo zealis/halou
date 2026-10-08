@@ -10,9 +10,9 @@
  * v1.0.1（v1.2.24）：**移除用户资料卡的「举报」按钮**。举报入口现只剩消息右键菜单
  * —— 举报针对的是具体的一条内容，不是某个人；资料卡底部摆红色举报按钮过于对立。
  *
- * 不修改主程序：依赖核心 HaChat.onMsgCtx 扩展点、Plugin::route / adminPage / asset。
+ * 不修改主程序：依赖核心 OwChat.onMsgCtx 扩展点、Plugin::route / adminPage / asset。
  */
-if (!defined('HALOU_VERSION')) exit;
+if (!defined('OWLSGO_VERSION')) exit;
 
 /* ===================== 数据表（幂等建表） ===================== */
 
@@ -52,7 +52,7 @@ DB::run("CREATE TABLE IF NOT EXISTS plugin_content_report_config (
 /* ===================== 配置读取 ===================== */
 
 /** 默认配置 */
-function haCRDefaultConfig(): array
+function owCRDefaultConfig(): array
 {
     return [
         'reasons'      => "垃圾广告\n辱骂攻击\n色情低俗\n违法违规\n刷屏灌水\n其他",
@@ -65,9 +65,9 @@ function haCRDefaultConfig(): array
 }
 
 /** 读取全部配置（缺失项补默认值） */
-function haCRGetConfig(): array
+function owCRGetConfig(): array
 {
-    $cfg = haCRDefaultConfig();
+    $cfg = owCRDefaultConfig();
     $rows = DB::all('SELECT k, v FROM plugin_content_report_config');
     foreach ($rows as $r) {
         if (array_key_exists($r['k'], $cfg)) $cfg[$r['k']] = $r['v'];
@@ -81,13 +81,13 @@ function haCRGetConfig(): array
 }
 
 /** 保存单个配置项（不存在则插入） */
-function haCRSetConfig(string $k, string $v): void
+function owCRSetConfig(string $k, string $v): void
 {
     DB::upsert('plugin_content_report_config', ['k' => $k, 'v' => $v], ['k']);
 }
 
 /** 把理由文本按行拆分为数组（去空行、去重、保留顺序） */
-function haCRParseReasons(string $raw): array
+function owCRParseReasons(string $raw): array
 {
     $lines = preg_split('/\r\n|\r|\n/', $raw);
     $seen = [];
@@ -110,41 +110,41 @@ $crGuard = function (array $ctx): void {
 /* ===================== 后台页面 ===================== */
 
 Plugin::adminPage('content-report', '内容举报', function () {
-    $cfg = haCRGetConfig();
+    $cfg = owCRGetConfig();
     // 开关 HTML（与核心 switchHtml 结构一致，由 admin.js 调 bindSwitches 绑定视觉同步）
     // v1.2.52：行容器改成 div、for 只挂轨道 —— 与核心同款修复（点文字/空白不再误切换）
     $sw = function (string $id, string $label, bool $on, string $hint = ''): string {
-        return '<div class="ha-switch-row">'
-            . '<span class="ha-switch-label">' . Sec::e($label) . '</span>'
-            . '<input type="checkbox" class="ha-switch-input" id="' . Sec::e($id) . '"' . ($on ? ' checked' : '') . '>'
-            . '<label class="ha-switch' . ($on ? ' is-on' : '') . '" for="' . Sec::e($id) . '"></label>'
-            . ($hint ? '<p class="ha-switch-hint">' . Sec::e($hint) . '</p>' : '')
+        return '<div class="ow-switch-row">'
+            . '<span class="ow-switch-label">' . Sec::e($label) . '</span>'
+            . '<input type="checkbox" class="ow-switch-input" id="' . Sec::e($id) . '"' . ($on ? ' checked' : '') . '>'
+            . '<label class="ow-switch' . ($on ? ' is-on' : '') . '" for="' . Sec::e($id) . '"></label>'
+            . ($hint ? '<p class="ow-switch-hint">' . Sec::e($hint) . '</p>' : '')
             . '</div>';
     };
-    $h = '<h2>内容举报</h2><p class="ha-admin-desc">前台用户可通过头像右键菜单或资料卡举报他人，后台可在此配置举报规则并处理举报记录。</p>'
+    $h = '<h2>内容举报</h2><p class="ow-admin-desc">前台用户可通过头像右键菜单或资料卡举报他人，后台可在此配置举报规则并处理举报记录。</p>'
         // ---- 配置区 ----
-        . '<div class="ha-card"><h3 style="margin-bottom:10px">举报规则配置</h3>'
-        . '<div class="ha-form-item"><label>举报理由（每行一条，将作为前台下拉选项）</label>'
-        . '<textarea class="ha-input" id="haCRReasons" rows="6" style="resize:vertical">' . Sec::e($cfg['reasons']) . '</textarea></div>'
-        . '<div class="ha-form-row">'
-        . '<div class="ha-form-item"><label>同一用户举报间隔（秒，0 关闭）</label>'
-        . '<input class="ha-input" id="haCRInterval" type="number" min="0" value="' . (int)$cfg['interval'] . '"></div>'
-        . '<div class="ha-form-item"><label>补充说明字数上限</label>'
-        . '<input class="ha-input" id="haCRDescLimit" type="number" min="10" max="2000" value="' . (int)$cfg['desc_limit'] . '"></div>'
+        . '<div class="ow-card"><h3 style="margin-bottom:10px">举报规则配置</h3>'
+        . '<div class="ow-form-item"><label>举报理由（每行一条，将作为前台下拉选项）</label>'
+        . '<textarea class="ow-input" id="owCRReasons" rows="6" style="resize:vertical">' . Sec::e($cfg['reasons']) . '</textarea></div>'
+        . '<div class="ow-form-row">'
+        . '<div class="ow-form-item"><label>同一用户举报间隔（秒，0 关闭）</label>'
+        . '<input class="ow-input" id="owCRInterval" type="number" min="0" value="' . (int)$cfg['interval'] . '"></div>'
+        . '<div class="ow-form-item"><label>补充说明字数上限</label>'
+        . '<input class="ow-input" id="owCRDescLimit" type="number" min="10" max="2000" value="' . (int)$cfg['desc_limit'] . '"></div>'
         . '</div>'
-        . '<div id="haCRSwitches">'
-        . $sw('haCRRequireDesc', '必须填写补充说明', (bool)$cfg['require_desc'], '开启后用户举报时必须填写补充说明')
-        . $sw('haCRAllowSelf', '允许举报自己的内容', (bool)$cfg['allow_self'], '关闭后用户不能举报自己发送的内容')
-        . $sw('haCRShowGuest', '未登录显示举报入口', (bool)$cfg['show_guest'], '开启后游客也能看到举报入口，点击跳转登录页')
+        . '<div id="owCRSwitches">'
+        . $sw('owCRRequireDesc', '必须填写补充说明', (bool)$cfg['require_desc'], '开启后用户举报时必须填写补充说明')
+        . $sw('owCRAllowSelf', '允许举报自己的内容', (bool)$cfg['allow_self'], '关闭后用户不能举报自己发送的内容')
+        . $sw('owCRShowGuest', '未登录显示举报入口', (bool)$cfg['show_guest'], '开启后游客也能看到举报入口，点击跳转登录页')
         . '</div>'
-        . '<button class="ha-btn ha-btn-primary" onclick="HaCR.saveConfig()">保存配置</button></div>'
+        . '<button class="ow-btn ow-btn-primary" onclick="OwCR.saveConfig()">保存配置</button></div>'
         // ---- 举报列表 ----
-        . '<div class="ha-card">'
-        . '<div class="ha-admin-batch">'
-        . '<span style="color:var(--ha-text-sub);font-size:12px">待处理举报会以高亮显示</span>'
+        . '<div class="ow-card">'
+        . '<div class="ow-admin-batch">'
+        . '<span style="color:var(--ow-text-sub);font-size:12px">待处理举报会以高亮显示</span>'
         . '</div>'
-        . '<div class="ha-table-wrap"><table class="ha-table" id="haCRTable"></table></div>'
-        . '<div id="haCRPaging"></div></div>';
+        . '<div class="ow-table-wrap"><table class="ow-table" id="owCRTable"></table></div>'
+        . '<div id="owCRPaging"></div></div>';
     return $h;
 });
 
@@ -153,7 +153,7 @@ Plugin::adminPage('content-report', '内容举报', function () {
 /** 后台：获取配置 */
 Plugin::route('plugin_content_report_config_get', function (array $ctx) use ($crGuard) {
     $crGuard($ctx);
-    $cfg = haCRGetConfig();
+    $cfg = owCRGetConfig();
     Api::json(['ok' => true, 'data' => $cfg]);
 });
 
@@ -163,21 +163,21 @@ Plugin::route('plugin_content_report_config_save', function (array $ctx) use ($c
     $post = $ctx['post'];
     $reasons = trim((string)($post['reasons'] ?? ''));
     if ($reasons === '') Api::json(['ok' => false, 'msg' => '举报理由不能为空']);
-    $parsed = haCRParseReasons($reasons);
+    $parsed = owCRParseReasons($reasons);
     if (!$parsed) Api::json(['ok' => false, 'msg' => '举报理由不能为空']);
     // 重新用换行拼接（规范化）
-    haCRSetConfig('reasons', implode("\n", $parsed));
+    owCRSetConfig('reasons', implode("\n", $parsed));
 
     $interval = max(0, (int)($post['interval'] ?? 0));
-    haCRSetConfig('interval', (string)$interval);
+    owCRSetConfig('interval', (string)$interval);
 
     $descLimit = max(10, min(2000, (int)($post['desc_limit'] ?? 200)));
-    haCRSetConfig('desc_limit', (string)$descLimit);
+    owCRSetConfig('desc_limit', (string)$descLimit);
 
     // 三个开关：on=1 / off=0
-    haCRSetConfig('require_desc', !empty($post['require_desc']) ? '1' : '0');
-    haCRSetConfig('allow_self', !empty($post['allow_self']) ? '1' : '0');
-    haCRSetConfig('show_guest', !empty($post['show_guest']) ? '1' : '0');
+    owCRSetConfig('require_desc', !empty($post['require_desc']) ? '1' : '0');
+    owCRSetConfig('allow_self', !empty($post['allow_self']) ? '1' : '0');
+    owCRSetConfig('show_guest', !empty($post['show_guest']) ? '1' : '0');
 
     Sec::log('content_report_config', $ctx['actor']['nickname'], ['interval' => $interval, 'desc_limit' => $descLimit]);
     Api::json(['ok' => true, 'msg' => '配置已保存']);
@@ -227,11 +227,11 @@ Plugin::route('plugin_content_report_delete', function (array $ctx) use ($crGuar
  *  已登录用户额外返回理由列表与 require_desc / allow_self。
  */
 Plugin::route('plugin_content_report_get_reasons', function (array $ctx) {
-    $cfg = haCRGetConfig();
+    $cfg = owCRGetConfig();
     $isUser = ($ctx['actor']['kind'] ?? '') === 'user';
     $data = ['show_guest' => (int)$cfg['show_guest']];
     if ($isUser) {
-        $data['reasons']      = haCRParseReasons($cfg['reasons']);
+        $data['reasons']      = owCRParseReasons($cfg['reasons']);
         $data['desc_limit']   = (int)$cfg['desc_limit'];
         $data['require_desc'] = (int)$cfg['require_desc'];
         $data['allow_self']   = (int)$cfg['allow_self'];
@@ -255,14 +255,14 @@ Plugin::route('plugin_content_report_submit', function (array $ctx) {
 
     if ($targetUid <= 0) Api::json(['ok' => false, 'msg' => '举报对象无效']);
 
-    $cfg = haCRGetConfig();
+    $cfg = owCRGetConfig();
 
     // 允许举报自己：关闭时拦截
     if ($targetUid === (int)$actor['id'] && empty($cfg['allow_self'])) {
         Api::json(['ok' => false, 'msg' => '不能举报自己']);
     }
 
-    $reasons = haCRParseReasons($cfg['reasons']);
+    $reasons = owCRParseReasons($cfg['reasons']);
     if (!$reasons || !in_array($reason, $reasons, true)) Api::json(['ok' => false, 'msg' => '请选择举报理由']);
 
     $descLimit = (int)$cfg['desc_limit'];

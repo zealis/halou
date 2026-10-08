@@ -1,14 +1,14 @@
-/* twofa 插件后台样式 —— 复用主程序 ha- 前缀变量，移动端友好 */
-.ha-twofa-stats {
+/* twofa 插件后台样式 —— 复用主程序 ow- 前缀变量，移动端友好 */
+.ow-twofa-stats {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
     padding: 16px;
 }
-.ha-twofa-stat {
+.ow-twofa-stat {
     flex: 1 1 140px;
     min-width: 120px;
-    background: var(--ha-bg-sub, #f5f7fa);
+    background: var(--ow-bg-sub, #f5f7fa);
     border-radius: 6px;
     padding: 16px 12px;
     text-align: center;
@@ -16,30 +16,30 @@
     flex-direction: column;
     gap: 4px;
 }
-.ha-twofa-stat-num {
+.ow-twofa-stat-num {
     font-size: 24px;
     font-weight: bold;
-    color: var(--ha-primary, #00558f);
+    color: var(--ow-primary, #00558f);
     line-height: 1.2;
 }
-.ha-twofa-stat-label {
+.ow-twofa-stat-label {
     font-size: 13px;
-    color: var(--ha-text-sub, #666);
+    color: var(--ow-text-sub, #666);
 }
-.ha-twofa-stat-warn .ha-twofa-stat-num {
+.ow-twofa-stat-warn .ow-twofa-stat-num {
     color: #C41D1F;
 }
 @media (max-width: 640px) {
-    .ha-twofa-stats {
+    .ow-twofa-stats {
         padding: 12px;
         gap: 8px;
     }
-    .ha-twofa-stat {
+    .ow-twofa-stat {
         flex: 1 1 calc(50% - 8px);
         min-width: 0;
         padding: 12px 8px;
     }
-    .ha-twofa-stat-num {
+    .ow-twofa-stat-num {
         font-size: 20px;
     }
 }

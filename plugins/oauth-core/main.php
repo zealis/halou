@@ -49,7 +49,7 @@
  * ⚠️ 依赖本插件才能用：你的 plugin.json 里不必写 oauth.apps 钩子也行
  *    （collect 会自动加载本插件并把已注册应用收集出来）。
  */
-if (!defined('HALOU_VERSION')) exit;   // 禁止直接 HTTP 访问本文件
+if (!defined('OWLSGO_VERSION')) exit;   // 禁止直接 HTTP 访问本文件
 
 /* ============================ 建表 ============================ */
 Plugin::on('install', function () {
@@ -245,7 +245,7 @@ Plugin::route('plugin_oauth_core_apps', function (array $ctx) use ($oaGuard) {
 
 Plugin::route('plugin_oauth_core_grant', function (array $ctx) use ($oaGuard) {
     if (!$oaGuard($ctx)) Api::json(['ok' => false, 'msg' => '请先登录'], 403);
-    // ⚠️ 前端 HaApi.post 用 encodeURIComponent 逐字段编码，**数组会被拍成逗号串**
+    // ⚠️ 前端 OwApi.post 用 encodeURIComponent 逐字段编码，**数组会被拍成逗号串**
     // （["a","b"] → "a,b"），这里必须兼容字符串形态。
     $raw = $ctx['post']['scopes'] ?? [];
     if (!is_array($raw)) $raw = explode(',', (string)$raw);

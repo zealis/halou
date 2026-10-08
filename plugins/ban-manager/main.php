@@ -9,7 +9,7 @@
  *         停用本插件只下线管理入口，已生效的禁言继续拦截；
  *         其他插件可通过核心钩子 ban.check 扩展禁言判定。
  */
-if (!defined('HALOU_VERSION')) exit;
+if (!defined('OWLSGO_VERSION')) exit;
 
 /** 管理员鉴权：插件路由的公共守卫 */
 $bmGuard = function (array $ctx): void {
@@ -18,15 +18,15 @@ $bmGuard = function (array $ctx): void {
 
 /* ---------- 后台页面 ---------- */
 Plugin::adminPage('ban-manager', '禁言管理', function () {
-    return '<h2>禁言管理</h2><p class="ha-admin-desc">按用户 / 游客昵称 / IP 禁言，可按房间隔离，支持过期时间。</p>'
-        . '<div class="ha-card"><div class="ha-form-row">'
-        . '<div class="ha-form-item"><label>类型</label><select class="ha-input" id="haBType"><option value="user">用户ID</option><option value="guest">游客昵称</option><option value="ip">IP 地址</option></select></div>'
-        . '<div class="ha-form-item"><label>目标</label><input class="ha-input" id="haBTarget"></div>'
-        . '<div class="ha-form-item"><label>房间ID（0=全局）</label><input class="ha-input" id="haBRoom" value="0"></div>'
-        . '<div class="ha-form-item"><label>时长（小时，0=永久）</label><input class="ha-input" id="haBHours" value="24"></div>'
-        . '<div class="ha-form-item"><label>原因</label><input class="ha-input" id="haBReason"></div>'
-        . '<button class="ha-btn ha-btn-danger" onclick="HaBM.add()">添加禁言</button></div></div>'
-        . '<div id="haBList"></div>';
+    return '<h2>禁言管理</h2><p class="ow-admin-desc">按用户 / 游客昵称 / IP 禁言，可按房间隔离，支持过期时间。</p>'
+        . '<div class="ow-card"><div class="ow-form-row">'
+        . '<div class="ow-form-item"><label>类型</label><select class="ow-input" id="owBType"><option value="user">用户ID</option><option value="guest">游客昵称</option><option value="ip">IP 地址</option></select></div>'
+        . '<div class="ow-form-item"><label>目标</label><input class="ow-input" id="owBTarget"></div>'
+        . '<div class="ow-form-item"><label>房间ID（0=全局）</label><input class="ow-input" id="owBRoom" value="0"></div>'
+        . '<div class="ow-form-item"><label>时长（小时，0=永久）</label><input class="ow-input" id="owBHours" value="24"></div>'
+        . '<div class="ow-form-item"><label>原因</label><input class="ow-input" id="owBReason"></div>'
+        . '<button class="ow-btn ow-btn-danger" onclick="OwBM.add()">添加禁言</button></div></div>'
+        . '<div id="owBList"></div>';
 });
 
 /* ---------- 列表（原 admin_bans） ---------- */
@@ -121,6 +121,6 @@ Plugin::route('plugin_ban_manager_quick', function (array $ctx) {
 Plugin::sensitive('plugin_ban_manager_quick');   // 右键快速禁言：敏感（v1.0.91）
 
 // 注册脚本：admin.js（后台页面交互）+ chat.js（群聊右键菜单）
-// 聊天页自 v1.0.55 起由主程序统一引入合并资源（在 HaChat.init 之后），插件无需自行注入
+// 聊天页自 v1.0.55 起由主程序统一引入合并资源（在 OwChat.init 之后），插件无需自行注入
 Plugin::asset('js', 'ban-manager/admin.js');
 Plugin::asset('js', 'ban-manager/chat.js');

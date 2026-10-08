@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Halou-Chat 自研扁平化 UI（ow 前缀）
+   Owlsgo-Chat 自研扁平化 UI（ow 前缀）
    色彩规范：经典蓝 #00A0E9（装饰）/ 文字蓝 #0099FF / 深蓝 #00558F，禁渐变、禁毛玻璃、
    禁 Emoji 图标依赖；文字与其背景对比度须达 WCAG AA（正文 4.5:1、大字与 UI 组件 3:1）
    兼容旧内核浏览器：flex 布局 + 媒体查询，无 CSS Grid 依赖（渐进增强）
@@ -8,66 +8,66 @@
 :root {
     /* 色系按 WCAG AA 校准（v1.0.56）：品牌色保留用于装饰/边框，
        承载文字或白字的场景一律使用加深后的 *-strong / 深色调，确保对比度 ≥4.5:1 */
-    --ha-primary: #00A0E9;          /* 品牌蓝：仅用于描边、图标底、焦点态，不承载文字 */
-    --ha-primary-strong: #0099FF;   /* 主色蓝（v1.0.122 调整）；实心按钮白字建议配合 hover 深蓝 #00558F 保证对比 */
-    --ha-primary-dark: #00558F;     /* 悬停、选中态（白 7.79:1、浅蓝底 7.09:1） */
-    --ha-bg: #FFFFFF;
-    --ha-bg-sub: #F5F5F5;           /* 次级底色：白卡片内的小块（表头/提示条/禁用输入框） */
-    /* v1.2.55：--ha-bg-sub 由 #F5F7FA 改为 #F5F5F5（用户定版），与聊天区底色
-       --ha-bg-chat 对齐 —— 全站只留这一档浅灰，白色卡片（「内容岛」）浮在它上面，
+    --ow-primary: #00A0E9;          /* 品牌蓝：仅用于描边、图标底、焦点态，不承载文字 */
+    --ow-primary-strong: #0099FF;   /* 主色蓝（v1.0.122 调整）；实心按钮白字建议配合 hover 深蓝 #00558F 保证对比 */
+    --ow-primary-dark: #00558F;     /* 悬停、选中态（白 7.79:1、浅蓝底 7.09:1） */
+    --ow-bg: #FFFFFF;
+    --ow-bg-sub: #F5F5F5;           /* 次级底色：白卡片内的小块（表头/提示条/禁用输入框） */
+    /* v1.2.55：--ow-bg-sub 由 #F5F7FA 改为 #F5F5F5（用户定版），与聊天区底色
+       --ow-bg-chat 对齐 —— 全站只留这一档浅灰，白色卡片（「内容岛」）浮在它上面，
        不再出现两种灰。
        ⚠️ 副作用：本变量同时被若干 hover 复用，落在**灰底区域**（两侧栏 / 顶栏）上的
-       hover 会与底色同色而失效 —— 那些点已改用 --ha-bg-chat-hover(#EBEBEB)，见下方各处注释。 */
-    --ha-bg-chat: #F5F5F5;
-    --ha-bg-chat-grad: none;             /* 纯色，不需要渐变 */
-    --ha-bg-chat-hover: #EBEBEB;         /* hover 反馈：略深一档的同色系灰 */
-    --ha-border: #E0E4E8;            /* 装饰性分隔线（卡片/表格），非交互组件 */
-    --ha-border-control: #8C8C8C;    /* 输入控件边框：对白底 3.36:1，满足 UI 组件 3:1 */
-    --ha-text: #333333;
-    --ha-text-sub: #5C5C5C;         /* 副文本：白底 6.69、浅灰底 6.23、徽章底 5.23 */
-    --ha-text-title: #1A1A1A;
-    --ha-green: #237804;            /* 成功 / 可发言：白底 5.59、浅绿标签底 5.44 */
-    --ha-yellow: #874D00;           /* 称号标签等：浅黄底 6.53 */
-    --ha-red: #C41D1F;              /* 危险 / 管理员标签：白底 5.93、浅红底 5.39，白字 5.93 */
-    --ha-orange: #A05000;           /* VIP 标签：浅橙底 5.41、白底 5.77 */
-    --ha-blue-light: #E6F7FF;
-    /* v1.1.22：悬浮底色独立成变量。原先 hover 直接复用 --ha-blue-light(#E6F7FF)，
-       导致「改悬浮色」会连带动到 3 处非悬浮：.ha-room-item/.ha-cl-item/.ha-admin-menu
-       的 .active 选中态，以及 .ha-msg.mine 自己消息气泡底色。
+       hover 会与底色同色而失效 —— 那些点已改用 --ow-bg-chat-hover(#EBEBEB)，见下方各处注释。 */
+    --ow-bg-chat: #F5F5F5;
+    --ow-bg-chat-grad: none;             /* 纯色，不需要渐变 */
+    --ow-bg-chat-hover: #EBEBEB;         /* hover 反馈：略深一档的同色系灰 */
+    --ow-border: #E0E4E8;            /* 装饰性分隔线（卡片/表格），非交互组件 */
+    --ow-border-control: #8C8C8C;    /* 输入控件边框：对白底 3.36:1，满足 UI 组件 3:1 */
+    --ow-text: #333333;
+    --ow-text-sub: #5C5C5C;         /* 副文本：白底 6.69、浅灰底 6.23、徽章底 5.23 */
+    --ow-text-title: #1A1A1A;
+    --ow-green: #237804;            /* 成功 / 可发言：白底 5.59、浅绿标签底 5.44 */
+    --ow-yellow: #874D00;           /* 称号标签等：浅黄底 6.53 */
+    --ow-red: #C41D1F;              /* 危险 / 管理员标签：白底 5.93、浅红底 5.39，白字 5.93 */
+    --ow-orange: #A05000;           /* VIP 标签：浅橙底 5.41、白底 5.77 */
+    --ow-blue-light: #E6F7FF;
+    /* v1.1.22：悬浮底色独立成变量。原先 hover 直接复用 --ow-blue-light(#E6F7FF)，
+       导致「改悬浮色」会连带动到 3 处非悬浮：.ow-room-item/.ow-cl-item/.ow-admin-menu
+       的 .active 选中态，以及 .ow-msg.mine 自己消息气泡底色。
        用户只要求改悬浮，故这里另开一个变量，两类语义彻底分开。 */
     /* v1.1.23：#E4E4E4 → #E8E8E8（悬浮稍亮一点，与选中态 #E4E4E4 拉开层次）。 */
-    --ha-hover-bg: #E8E8E8;
-    /* v1.1.23：选中态独立成变量。原先 3 处 .active 都复用 --ha-blue-light(#E6F7FF 浅蓝)，
-       本轮按要求改成中性灰 #E4E4E4。新增独立变量而不是改 --ha-blue-light，
-       因为后者还被 .ha-msg.mine（自己消息气泡底色）共用 —— 那是**非选中**场景，
+    --ow-hover-bg: #E8E8E8;
+    /* v1.1.23：选中态独立成变量。原先 3 处 .active 都复用 --ow-blue-light(#E6F7FF 浅蓝)，
+       本轮按要求改成中性灰 #E4E4E4。新增独立变量而不是改 --ow-blue-light，
+       因为后者还被 .ow-msg.mine（自己消息气泡底色）共用 —— 那是**非选中**场景，
        跟「当前选中行」语义无关，不能一起改。 */
-    --ha-active-bg: #E4E4E4;
-    --ha-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-    --ha-mono: Consolas, Monaco, "Courier New", monospace;
+    --ow-active-bg: #E4E4E4;
+    --ow-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --ow-mono: Consolas, Monaco, "Courier New", monospace;
     /* v1.1.17：顶栏高度带。实测 = padding 10+10 + 图标钮 36 + 下边框 1 = 57px。
        抽成变量的唯一目的：**让右侧栏「群聊设置」下方的分隔线与顶栏下边框
        落在同一水平线上**（见文件末尾 v1.1.17 的桌面端对齐块）。
        改这个值只需改这一处，两侧同时跟随，不会各自漂移。 */
-    --ha-topbar-h: 57px;
+    --ow-topbar-h: 57px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
 body {
-    font-family: var(--ha-font);
+    font-family: var(--ow-font);
     font-size: 14px;
     line-height: 1.6;
-    color: var(--ha-text);
-    background: var(--ha-bg-sub);
+    color: var(--ow-text);
+    background: var(--ow-bg-sub);
 }
-a { color: var(--ha-primary-strong); text-decoration: none; }
-a:hover { color: var(--ha-primary-dark); }
+a { color: var(--ow-primary-strong); text-decoration: none; }
+a:hover { color: var(--ow-primary-dark); }
 img { max-width: 100%; }
 ul { list-style: none; }
 
 /* ---------- 滚动条（v1.2.16）----------
    轨道透明、只给滑块上色，内容区不因滚动条被挤出一道灰带。
-   滑块 #D8D8D8：比 --ha-border(#E0E4E8) 略深一点，浅到不抢眼、
+   滑块 #D8D8D8：比 --ow-border(#E0E4E8) 略深一点，浅到不抢眼、
    又深到在 #F5F5F5 轨道上能看出边界。
    ::-webkit-scrollbar 是 Chrome/Edge/Safari；scrollbar-color 是
    Firefox 2024+ 标准属性。两套都写，旧内核无对应属性则保持系统默认，
@@ -88,34 +88,34 @@ html { scrollbar-color: #D8D8D8 transparent; scrollbar-width: thin; }
 button { font-family: inherit; cursor: pointer; }
 
 /* ---------- 按钮 ---------- */
-.ha-btn {
+.ow-btn {
     display: inline-block;
     padding: 8px 18px;
     border: 1px solid transparent;
     border-radius: 6px;
     font-size: 14px;
     line-height: 1.4;
-    background: var(--ha-bg-sub);
-    color: var(--ha-text);
+    background: var(--ow-bg-sub);
+    color: var(--ow-text);
     transition: background .15s;
 }
-.ha-btn-primary { background: var(--ha-primary-strong); color: #fff; }
-.ha-btn-primary:hover { background: var(--ha-primary-dark); color: #fff; }   /* 显式锁白，防 a:hover 级联吞字 */
-.ha-btn-primary:active { background: #005a9e; }
-.ha-btn-ghost { background: transparent; border-color: var(--ha-border-control); }
-.ha-btn-ghost:hover { background: var(--ha-hover-bg); color: var(--ha-primary-dark); }
-.ha-btn-block { display: block; width: 100%; text-align: center; }
+.ow-btn-primary { background: var(--ow-primary-strong); color: #fff; }
+.ow-btn-primary:hover { background: var(--ow-primary-dark); color: #fff; }   /* 显式锁白，防 a:hover 级联吞字 */
+.ow-btn-primary:active { background: #005a9e; }
+.ow-btn-ghost { background: transparent; border-color: var(--ow-border-control); }
+.ow-btn-ghost:hover { background: var(--ow-hover-bg); color: var(--ow-primary-dark); }
+.ow-btn-block { display: block; width: 100%; text-align: center; }
 /* 小号按钮（列表行内操作，如「移出」）：与正文同色系但更紧凑 */
-.ha-btn-mini { padding: 4px 10px; font-size: 12px; border-radius: 4px; }
+.ow-btn-mini { padding: 4px 10px; font-size: 12px; border-radius: 4px; }
 /* 弹窗按钮行分列：左侧一个辅助操作（如「成员管理」），右侧保持右对齐的取消/保存。
    中间的弹性占位把右半组推到右边，避免给按钮加 margin-left:auto（移动端会挤）。 */
-.ha-modal-actions-split { justify-content: space-between; -webkit-justify-content: space-between; }
-.ha-modal-actions-split .ha-modal-actions-sp { flex: 1; -webkit-flex: 1; min-width: 0; }
-.ha-btn-danger { background: var(--ha-red); color: #fff; }
-.ha-btn-danger:hover { background: #cf1322; }
-.ha-btn[disabled] { opacity: .5; cursor: not-allowed; }
+.ow-modal-actions-split { justify-content: space-between; -webkit-justify-content: space-between; }
+.ow-modal-actions-split .ow-modal-actions-sp { flex: 1; -webkit-flex: 1; min-width: 0; }
+.ow-btn-danger { background: var(--ow-red); color: #fff; }
+.ow-btn-danger:hover { background: #cf1322; }
+.ow-btn[disabled] { opacity: .5; cursor: not-allowed; }
 
-.ha-icon-btn {
+.ow-icon-btn {
     border: none;
     background: transparent;
     font-size: 18px;
@@ -124,66 +124,66 @@ button { font-family: inherit; cursor: pointer; }
     line-height: 36px;
     text-align: center;
     border-radius: 6px;
-    color: var(--ha-text-sub);
+    color: var(--ow-text-sub);
 }
-/* v1.2.55：顶栏底色是 --ha-bg-chat(#F5F5F5)，用 --ha-bg-sub 做 hover 会与底色同色 */
-.ha-icon-btn:hover { background: var(--ha-bg-chat-hover); color: var(--ha-primary-dark); }
-.ha-ico { vertical-align: middle; }
+/* v1.2.55：顶栏底色是 --ow-bg-chat(#F5F5F5)，用 --ow-bg-sub 做 hover 会与底色同色 */
+.ow-icon-btn:hover { background: var(--ow-bg-chat-hover); color: var(--ow-primary-dark); }
+.ow-ico { vertical-align: middle; }
 
 /* ---------- 表单 ---------- */
-.ha-form-item { margin-bottom: 14px; }
-.ha-form-item label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--ha-text); }
-.ha-input {
+.ow-form-item { margin-bottom: 14px; }
+.ow-form-item label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--ow-text); }
+.ow-input {
     width: 100%;
     padding: 9px 12px;
-    border: 1px solid var(--ha-border-control);
+    border: 1px solid var(--ow-border-control);
     border-radius: 6px;
-    background: var(--ha-bg-sub);
+    background: var(--ow-bg-sub);
     font-size: 14px;
     font-family: inherit;
-    color: var(--ha-text);
+    color: var(--ow-text);
 }
-.ha-input:focus { outline: none; border-color: var(--ha-primary-strong); background: #fff; }
-.ha-form-msg { margin-top: 10px; font-size: 13px; min-height: 20px; }
-.ha-captcha-row { display: flex; display: -webkit-flex; gap: 8px; }
-.ha-captcha-row .ha-input { flex: 1; -webkit-flex: 1; }
-.ha-captcha-row img { height: 38px; border: 1px solid var(--ha-border); border-radius: 6px; cursor: pointer; }
+.ow-input:focus { outline: none; border-color: var(--ow-primary-strong); background: #fff; }
+.ow-form-msg { margin-top: 10px; font-size: 13px; min-height: 20px; }
+.ow-captcha-row { display: flex; display: -webkit-flex; gap: 8px; }
+.ow-captcha-row .ow-input { flex: 1; -webkit-flex: 1; }
+.ow-captcha-row img { height: 38px; border: 1px solid var(--ow-border); border-radius: 6px; cursor: pointer; }
 
 /* ---------- 开关（State 按钮，v1.1.5 通用样式轮子） ----------
-   结构：.ha-switch-row（行） > label.ha-switch-label（左侧文字）
-        + .ha-switch（右侧 iOS 风格开关） + p.ha-switch-hint（下方提示）
-   用法见 assets/js/chat.js 的 HaChat.switchHtml()，前后台与插件共用同一套。
+   结构：.ow-switch-row（行） > label.ow-switch-label（左侧文字）
+        + .ow-switch（右侧 iOS 风格开关） + p.ow-switch-hint（下方提示）
+   用法见 assets/js/chat.js 的 OwChat.switchHtml()，前后台与插件共用同一套。
 
-   ⚠️ 选择器写成 `.ha-switch-row, .ha-switch-row.ha-switch-row` 是刻意的：
-   .ha-switch-row 本身就是 <label>，放进 .ha-form-item 里会被
-   `.ha-form-item label { display:block }`（特异性 0,0,1,1）盖掉
-   `.ha-switch-row`（0,0,1,0）的 flex 布局 —— 表现为开关掉到文字下一行、
+   ⚠️ 选择器写成 `.ow-switch-row, .ow-switch-row.ow-switch-row` 是刻意的：
+   .ow-switch-row 本身就是 <label>，放进 .ow-form-item 里会被
+   `.ow-form-item label { display:block }`（特异性 0,0,1,1）盖掉
+   `.ow-switch-row`（0,0,1,0）的 flex 布局 —— 表现为开关掉到文字下一行、
    整行高度与其它表单项对不齐。重复类名把权重提到 0,0,2,0 稳定压过它。 */
-.ha-switch-row,
-.ha-switch-row.ha-switch-row {
+.ow-switch-row,
+.ow-switch-row.ow-switch-row {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 12px;
     margin-bottom: 14px;
-    min-height: 30px;      /* 与 .ha-input 的 9px*2+1px*2+14 ≈ 35px 视觉对齐 */
+    min-height: 30px;      /* 与 .ow-input 的 9px*2+1px*2+14 ≈ 35px 视觉对齐 */
     /* v1.2.52：整行**不可点**（cursor 默认）。行容器已从 <label for> 改成 div，
-       点击只有 .ha-switch 轨道生效 —— 指针形态必须跟着改，否则「看着能点、点了没反应」。 */
+       点击只有 .ow-switch 轨道生效 —— 指针形态必须跟着改，否则「看着能点、点了没反应」。 */
     cursor: default;
     user-select: none; -webkit-user-select: none;
-    font-size: 13px;       /* 同为覆盖 .ha-form-item label 的继承值 */
+    font-size: 13px;       /* 同为覆盖 .ow-form-item label 的继承值 */
 }
-.ha-switch-row.is-disabled { cursor: not-allowed; opacity: .5; }
-.ha-switch-label {
+.ow-switch-row.is-disabled { cursor: not-allowed; opacity: .5; }
+.ow-switch-label {
     /* v1.2.53：不再 `flex:1` 撑满整行 —— 原来标签吃掉全部剩余宽度，把轨道顶到最右，
        开关与文字隔着一整行空白（用户报的「样式错乱」）。
        改成「按内容宽度、空间不足才收缩」，轨道就紧跟在文字后面（间距由行的 gap:12px 给）。 */
     flex: 0 1 auto; -webkit-flex: 0 1 auto;
     min-width: 0; -webkit-min-width: 0;
     font-size: 13px;
-    color: var(--ha-text);
-    margin-bottom: 0;      /* 覆盖 .ha-form-item label 的 display:block + margin */
+    color: var(--ow-text);
+    margin-bottom: 0;      /* 覆盖 .ow-form-item label 的 display:block + margin */
 }
-.ha-switch {
+.ow-switch {
     /* 尺寸参照 iOS 风格开关：轨道 44×26，滑块 22，位移 18 */
     position: relative;
     flex-shrink: 0; -webkit-flex-shrink: 0;
@@ -195,7 +195,7 @@ button { font-family: inherit; cursor: pointer; }
     transition: background .2s; -webkit-transition: background .2s;
     box-sizing: border-box;
 }
-.ha-switch::after {
+.ow-switch::after {
     content: '';
     position: absolute; top: 2px; left: 2px;
     width: 22px; height: 22px;
@@ -204,72 +204,72 @@ button { font-family: inherit; cursor: pointer; }
     box-shadow: 0 1px 3px rgba(0, 0, 0, .28);
     transition: transform .2s; -webkit-transition: transform .2s;
 }
-.ha-switch.is-on { background: var(--ha-primary-strong); }
-.ha-switch.is-on::after { transform: translateX(18px); -webkit-transform: translateX(18px); }
-/* 禁用态：整行半透明由 .ha-switch-row.is-disabled 管，这里只补「轨道不该是手型」 */
-.ha-switch-row.is-disabled .ha-switch { cursor: not-allowed; }
+.ow-switch.is-on { background: var(--ow-primary-strong); }
+.ow-switch.is-on::after { transform: translateX(18px); -webkit-transform: translateX(18px); }
+/* 禁用态：整行半透明由 .ow-switch-row.is-disabled 管，这里只补「轨道不该是手型」 */
+.ow-switch-row.is-disabled .ow-switch { cursor: not-allowed; }
 
 /* ---------- 折叠分组（v1.2.53，通用轮子）----------
    后台「系统设置」按主题分成若干组（基本信息 / 群聊 / 游客、存储 / 系统与维护），
    每组可点标题展开收起 —— 表单项一多时不用拖长条滚动找。
    结构（与开关一样，前后台与插件共用）：
-     <div class="ha-fold is-open">
-       <div class="ha-fold-hd" onclick="...">标题<span class="ha-fold-arrow">▸</span></div>
-       <div class="ha-fold-bd">…内容…</div>
+     <div class="ow-fold is-open">
+       <div class="ow-fold-hd" onclick="...">标题<span class="ow-fold-arrow">▸</span></div>
+       <div class="ow-fold-bd">…内容…</div>
      </div>
    展开状态由 is-open 表达（**不用** :nth-child / 内联样式）。 */
-.ha-fold {
-    border: 1px solid var(--ha-border);
+.ow-fold {
+    border: 1px solid var(--ow-border);
     border-radius: 6px;
     margin-bottom: 12px;
     background: #FFFFFF;
     overflow: hidden;
 }
-.ha-fold-hd {
+.ow-fold-hd {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 8px;
     padding: 10px 12px;
     font-size: 14px;
     font-weight: 600;
-    color: var(--ha-text-title);
+    color: var(--ow-text-title);
     cursor: pointer;
     user-select: none; -webkit-user-select: none;
 }
-.ha-fold-hd:hover { background: var(--ha-bg-sub); }
-.ha-fold-arrow {
+.ow-fold-hd:hover { background: var(--ow-bg-sub); }
+.ow-fold-arrow {
     margin-left: auto;
     font-size: 12px;
-    color: var(--ha-text-sub);
+    color: var(--ow-text-sub);
     transition: transform .2s; -webkit-transition: transform .2s;
 }
-.ha-fold.is-open .ha-fold-arrow { transform: rotate(90deg); -webkit-transform: rotate(90deg); }
-.ha-fold-bd {
+.ow-fold.is-open .ow-fold-arrow { transform: rotate(90deg); -webkit-transform: rotate(90deg); }
+.ow-fold-bd {
     display: none;
     padding: 12px;
-    border-top: 1px solid var(--ha-border);
+    border-top: 1px solid var(--ow-border);
 }
-.ha-fold.is-open .ha-fold-bd { display: block; }
-.ha-switch-hint {
+.ow-fold.is-open .ow-fold-bd { display: block; }
+.ow-switch-hint {
     flex-basis: 100%; -webkit-flex-basis: 100%;
     margin: -6px 0 0;                     /* 紧贴开关行，不额外撑高 */
     font-size: 12px;
-    color: var(--ha-text-sub);
+    color: var(--ow-text-sub);
     line-height: 1.5;
 }
 /* 提示要换行到下一行：把行改成可换行容器，标签与开关保持一行 */
-/* v1.2.53：删掉 `.ha-switch-row > .ha-switch { margin-left:auto }`。
+/* v1.2.53：删掉 `.ow-switch-row > .ow-switch { margin-left:auto }`。
    它和上面的 flex:1 是同一套「轨道靠右」设计，用户要求开关紧跟文字后一并去掉。
    行的 gap:12px 已经保证文字与轨道的间距。hint 依旧 flex-basis:100% 换行到下一行。 */
-.ha-switch-row { flex-wrap: wrap; -webkit-flex-wrap: wrap; }
+.ow-switch-row { flex-wrap: wrap; -webkit-flex-wrap: wrap; }
 /* 无障碍：键盘可达。原生 checkbox 视觉隐藏但保留在 DOM 与 tab 序列里 */
-.ha-switch-input { position: absolute; opacity: 0; width: 0; height: 0; }
-.ha-switch-input:focus-visible + .ha-switch { outline: 2px solid var(--ha-primary-strong); outline-offset: 2px; }
+.ow-switch-input { position: absolute; opacity: 0; width: 0; height: 0; }
+.ow-switch-input:focus-visible + .ow-switch { outline: 2px solid var(--ow-primary-strong); outline-offset: 2px; }
 
 /* ---------- 滑块（range，v1.2.21 通用样式轮子）----------
-   全项目只有一处 range：头像裁剪弹窗的缩放滑块（chat.js 的 #haCropZoom）。
+   全项目只有一处 range：头像裁剪弹窗的缩放滑块（chat.js 的 #owCropZoom）。
    不给它上色时走浏览器 UA 蓝（Chrome 是 #0075FF 一类），和主按钮
-   --ha-primary-strong(#0099FF) 不是同一个蓝 —— 同一屏里出现两种蓝。
+   --ow-primary-strong(#0099FF) 不是同一个蓝 —— 同一屏里出现两种蓝。
 
    accent-color 一条属性同时管住「滑块圆钮 + 已填充轨道」，
    Chrome 93+ / Firefox / Safari 15.4+ 均支持；旧内核无该属性时
@@ -280,15 +280,15 @@ button { font-family: inherit; cursor: pointer; }
    accent-color 的进度填充也会跟着失效，反而更丑。
    本项目禁渐变/禁毛玻璃，滑块保持纯色圆钮即可。 */
 input[type=range] {
-    accent-color: var(--ha-primary-strong);   /* #0099FF，与 .ha-btn-primary 同色 */
+    accent-color: var(--ow-primary-strong);   /* #0099FF，与 .ow-btn-primary 同色 */
     cursor: pointer;
 }
 
-.ha-alert { padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 13px; }
-.ha-alert-error { background: #fff1f0; color: var(--ha-red); border: 1px solid #ffa39e; }
+.ow-alert { padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 13px; }
+.ow-alert-error { background: #fff1f0; color: var(--ow-red); border: 1px solid #ffa39e; }
 
 /* ---------- 标签 ---------- */
-.ha-tag {
+.ow-tag {
     display: inline-block;
     padding: 1px 8px;
     font-size: 10px;
@@ -296,21 +296,21 @@ input[type=range] {
     border-radius: 3px;
     vertical-align: middle;
 }
-.ha-tag-green { background: #f6ffed; color: var(--ha-green); border: 1px solid #b7eb8f; }
-/* v1.2.56：危险/禁用标签（与 ha-tag-green 对称；此前没有红色系标签，禁用态只能用文字） */
-.ha-tag-red { background: #FFF1F0; color: var(--ha-red); border: 1px solid #FFA39E; }
+.ow-tag-green { background: #f6ffed; color: var(--ow-green); border: 1px solid #b7eb8f; }
+/* v1.2.56：危险/禁用标签（与 ow-tag-green 对称；此前没有红色系标签，禁用态只能用文字） */
+.ow-tag-red { background: #FFF1F0; color: var(--ow-red); border: 1px solid #FFA39E; }
 /* 群主（v1.0.89）：浅棕底 #F4DCCA + 橙字 #F4995D；会员同理去黑字改灰字 */
-.ha-tag-owner { background: #F4DCCA; color: #F4995D; border: 1px solid #E9CDB2; }
-.ha-tag-vip { background: #fff7e6; color: var(--ha-orange); border: 1px solid #ffd591; }
+.ow-tag-owner { background: #F4DCCA; color: #F4995D; border: 1px solid #E9CDB2; }
+.ow-tag-vip { background: #fff7e6; color: var(--ow-orange); border: 1px solid #ffd591; }
 /* 会员（v1.0.89）：灰底 + 中灰字（同群主思路：文字用标签色的深一档，不用黑） */
-.ha-tag-member { background: #E4E4E4; color: #8C8C8C; border: 1px solid #D5D5D5; }
+.ow-tag-member { background: #E4E4E4; color: #8C8C8C; border: 1px solid #D5D5D5; }
 /* v1.2.40：超级管理员（仅管理场景出现：用户资料卡 / 群成员管理）。
-   用主色系（蓝）以便一眼认出；**刻意区别于 .ha-tag-owner**（群主是米金），
+   用主色系（蓝）以便一眼认出；**刻意区别于 .ow-tag-owner**（群主是米金），
    两者含义不同不能同色。 */
-.ha-tag-admin { background: #E6F4FF; color: var(--ha-primary-dark); border: 1px solid #91CAFF; }
-.ha-tag-guest { background: var(--ha-bg-sub); color: var(--ha-text-sub); border: 1px solid var(--ha-border); }
-.ha-tag-title { background: #fffbe6; color: var(--ha-yellow); border: 1px solid #ffe58f; }
-.ha-badge-num {
+.ow-tag-admin { background: #E6F4FF; color: var(--ow-primary-dark); border: 1px solid #91CAFF; }
+.ow-tag-guest { background: var(--ow-bg-sub); color: var(--ow-text-sub); border: 1px solid var(--ow-border); }
+.ow-tag-title { background: #fffbe6; color: var(--ow-yellow); border: 1px solid #ffe58f; }
+.ow-badge-num {
     display: inline-block;
     min-width: 18px;
     padding: 0 5px;
@@ -318,8 +318,8 @@ input[type=range] {
     line-height: 16px;
     text-align: center;
     border-radius: 8px;
-    background: var(--ha-border);
-    color: var(--ha-text-sub);
+    background: var(--ow-border);
+    color: var(--ow-text-sub);
 }
 
 /* ---------- 通用 Tabs 组件（v1.2.20，选中态配色 v1.2.21） ----------
@@ -330,24 +330,24 @@ input[type=range] {
    - v1.2.20 白胶囊 + 黑字 + 轻投影，理由是「主色已在发送按钮等处密集出现，
      标签页再上色会拉走侧栏视觉重心」；
    - v1.2.21 用户要求「和按钮一样 #0099FF」→ 改为**主色实心 + 白字**，
-     与 .ha-btn-primary / .ha-switch.is-on 统一为「选中 = 主色」。
+     与 .ow-btn-primary / .ow-switch.is-on 统一为「选中 = 主色」。
    实测观感：实色胶囊在 240px 侧栏里更像「当前所在的位置」，而不是一块待点的白块。
 
    ⚠️ 结构约定（插件扩展必须遵守）：
-   <div class="ha-tabs" id="haSideTabs">
-     <button class="ha-tab is-active" data-tab="chat"><span class="ha-tab-lb">消息</span></button>
-     <button class="ha-tab" data-tab="friends"><span class="ha-tab-lb">联系人</span></button>
+   <div class="ow-tabs" id="owSideTabs">
+     <button class="ow-tab is-active" data-tab="chat"><span class="ow-tab-lb">消息</span></button>
+     <button class="ow-tab" data-tab="friends"><span class="ow-tab-lb">联系人</span></button>
    </div>
    - 选中态由 `is-active` 类表达，**不要**用 :nth-child 或 JS 内联样式 ——
      插件可在任意位置插入标签，位置会变。
-   - 面板切换由 JS 控制（.ha-tab-panel 的 display），本组件只管标签条外观。 */
-.ha-tabs {
+   - 面板切换由 JS 控制（.ow-tab-panel 的 display），本组件只管标签条外观。 */
+.ow-tabs {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 2px;
     padding: 3px;
     margin: 10px 12px 6px;
-    background: var(--ha-bg-sub);
+    background: var(--ow-bg-sub);
     border-radius: 9px;
     /* 标签数量多时（插件可能加）允许横向滚动，不换行撑高侧栏 */
     overflow-x: auto;
@@ -355,8 +355,8 @@ input[type=range] {
     scrollbar-width: none;              /* Firefox：隐藏滚动条，条本身已很矮 */
     -webkit-overflow-scrolling: touch;
 }
-.ha-tabs::-webkit-scrollbar { display: none; }   /* WebKit：同上 */
-.ha-tab {
+.ow-tabs::-webkit-scrollbar { display: none; }   /* WebKit：同上 */
+.ow-tab {
     flex: 1 1 auto; -webkit-flex: 1 1 auto;
     min-width: 0;
     /* 3px 上下 + 13px 字号 → 标签条总高约 34px，与侧栏其它控件同一档 */
@@ -366,33 +366,33 @@ input[type=range] {
     border-radius: 6px;
     font-size: 13px;
     line-height: 1;
-    color: var(--ha-text-sub);
+    color: var(--ow-text-sub);
     cursor: pointer;
     white-space: nowrap;
     /* 背景色过渡，切换时不闪 */
     transition: background-color .15s, color .15s, box-shadow .15s;
     -webkit-transition: background-color .15s, color .15s, box-shadow .15s;
 }
-.ha-tab:hover { color: var(--ha-text-title); }
-.ha-tab.is-active {
-    /* v1.2.21：选中态由「白底黑字」改为**主色实心**，与 .ha-btn-primary /
-       .ha-switch.is-on 同色 #0099FF（--ha-primary-strong），
+.ow-tab:hover { color: var(--ow-text-title); }
+.ow-tab.is-active {
+    /* v1.2.21：选中态由「白底黑字」改为**主色实心**，与 .ow-btn-primary /
+       .ow-switch.is-on 同色 #0099FF（--ow-primary-strong），
        对齐项目里「选中 / 激活 = 主色」的既定语言。
        几何完全不动：字号 13px、内边距 6px 10px、圆角 6px 全部保持，
        所以只剩颜色差异，切换时不会出现胶囊宽度跳动。
        ⚠️ 不要再叠 font-weight:600：中文字体在 13px 下加粗会引起字形撑宽，
        两颗标签会重排（用户选定的分段控件观感被破坏）。 */
-    background: var(--ha-primary-strong);
+    background: var(--ow-primary-strong);
     color: #FFFFFF;
     box-shadow: none;   /* 白胶囊靠轻阴影浮起；实色胶囊不需要 */
     cursor: default;
 }
-/* 显式锁白：.ha-tab:hover（0,0,2,0）与 .ha-tab.is-active（0,0,2,0）同特异性，
+/* 显式锁白：.ow-tab:hover（0,0,2,0）与 .ow-tab.is-active（0,0,2,0）同特异性，
    靠源码顺序定胜负；这里仍显式写一条锁死，避免日后有人把 :hover 挪到后面，
-   选中项文字被 :hover 的深色吞掉（.ha-btn-primary 踩过一次完全同型的坑）。 */
-.ha-tab.is-active:hover { background: var(--ha-primary-strong); color: #FFFFFF; }
-/* 插件新增的标签允许带角标（如未读数），用 .ha-tab-badge 套在 .ha-tab-lb 之后 */
-.ha-tab .ha-tab-badge {
+   选中项文字被 :hover 的深色吞掉（.ow-btn-primary 踩过一次完全同型的坑）。 */
+.ow-tab.is-active:hover { background: var(--ow-primary-strong); color: #FFFFFF; }
+/* 插件新增的标签允许带角标（如未读数），用 .ow-tab-badge 套在 .ow-tab-lb 之后 */
+.ow-tab .ow-tab-badge {
     display: inline-block;
     vertical-align: 1px;
     min-width: 14px;
@@ -403,30 +403,30 @@ input[type=range] {
     line-height: 14px;
     text-align: center;
     border-radius: 7px;
-    background: var(--ha-primary);
+    background: var(--ow-primary);
     color: #FFFFFF;
 }
 /* ⚠️ 窄屏（移动端抽屉）下侧栏宽度不变仍是 240px，无需特殊处理；
    但真机小屏字体偏小时把标签条略微收紧，避免 3 个以上标签被挤到滚动 */
 @media (max-width: 400px) {
-    .ha-tabs { margin: 8px 8px 4px; }
-    .ha-tab { padding: 6px 8px; font-size: 12px; }
+    .ow-tabs { margin: 8px 8px 4px; }
+    .ow-tab { padding: 6px 8px; font-size: 12px; }
 }
 
 /* ---------- 头像 ---------- */
-.ha-avatar {
+.ow-avatar {
     /* v1.1.8：补 display:inline-block —— **行内元素不接受 width/height**。
        原先只写了 width:40px;height:40px 却没设 display，规则被浏览器忽略：
        实测资料卡里的头像算出来是 332×21（撑满整个弹窗），
        里面的 <img> 拿 width:100% 找不到有效参照，退化成原图尺寸被放大成巨图。
-       设置页看起来正常，只是因为它被 .ha-set-avatar-btn（inline-block）包住了 ——
+       设置页看起来正常，只是因为它被 .ow-set-avatar-btn（inline-block）包住了 ——
        也就是说尺寸档是否生效取决于外层恰好是什么 display，非常脆弱。
        补上 inline-block 后，所有尺寸档（xs/sm/md/默认）才真正按预期生效。 */
     display: inline-block; -webkit-inline-block: middle;
     vertical-align: middle;
     width: 40px; height: 40px;
     border-radius: 50%;
-    background: var(--ha-border);
+    background: var(--ow-border);
     color: #fff;
     font-size: 16px;
     text-align: center;
@@ -438,42 +438,42 @@ input[type=range] {
 /* <img> 尺寸锁死：width/height 100% + object-fit:cover，
    再补 max-* 与 min-* —— 任何尺寸的原图（超大位图、SVG、CSS 生成的 dataURL）
    都不允许撑破容器；min-width/min-height:0 保证在 flex 容器里不被内容顶开。
-   容器 .ha-avatar 已有 overflow:hidden + border-radius:50%，构成第二重保险。 */
-.ha-avatar img {
+   容器 .ow-avatar 已有 overflow:hidden + border-radius:50%，构成第二重保险。 */
+.ow-avatar img {
     width: 100%; height: 100%;
     max-width: 100%; max-height: 100%;
     min-width: 0; min-height: 0;
     object-fit: cover; object-position: center;
     border-radius: 50%; display: block;
 }
-.ha-avatar-sm { width: 28px; height: 28px; line-height: 28px; font-size: 12px; }
-.ha-avatar-md { width: 32px; height: 32px; line-height: 32px; font-size: 14px; }
-.ha-avatar-xs { width: 20px; height: 20px; line-height: 20px; font-size: 10px; }
+.ow-avatar-sm { width: 28px; height: 28px; line-height: 28px; font-size: 12px; }
+.ow-avatar-md { width: 32px; height: 32px; line-height: 32px; font-size: 14px; }
+.ow-avatar-xs { width: 20px; height: 20px; line-height: 20px; font-size: 10px; }
 /* 'lg' = 64px：资料卡与个人设置共用的头像档（v1.1.9）。
    原先两处都用 'md'(32px)，在 380px 宽的弹窗里视觉权重太轻，
    且头像本身（首字色块）只有 14px 字号，看上去更小，故整体放大一档。 */
-.ha-avatar-lg { width: 64px; height: 64px; line-height: 64px; font-size: 26px; }
+.ow-avatar-lg { width: 64px; height: 64px; line-height: 64px; font-size: 26px; }
 /* 个人设置：头像置顶居中，点击即可更换 */
-.ha-set-avatar { text-align: center; margin: 0 0 16px; }
+.ow-set-avatar { text-align: center; margin: 0 0 16px; }
 /* 头像上传的可点容器：固定成方框并裁圆，保证 hover 热区与视觉尺寸一致 */
-.ha-set-avatar-btn { display: inline-block; cursor: pointer; border-radius: 50%; line-height: 0; vertical-align: middle; }
-.ha-set-avatar-btn:hover { opacity: .88; }
+.ow-set-avatar-btn { display: inline-block; cursor: pointer; border-radius: 50%; line-height: 0; vertical-align: middle; }
+.ow-set-avatar-btn:hover { opacity: .88; }
 
 /* ---------- 用户资料卡（v1.1.9 重做：头像左上 + 文字右侧，取代原「居中大图」布局） ---------- */
-.ha-card-head { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 14px; margin-bottom: 14px; }
-.ha-card-av {
+.ow-card-head { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 14px; margin-bottom: 14px; }
+.ow-card-av {
     flex-shrink: 0; -webkit-flex-shrink: 0;
     width: 64px; height: 64px;
     line-height: 0;
     overflow: hidden;
     border-radius: 50%;
 }
-.ha-card-id { min-width: 0; -webkit-flex: 1; flex: 1; -webkit-flex: 1; }
+.ow-card-id { min-width: 0; -webkit-flex: 1; flex: 1; -webkit-flex: 1; }
 /* v1.2.40：昵称强制**单行**，超出省略号。
-   原先 `.ha-card-name` 是 `word-break: break-all`，长昵称会把资料卡撑成两三行，
+   原先 `.ow-card-name` 是 `word-break: break-all`，长昵称会把资料卡撑成两三行，
    身份标签被顶到第二行，卡片高度也跟着变 —— 和侧栏资料区同一个毛病。 */
-.ha-card-name {
-    font-size: 17px; font-weight: 600; color: var(--ha-text-title);
+.ow-card-name {
+    font-size: 17px; font-weight: 600; color: var(--ow-text-title);
     line-height: 1.4;
     min-width: 0; -webkit-min-width: 0;
     white-space: nowrap;
@@ -482,149 +482,149 @@ input[type=range] {
 }
 /* v1.2.23：昵称 + 身份标签同一行（标签在昵称右侧）。
    只用于**用户资料卡** —— 群资料卡仍是「群名一行 + 类型标签一行」，
-   没有 .ha-card-name-row，不受影响。
+   没有 .ow-card-name-row，不受影响。
    ⚠️ min-width:0 必写：flex item 默认 min-width:auto，长昵称不会换行而是把行撑出去。
-   ⚠️ .ha-card-badges 自带 margin-top:6px（给「独立一行」用的），
+   ⚠️ .ow-card-badges 自带 margin-top:6px（给「独立一行」用的），
    进到同一行里必须清掉，否则标签比昵称低 6px 看着是歪的。
    v1.2.40：wrap 改 nowrap —— 长昵称不再把标签挤到第二行（由昵称自己省略号让位）。 */
-.ha-card-name-row {
+.ow-card-name-row {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     flex-wrap: nowrap; -webkit-flex-wrap: nowrap;
     gap: 6px;
     min-width: 0;
 }
-.ha-card-name-row .ha-card-name { flex: 0 1 auto; -webkit-flex: 0 1 auto; min-width: 0; }
+.ow-card-name-row .ow-card-name { flex: 0 1 auto; -webkit-flex: 0 1 auto; min-width: 0; }
 /* 身份标签不参与收缩：昵称被截断时标签仍要完整可读 */
-.ha-card-name-row .ha-card-badges { flex-shrink: 0; -webkit-flex-shrink: 0; }
+.ow-card-name-row .ow-card-badges { flex-shrink: 0; -webkit-flex-shrink: 0; }
 /* 昵称下方的 ID 行：比昵称小一档、用次要文字色，避免和昵称抢权重 */
-.ha-card-sub { margin-top: 4px; font-size: 12px; color: var(--ha-text-sub); }
-.ha-card-badges { margin-top: 6px; display: flex; display: -webkit-flex; flex-wrap: wrap; -webkit-flex-wrap: wrap; gap: 6px; align-items: center; -webkit-align-items: center; }
-/* ⚠️ 必须写在 .ha-card-badges **之后**：两者同为单类选择器（特异性 0,0,1,0），
-   靠源码顺序定胜负。写在前面会被 .ha-card-badges 的 margin-top:6px 盖掉，
+.ow-card-sub { margin-top: 4px; font-size: 12px; color: var(--ow-text-sub); }
+.ow-card-badges { margin-top: 6px; display: flex; display: -webkit-flex; flex-wrap: wrap; -webkit-flex-wrap: wrap; gap: 6px; align-items: center; -webkit-align-items: center; }
+/* ⚠️ 必须写在 .ow-card-badges **之后**：两者同为单类选择器（特异性 0,0,1,0），
+   靠源码顺序定胜负。写在前面会被 .ow-card-badges 的 margin-top:6px 盖掉，
    表现为「标签比昵称中心低 3px」（align-items:center 下 margin 只体现为半个偏移），
    肉眼是歪的但断言 top 差 <8px 却会通过 —— 判这类问题要直接读 marginTop。 */
-.ha-card-badges-inline { margin-top: 0; }
+.ow-card-badges-inline { margin-top: 0; }
 /* 资料明细：改竖排文本为「标签 : 值」两列，视觉上与头部区分层 */
-.ha-card-meta {
-    border-top: 1px solid var(--ha-border);
+.ow-card-meta {
+    border-top: 1px solid var(--ow-border);
     padding-top: 12px;
     font-size: 13px; color: #5C5C5C;
 }
-.ha-card-meta-row { display: flex; display: -webkit-flex; align-items: baseline; -webkit-align-items: baseline; gap: 8px; padding: 3px 0; }
-.ha-card-meta-k { flex-shrink: 0; -webkit-flex-shrink: 0; color: var(--ha-text-sub); }
-.ha-card-meta-v { min-width: 0; word-break: break-all; }
+.ow-card-meta-row { display: flex; display: -webkit-flex; align-items: baseline; -webkit-align-items: baseline; gap: 8px; padding: 3px 0; }
+.ow-card-meta-k { flex-shrink: 0; -webkit-flex-shrink: 0; color: var(--ow-text-sub); }
+.ow-card-meta-v { min-width: 0; word-break: break-all; }
 
 /* ---------- 表单里的开关项（v1.1.11） ----------
    创建群聊 / 群聊设置里的「公开群聊」State 开关。
-   .ha-switch-row 本身自带布局，这里只把表单容器的 label 上边距让出来，
+   .ow-switch-row 本身自带布局，这里只把表单容器的 label 上边距让出来，
    避免开关与上方输入框贴得太近（form-item 的 margin-bottom 仍由容器控制）。 */
-.ha-form-item-switch { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--ha-border); }
-.ha-rc-note { margin: -4px 0 10px; }
+.ow-form-item-switch { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--ow-border); }
+.ow-rc-note { margin: -4px 0 10px; }
 
 /* ---------- 群成员（v1.1.11） ---------- */
-.ha-mem-head { font-size: 12px; color: var(--ha-text-sub); margin: -8px 0 8px; }
-.ha-mem-list {
-    border-top: 1px solid var(--ha-border);
-    border-bottom: 1px solid var(--ha-border);
+.ow-mem-head { font-size: 12px; color: var(--ow-text-sub); margin: -8px 0 8px; }
+.ow-mem-list {
+    border-top: 1px solid var(--ow-border);
+    border-bottom: 1px solid var(--ow-border);
     max-height: 40vh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
 }
-.ha-mem-row {
+.ow-mem-row {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 8px;
     padding: 8px 0;
-    border-top: 1px solid var(--ha-border);
+    border-top: 1px solid var(--ow-border);
 }
-.ha-mem-row:first-child { border-top: none; }
-.ha-mem-name { flex: 1; -webkit-flex: 1; min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ow-mem-row:first-child { border-top: none; }
+.ow-mem-name { flex: 1; -webkit-flex: 1; min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* v1.2.40：成员行的身份标签（超管/群主）。不参与收缩，昵称让位给它 */
-.ha-mem-role { flex-shrink: 0; -webkit-flex-shrink: 0; }
-.ha-mem-id { flex-shrink: 0; -webkit-flex-shrink: 0; font-size: 12px; color: var(--ha-text-sub); font-variant-numeric: tabular-nums; }
-.ha-mem-del { flex-shrink: 0; -webkit-flex-shrink: 0; color: var(--ha-red); }
-.ha-mem-del:hover { background: #fff1f0; color: #cf1322; }
-.ha-mem-empty { padding: 14px 0; text-align: center; font-size: 13px; color: var(--ha-text-sub); }
-.ha-mem-invite { margin-top: 12px; }
+.ow-mem-role { flex-shrink: 0; -webkit-flex-shrink: 0; }
+.ow-mem-id { flex-shrink: 0; -webkit-flex-shrink: 0; font-size: 12px; color: var(--ow-text-sub); font-variant-numeric: tabular-nums; }
+.ow-mem-del { flex-shrink: 0; -webkit-flex-shrink: 0; color: var(--ow-red); }
+.ow-mem-del:hover { background: #fff1f0; color: #cf1322; }
+.ow-mem-empty { padding: 14px 0; text-align: center; font-size: 13px; color: var(--ow-text-sub); }
+.ow-mem-invite { margin-top: 12px; }
 /* 邀请链接很长，允许换行并整段可点；不设 word-break:break-all 免得断在字符中间 */
-.ha-mem-link { word-break: break-all; }
-.ha-mem-link a { color: var(--ha-primary-dark); text-decoration: none; }
-.ha-mem-link a:hover { text-decoration: underline; }
+.ow-mem-link { word-break: break-all; }
+.ow-mem-link a { color: var(--ow-primary-dark); text-decoration: none; }
+.ow-mem-link a:hover { text-decoration: underline; }
 /* 头像裁剪：canvas 直绘 + 滑块实时重绘（与论坛一致，所见即所得） */
-.ha-crop-wrap { text-align: center; margin: 6px 0 12px; }
-.ha-crop-wrap canvas {
+.ow-crop-wrap { text-align: center; margin: 6px 0 12px; }
+.ow-crop-wrap canvas {
     width: 200px; height: 200px;
-    border: 1px solid var(--ha-border); border-radius: 4px;
-    background: var(--ha-bg-sub);
+    border: 1px solid var(--ow-border); border-radius: 4px;
+    background: var(--ow-bg-sub);
     touch-action: none;
 }
-.ha-crop-ctrl { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 10px; margin-bottom: 14px; }
-.ha-crop-ctrl input[type=range] { flex: 1; -webkit-flex: 1; min-width: 0; }
-.ha-crop-val { font-size: 12px; color: var(--ha-text-sub); width: 48px; text-align: right; flex-shrink: 0; -webkit-flex-shrink: 0; }
+.ow-crop-ctrl { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 10px; margin-bottom: 14px; }
+.ow-crop-ctrl input[type=range] { flex: 1; -webkit-flex: 1; min-width: 0; }
+.ow-crop-val { font-size: 12px; color: var(--ow-text-sub); width: 48px; text-align: right; flex-shrink: 0; -webkit-flex-shrink: 0; }
 
 /* ==========================================================================
    登录 / 注册 / 安装
    ========================================================================== */
-.ha-auth-body {
+.ow-auth-body {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     justify-content: center; -webkit-justify-content: center;
     min-height: 100%;
     padding: 20px;
 }
-.ha-auth-card {
+.ow-auth-card {
     width: 100%;
     max-width: 400px;
-    background: var(--ha-bg);
-    border: 1px solid var(--ha-border);
+    background: var(--ow-bg);
+    border: 1px solid var(--ow-border);
     border-radius: 10px;
     padding: 32px 28px;
 }
-.ha-auth-logo { text-align: center; margin-bottom: 24px; }
-.ha-auth-logo img { width: 64px; height: 64px; }
-.ha-auth-logo h1 { font-size: 24px; font-weight: 600; color: var(--ha-text-title); line-height: 1.3; margin-top: 10px; }
-.ha-auth-logo p { font-size: 12px; color: var(--ha-text-sub); }
-.ha-auth-links { display: flex; display: -webkit-flex; justify-content: space-between; -webkit-justify-content: space-between; margin-top: 16px; font-size: 13px; }
+.ow-auth-logo { text-align: center; margin-bottom: 24px; }
+.ow-auth-logo img { width: 64px; height: 64px; }
+.ow-auth-logo h1 { font-size: 24px; font-weight: 600; color: var(--ow-text-title); line-height: 1.3; margin-top: 10px; }
+.ow-auth-logo p { font-size: 12px; color: var(--ow-text-sub); }
+.ow-auth-links { display: flex; display: -webkit-flex; justify-content: space-between; -webkit-justify-content: space-between; margin-top: 16px; font-size: 13px; }
 
 /* ==========================================================================
    聊天主界面
    ========================================================================== */
-.ha-chat-body { overflow: hidden; }
-.ha-layout {
+.ow-chat-body { overflow: hidden; }
+.ow-layout {
     display: flex; display: -webkit-flex;
     height: 100vh;
     height: 100dvh;          /* 移动端浏览器地址栏场景（支持的浏览器生效） */
     max-width: 1440px;
     margin: 0 auto;
-    background: var(--ha-bg);
+    background: var(--ow-bg);
     overflow: hidden;        /* 任何情况下都不让页面整体横向/纵向滚动，滚动交给消息区 */
 }
 
 /* 左侧栏 */
-.ha-sidebar {
+.ow-sidebar {
     width: 240px;
-    border-right: 1px solid var(--ha-border);
-    /* v1.1.4：与聊天区底色一致（原先用 --ha-bg-sub #F5F7FA，差 (7,6,5) 肉眼可辨） */
-    background: var(--ha-bg-chat);
+    border-right: 1px solid var(--ow-border);
+    /* v1.1.4：与聊天区底色一致（原先用 --ow-bg-sub #F5F7FA，差 (7,6,5) 肉眼可辨） */
+    background: var(--ow-bg-chat);
     display: flex; display: -webkit-flex;
     flex-direction: column; -webkit-flex-direction: column;
     flex-shrink: 0; -webkit-flex-shrink: 0;
 }
-.ha-brand {
+.ow-brand {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 8px;
     padding: 14px 16px;
-    border-bottom: 1px solid var(--ha-border);
+    border-bottom: 1px solid var(--ow-border);
     font-size: 16px;
     font-weight: 600;
-    color: var(--ha-text-title);
+    color: var(--ow-text-title);
 }
 /* v1.2.25：28px → 22px。品牌条总高 57px（14px 上下内边距 + 28px 内容），
    28px 的图标在条内基本顶满，与旁边 16px 的站点名并排偏大。
    缩到 22px 后图标不再压住站点名，但**品牌条高度不变** ——
-   条高由 .ha-brand-search 的 28px 撑住（见下一条），
+   条高由 .ow-brand-search 的 28px 撑住（见下一条），
    所以顶栏与左侧栏的分隔线仍在 y=56/57，三线齐平不受影响。 */
 /* v1.2.26：光学居中补偿 translateY(1.5px)。
    为什么盒子已经居中了还是看着歪：本 logo 的造型是「上方实心方块 + 下方伸出一个尖角」，
@@ -636,20 +636,20 @@ input[type=range] {
    1.5px ≈ 补偿到 75%。不全补偿（1.93px）：全补偿后尾巴会显得往下坠反而更怪。
 
    ⚠️ 偏移量来自 SVG 内部比例，与显示尺寸成正比：偏移 = 显示尺寸 × 8.8% × 0.75。
-   改 .ha-brand img 的 width/height 时必须按比例重算（例：24px → 1.6px）。
+   改 .ow-brand img 的 width/height 时必须按比例重算（例：24px → 1.6px）。
    ⚠️ 登录/安装页那颗 64px 的 logo **没有**加这条 —— 它独占一行、下方是居中的大标题，
    不存在「与文字并排」的对齐诉求，加了反而整体下沉。
    ⚠️ transform 不参与布局，品牌条高度与分隔线位置不受影响。 */
-.ha-brand img { width: 22px; height: 22px; transform: translateY(1.5px); -webkit-transform: translateY(1.5px); }
+.ow-brand img { width: 22px; height: 22px; transform: translateY(1.5px); -webkit-transform: translateY(1.5px); }
 /* v1.2.31：站点名右侧的**搜索按钮**（原竖三点菜单已删除）。
-   v1.2.32 位置修正：原来用 line-height 顶行 + 继承 .ha-icon-btn 的 padding，
+   v1.2.32 位置修正：原来用 line-height 顶行 + 继承 .ow-icon-btn 的 padding，
    图标在 28px 方框里偏上、按钮也显得偏左。改为 flex 双向居中 + 加大右间距。
    ⚠️ 这个 28px 同时是**品牌条高度的支点**：logo 缩到 22px、站点名 16px 之后，
    整条的高度就靠它撑着（实测 57px）。别再顺手改小，否则品牌条会跟着变矮，
    与顶栏、侧栏第一行的分隔线错位（下方「首行分隔线与顶栏下边框水平对齐」一节有说明）。 */
-.ha-brand .ha-brand-search {
+.ow-brand .ow-brand-search {
     margin-left: auto;
-    margin-right: -8px;          /* 视觉贴右：抵消 icon-btn 自带留白 + .ha-brand 的 16px padding */
+    margin-right: -8px;          /* 视觉贴右：抵消 icon-btn 自带留白 + .ow-brand 的 16px padding */
     /* ⚠️ 负边距的上限：hover 背景块（28px 宽）右缘不得越过侧栏右边界。
        -8px 时块右缘 = 侧栏右缘 - 4px，仍在界内；再往负就溢到聊天区了。 */
     width: 28px; height: 28px;
@@ -663,27 +663,27 @@ input[type=range] {
    实测：logo 中心 29.5 / 站点名文字墨迹中心 28 / 品牌条中心 28.5。
    原先图标与文字严格齐平（28），但 logo 是这一行最显眼的参照物，
    图标比它高 1.5px 就会显得「飘在上面」。 */
-.ha-brand .ha-brand-search .ha-ico {
+.ow-brand .ow-brand-search .ow-ico {
     display: block;            /* 消掉 svg 的基线间隙 */
     transform: translateY(1.5px); -webkit-transform: translateY(1.5px);
 }
 /* ---------- 搜索窗（v1.2.31） ---------- */
-.ha-sr-scope { margin-bottom: 10px; }        /* 范围切换复用 .ha-tabs 组件外观 */
-.ha-sr-scope .ha-tab { font-size: 13px; padding: 6px 8px; }
+.ow-sr-scope { margin-bottom: 10px; }        /* 范围切换复用 .ow-tabs 组件外观 */
+.ow-sr-scope .ow-tab { font-size: 13px; padding: 6px 8px; }
 /* v1.2.34：结果区高度改为「固定上限 + 随视口收缩」双保险。
    实测灌 200 条：列表锁定 380px、scrollHeight 11516、弹窗总高 563/900 —— 不会撑爆。
    45vh 是给小屏的：固定 380px 在 500px 高的窗口里，弹窗会顶出屏幕。 */
-.ha-sr-list { margin-top: 10px; max-height: min(380px, 45vh); overflow-y: auto; }
+.ow-sr-list { margin-top: 10px; max-height: min(380px, 45vh); overflow-y: auto; }
 /* 结果被条数上限截断时的说明（后端每个范围都有 LIMIT） */
-.ha-sr-tip {
+.ow-sr-tip {
     padding: 8px 6px 2px;
     font-size: 12px;
-    color: var(--ha-text-sub);
+    color: var(--ow-text-sub);
     text-align: center;
-    border-top: 1px solid var(--ha-border);
+    border-top: 1px solid var(--ow-border);
     margin-top: 4px;
 }
-.ha-sr-item {
+.ow-sr-item {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 10px;
@@ -691,106 +691,106 @@ input[type=range] {
     border-radius: 6px;
     cursor: pointer;
 }
-.ha-sr-item:hover { background: var(--ha-hover-bg); }
-.ha-sr-main { flex: 1; -webkit-flex: 1; min-width: 0; }
-.ha-sr-title {
+.ow-sr-item:hover { background: var(--ow-hover-bg); }
+.ow-sr-main { flex: 1; -webkit-flex: 1; min-width: 0; }
+.ow-sr-title {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 6px;
-    font-size: 14px; color: var(--ha-text-title);
+    font-size: 14px; color: var(--ow-text-title);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.ha-sr-sub {
+.ow-sr-sub {
     display: block;
-    font-size: 12px; color: var(--ha-text-sub);
+    font-size: 12px; color: var(--ow-text-sub);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.ha-sr-tag {
+.ow-sr-tag {
     flex-shrink: 0; -webkit-flex-shrink: 0;
     padding: 0 5px;
     font-size: 11px; line-height: 17px;
     border-radius: 3px;
-    color: var(--ha-text-sub);
-    background: var(--ha-bg-sub);
+    color: var(--ow-text-sub);
+    background: var(--ow-bg-sub);
 }
 /* v1.2.35：结果条目分批懒渲染后，再让**屏外条目**跳过布局与绘制。
    content-visibility 是渐进增强：不支持的浏览器忽略这两行，行为不变。
    ⚠️ contain-intrinsic-size 必须给，否则浏览器会按 0 高度估算，
    滚动条会随批次跳动（每加一批滚动条就抖一下）。 */
-.ha-sr-item {
+.ow-sr-item {
     content-visibility: auto;
     contain-intrinsic-size: auto 46px;
 }
 /* 追加批次时的淡入，让「还有更多」可感知（同时也是性能优化的视觉反馈） */
-@keyframes haSrIn { from { opacity: .4; } to { opacity: 1; } }
-.ha-sr-batch-in > .ha-sr-item { animation: haSrIn .18s ease-out; }
+@keyframes owSrIn { from { opacity: .4; } to { opacity: 1; } }
+.ow-sr-batch-in > .ow-sr-item { animation: owSrIn .18s ease-out; }
 /* 消息结果：发送者与片段分两行，避免长文本把标题挤没 */
-.ha-sr-item.is-msg { align-items: flex-start; -webkit-align-items: flex-start; }
-.ha-sr-empty { padding: 18px 6px; font-size: 13px; color: var(--ha-text-sub); text-align: center; }
+.ow-sr-item.is-msg { align-items: flex-start; -webkit-align-items: flex-start; }
+.ow-sr-empty { padding: 18px 6px; font-size: 13px; color: var(--ow-text-sub); text-align: center; }
 /* 搜索命中定位后的高亮（v1.2.32）：一次性闪一下就撤，不常驻 */
-.ha-msg-hit { animation: haMsgHit 2.4s ease-out; }
-@keyframes haMsgHit {
+.ow-msg-hit { animation: owMsgHit 2.4s ease-out; }
+@keyframes owMsgHit {
     0%, 55% { background: #FFF3C4; box-shadow: 0 0 0 6px #FFF3C4; border-radius: 8px; }
     100% { background: transparent; box-shadow: 0 0 0 6px transparent; border-radius: 8px; }
 }
-.ha-side-title {
+.ow-side-title {
     padding: 12px 16px 6px;
     font-size: 12px;
-    color: var(--ha-text-sub);
+    color: var(--ow-text-sub);
 }
-.ha-room-list { flex: 1; -webkit-flex: 1; overflow-y: auto; padding: 0 8px; }
-.ha-room-item {
+.ow-room-list { flex: 1; -webkit-flex: 1; overflow-y: auto; padding: 0 8px; }
+.ow-room-item {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 10px;
     padding: 8px 10px;
     border-radius: 6px;
     cursor: pointer;
-    color: var(--ha-text);
+    color: var(--ow-text);
 }
-.ha-room-item:hover { background: var(--ha-hover-bg); }
-.ha-room-item.active { background: var(--ha-active-bg); color: var(--ha-primary-dark); font-weight: 600; }
-.ha-room-icon {
+.ow-room-item:hover { background: var(--ow-hover-bg); }
+.ow-room-item.active { background: var(--ow-active-bg); color: var(--ow-primary-dark); font-weight: 600; }
+.ow-room-icon {
     width: 32px; height: 32px;
     border-radius: 50%;
-    background: var(--ha-primary-strong);
+    background: var(--ow-primary-strong);
     color: #fff;
     text-align: center;
     line-height: 32px;
     font-size: 14px;
     flex-shrink: 0; -webkit-flex-shrink: 0;
 }
-.ha-room-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+.ow-room-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 /* 群聊列表右侧 ⋮ 设置入口（仅管理员/房主可见） */
-.ha-room-more {
+.ow-room-more {
     margin-left: auto; -webkit-margin-left: auto;
     flex-shrink: 0; -webkit-flex-shrink: 0;
     width: 22px; height: 22px; line-height: 20px; padding: 0;
     background: transparent; border: none; cursor: pointer;
-    font-size: 14px; color: var(--ha-text-sub); border-radius: 4px;
+    font-size: 14px; color: var(--ow-text-sub); border-radius: 4px;
 }
-/* v1.2.55：左侧栏是灰底，hover 用 --ha-bg-chat-hover 才看得见（原 --ha-bg-sub 与底色同色） */
-.ha-room-more:hover { background: var(--ha-bg-chat-hover); color: var(--ha-text); }
+/* v1.2.55：左侧栏是灰底，hover 用 --ow-bg-chat-hover 才看得见（原 --ow-bg-sub 与底色同色） */
+.ow-room-more:hover { background: var(--ow-bg-chat-hover); color: var(--ow-text); }
 /* 后台群头像预览 */
-.ha-room-avatar-btn { display: inline-block; cursor: pointer; }
-.ha-room-avatar-btn img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 1px solid var(--ha-border); display: block; }
-.ha-room-avatar-btn img:hover { opacity: .85; }
-.ha-room-avatar-empty {
+.ow-room-avatar-btn { display: inline-block; cursor: pointer; }
+.ow-room-avatar-btn img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 1px solid var(--ow-border); display: block; }
+.ow-room-avatar-btn img:hover { opacity: .85; }
+.ow-room-avatar-empty {
     display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; justify-content: center; -webkit-justify-content: center;
     width: 56px; height: 56px; border-radius: 50%;
-    border: 1px dashed var(--ha-border-control); font-size: 12px; color: var(--ha-text-sub);
+    border: 1px dashed var(--ow-border-control); font-size: 12px; color: var(--ow-text-sub);
 }
-.ha-room-item .ha-room-lock { font-size: 12px; color: var(--ha-text-sub); }
+.ow-room-item .ow-room-lock { font-size: 12px; color: var(--ow-text-sub); }
 
 /* ---------- 通用会话列表（v1.1.0：群聊 + 私聊共用） ----------
-   与 .ha-room-item 同一套视觉，仅多出「摘要行 / 时间 / 标签」，
-   命名空间 .ha-cl-* 与 JS 侧 ChatList 轮子一一对应。 */
+   与 .ow-room-item 同一套视觉，仅多出「摘要行 / 时间 / 标签」，
+   命名空间 .ow-cl-* 与 JS 侧 ChatList 轮子一一对应。 */
 /* v1.1.22：容器 48px → **40px**（用户反馈「头像现在又太大了，小一点」）。
    尺寸轨迹：32（偏小）→ 40（偏小）→ 48（偏大）→ **40（当前）**。
    取 40px 的依据：行内 padding 16 + 文字块 41 = 57，
    40px 占行高 71%；44px 73%；48px 75%。40px 与两行文字视觉重量匹配。
-   ⚠️ 同宽的 .ha-avatar-sm 仍是 28px（成员列表等场景），**只改会话列表这一处**。 */
-.ha-cl-item {
+   ⚠️ 同宽的 .ow-avatar-sm 仍是 28px（成员列表等场景），**只改会话列表这一处**。 */
+.ow-cl-item {
     display: flex; display: -webkit-flex;
     /* v1.1.21：align-items 从 center 改为 **flex-start**。
        原因：头像 48px 与文字块 41px 不等高，center 会让文字块垂直居中 →
@@ -802,22 +802,22 @@ input[type=range] {
     padding: 8px 10px;
     border-radius: 6px;
     cursor: pointer;
-    color: var(--ha-text);
+    color: var(--ow-text);
 }
-.ha-cl-item:hover { background: var(--ha-hover-bg); }
+.ow-cl-item:hover { background: var(--ow-hover-bg); }
 /* v1.1.6：选中态去掉 color 与 font-weight —— 文字选中前后完全一致。
-   原先 `.active` 设在父容器上，color 被 .ha-cl-title 继承（变深蓝 #00558F）、
-   font-weight:600 还被没有显式字重的子元素连坐 —— .ha-cl-sub 摘要与 .ha-cl-time
+   原先 `.active` 设在父容器上，color 被 .ow-cl-title 继承（变深蓝 #00558F）、
+   font-weight:600 还被没有显式字重的子元素连坐 —— .ow-cl-sub 摘要与 .ow-cl-time
    时间都跟着变粗。实测：active 标题 rgb(0,85,143)/600 vs 未选中 rgb(51,51,51)/400。
    v1.1.7：曾加过左侧 3px 主色竖条做选中指示，现按要求移除，只保留底色。 */
-.ha-cl-item.active { background: var(--ha-active-bg); }
+.ow-cl-item.active { background: var(--ow-active-bg); }
 /* 容器尺寸历史：32 → 40 → 48 → **40**（v1.1.22，用户反馈「又太大了」）。
    文字区宽度（实测）：列表 239px、行 223px，扣 padding 20 + gap 10 + 头像 40
    → 文字区 **118.9px**。足够显示「群名 + 标签」与摘要；长摘要按 ellipsis 省略。 */
-.ha-cl-icon {
+.ow-cl-icon {
     width: 40px; height: 40px;
     border-radius: 50%;
-    background: var(--ha-primary-strong);
+    background: var(--ow-primary-strong);
     color: #fff;
     text-align: center;
     line-height: 40px;
@@ -827,9 +827,9 @@ input[type=range] {
     flex-shrink: 0; -webkit-flex-shrink: 0;
     overflow: hidden;
 }
-.ha-cl-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+.ow-cl-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 /* 主体：上行标题（含标签）/ 下行最后一条摘要 */
-.ha-cl-main {
+.ow-cl-main {
     flex: 1; -webkit-flex: 1;
     min-width: 0;                    /* 允许在 flex 中收缩，摘要才能正确省略 */
     display: flex; display: -webkit-flex;
@@ -843,7 +843,7 @@ input[type=range] {
        实测值 40.4px = 标题 line-height 20 + 摘要 min-height 20。
        ⚠️ 修复前实测的偏移差：有消息 8px vs 无消息 15.8px（**差 7.8px**）——
          根因是 align-items:center 让 41px 文字块在 48px 行里居中下移，
-         且 .ha-cl-sub 空着也占 19.2px。改 flex-start + 摘要 min-height 后偏移差 = 0。 */
+         且 .ow-cl-sub 空着也占 19.2px。改 flex-start + 摘要 min-height 后偏移差 = 0。 */
     min-height: 40.4px;
     justify-content: flex-start;     /* 顶端对齐：不让内容在 min-height 里居中 */
 }
@@ -851,7 +851,7 @@ input[type=range] {
    line-height 锁 20px（14px 字号 × 1.43），与摘要的 min-height 20px 配对。
    ⚠️ `height: 20px` 改用 min-height 更安全 —— 未来若标题加标签变两行不会被裁切。
    摘要行高同样锁 20px，空摘要时保留占位 → 名称与摘要的 Y 坐标恒定。 */
-.ha-cl-title {
+.ow-cl-title {
     font-size: 14px;
     line-height: 20px;
     min-height: 20px;               /* 空摘要时标题仍在同一位置 */
@@ -860,7 +860,7 @@ input[type=range] {
 }
 /* v1.2.28：会话置顶标记（inline SVG，12px 描边图钉）。
    灰 #8E8EA0 与昵称色同源，opacity 再压一档，退到「有信息但不抢眼」的位置。 */
-.ha-cl-pin {
+.ow-cl-pin {
     display: inline-block;
     width: 12px; height: 12px;
     margin-right: 4px;
@@ -868,70 +868,70 @@ input[type=range] {
     opacity: .75;
     background: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238E8EA0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3.5h6M10 3.5v5.2L7.4 13h9.2L14 8.7V3.5'/%3E%3Cpath d='M12 13v7.5'/%3E%3C/svg%3E") no-repeat center / 12px 12px;
 }
-.ha-cl-sub {
+.ow-cl-sub {
     font-size: 12px;
     line-height: 20px;
     /* v1.1.21：min-height 而非 height —— 有摘要时按内容（单行 20px），
-       空摘要时仍占 20px，保证父级 .ha-cl-main 的两行结构不变。 */
+       空摘要时仍占 20px，保证父级 .ow-cl-main 的两行结构不变。 */
     min-height: 20px;
-    color: var(--ha-text-sub);
+    color: var(--ow-text-sub);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.ha-cl-tag {
+.ow-cl-tag {
     display: inline-block;
     margin-left: 6px;
     padding: 0 5px;
     font-size: 11px; line-height: 17px;
     font-weight: 400;
-    color: var(--ha-text-sub);
-    border: 1px solid var(--ha-border);
+    color: var(--ow-text-sub);
+    border: 1px solid var(--ow-border);
     border-radius: 3px;
     vertical-align: 1px;
 }
-.ha-cl-time {
+.ow-cl-time {
     font-size: 11px;
-    color: var(--ha-text-sub);
+    color: var(--ow-text-sub);
     flex-shrink: 0; -webkit-flex-shrink: 0;
     align-self: flex-start; -webkit-align-self: flex-start;
     margin-top: 2px;
 }
-.ha-cl-empty {
+.ow-cl-empty {
     padding: 16px 10px;
     text-align: center;
     font-size: 13px;
-    color: var(--ha-text-sub);
+    color: var(--ow-text-sub);
     list-style: none;
 }
 /* 顶栏「私聊」徽标：标识当前视图为双人会话（与群聊区分） */
-.ha-dm-badge {
+.ow-dm-badge {
     display: inline-block;
     margin-left: 8px;
     padding: 0 6px;
     font-size: 11px; line-height: 18px;
     font-weight: 400;
     color: #fff;
-    background: var(--ha-primary-strong);
+    background: var(--ow-primary-strong);
     border-radius: 3px;
     vertical-align: 2px;
 }
-.ha-me {
+.ow-me {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 10px;
     padding: 12px 16px;
-    border-top: 1px solid var(--ha-border);
+    border-top: 1px solid var(--ow-border);
 }
 /* v1.2.39：昵称强制单行，超出省略号。
-   原先 `.ha-me-name` 没有任何截断规则，昵称长一点就**在资料区里换行**，
+   原先 `.ow-me-name` 没有任何截断规则，昵称长一点就**在资料区里换行**，
    把下面的「ID · 积分」整块往下顶，资料区高度也跟着变 —— 侧栏底部会忽然变高。
    三个条件缺一不可：
      min-width:0      在 flex 容器里允许收缩到内容宽度以下（否则 flex 项不肯缩）
      white-space:nowrap  不换行
      overflow:hidden + text-overflow:ellipsis  溢出画省略号
    `flex:0 1 auto` = 可缩不可扩：短昵称照原样，长昵称才截断。 */
-.ha-me-name {
+.ow-me-name {
     font-weight: 600;
-    color: var(--ha-text-title);
+    color: var(--ow-text-title);
     flex: 0 1 auto; -webkit-flex: 0 1 auto;
     min-width: 0; -webkit-min-width: 0;
     white-space: nowrap;
@@ -939,12 +939,12 @@ input[type=range] {
     text-overflow: ellipsis;
 }
 /* 登录用户的资料区可点击（弹出操作菜单） */
-.ha-me-click { cursor: pointer; transition: background .15s; }
-/* v1.2.55：资料区在灰底侧栏里，hover 改 --ha-bg-chat-hover（原 --ha-bg-sub 与底色同色） */
-.ha-me-click:hover { background: var(--ha-bg-chat-hover); }
-.ha-me-info { min-width: 0; flex: 1; -webkit-flex: 1; }
+.ow-me-click { cursor: pointer; transition: background .15s; }
+/* v1.2.55：资料区在灰底侧栏里，hover 改 --ow-bg-chat-hover（原 --ow-bg-sub 与底色同色） */
+.ow-me-click:hover { background: var(--ow-bg-chat-hover); }
+.ow-me-info { min-width: 0; flex: 1; -webkit-flex: 1; }
 /* 昵称行**不换行**：头衔标签固定在昵称右侧（原来 wrap 会让标签掉到第二行） */
-.ha-me-line {
+.ow-me-line {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 6px;
@@ -952,11 +952,11 @@ input[type=range] {
     min-width: 0; -webkit-min-width: 0;
 }
 /* 头衔标签不参与收缩：昵称被截断时标签仍要完整可读 */
-.ha-me-line .ha-tag { flex-shrink: 0; -webkit-flex-shrink: 0; }
-.ha-side-actions { display: flex; display: -webkit-flex; gap: 8px; padding: 0 16px 14px; flex-wrap: wrap; -webkit-flex-wrap: wrap; }
+.ow-me-line .ow-tag { flex-shrink: 0; -webkit-flex-shrink: 0; }
+.ow-side-actions { display: flex; display: -webkit-flex; gap: 8px; padding: 0 16px 14px; flex-wrap: wrap; -webkit-flex-wrap: wrap; }
 
 /* 主区域 */
-.ha-main {
+.ow-main {
     flex: 1; -webkit-flex: 1;
     display: flex; display: -webkit-flex;
     flex-direction: column; -webkit-flex-direction: column;
@@ -965,30 +965,30 @@ input[type=range] {
     min-width: 0; min-height: 0;
     position: relative;
 }
-.ha-topbar {
+.ow-topbar {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 10px;
     flex-shrink: 0; -webkit-flex-shrink: 0;   /* 头部与输入栏不参与压缩 */
-    /* v1.1.17：显式高度并引用 --ha-topbar-h，供右侧栏首行对齐使用。
+    /* v1.1.17：显式高度并引用 --ow-topbar-h，供右侧栏首行对齐使用。
        原先高度是「padding 10+10 + 图标钮 36 + 边框 1」算出来的 57px，
        数值本身不变，只是把它变成**可被引用的真源**（见文件末尾对齐块）。 */
-    height: var(--ha-topbar-h);
+    height: var(--ow-topbar-h);
     padding: 10px 16px;
-    border-bottom: 1px solid var(--ha-border);
+    border-bottom: 1px solid var(--ow-border);
     /* 顶栏底色与群聊界面一致（v1.0.120），靠下边框区分。
        v1.1.4 起改用统一变量，与消息区、公告条、两侧边栏同一底色 */
-    background-color: var(--ha-bg-chat);
-    background-image: var(--ha-bg-chat-grad);
+    background-color: var(--ow-bg-chat);
+    background-image: var(--ow-bg-chat-grad);
 }
-.ha-room-name { font-size: 18px; font-weight: 600; color: var(--ha-text-title); line-height: 1.3; }
-.ha-latency { font-size: 12px; color: var(--ha-green); }
-.ha-topbar .ha-icon-btn:last-child { margin-left: auto; }
+.ow-room-name { font-size: 18px; font-weight: 600; color: var(--ow-text-title); line-height: 1.3; }
+.ow-latency { font-size: 12px; color: var(--ow-green); }
+.ow-topbar .ow-icon-btn:last-child { margin-left: auto; }
 
 /* 公告轮播（v1.0.102）已剥离为 announcements 插件，样式见 plugins/announcements/assets/ */
 
 /* 消息列表 */
-.ha-messages {
+.ow-messages {
     flex: 1; -webkit-flex: 1;
     min-height: 0;           /* 同上：允许被压缩，滚动条留在消息区内部 */
     overflow-y: auto;
@@ -996,91 +996,91 @@ input[type=range] {
     -webkit-overflow-scrolling: touch;
     padding: 12px 16px;
     /* 群聊背景界面（v1.0.97）：浅灰纵向渐变。v1.1.4 起改用统一变量 */
-    background-color: var(--ha-bg-chat);
-    background-image: var(--ha-bg-chat-grad);
+    background-color: var(--ow-bg-chat);
+    background-image: var(--ow-bg-chat-grad);
 }
-/* 「加载更早消息…」的样式（.ha-load-more）随 v1.2.6 懒加载一并移除：
+/* 「加载更早消息…」的样式（.ow-load-more）随 v1.2.6 懒加载一并移除：
    消息区不再有这个可点入口节点，向上滚动即自动加载。 */
 /* 消息流时间戳（v1.2.5）：相邻消息间隔超过 5 分钟时在两者之间插入一条居中分隔。
-   插入与否由 JS 判断（见 HaChat.needTimeDivider），CSS 只负责呈现。
-   上下留白要略大于 .ha-msg 的 14px 下边距，否则会与气泡贴得太近、像气泡的一部分。 */
-.ha-time-divider {
+   插入与否由 JS 判断（见 OwChat.needTimeDivider），CSS 只负责呈现。
+   上下留白要略大于 .ow-msg 的 14px 下边距，否则会与气泡贴得太近、像气泡的一部分。 */
+.ow-time-divider {
     text-align: center;
     margin: 16px 0 14px;
     user-select: none; -webkit-user-select: none;
 }
-.ha-time-divider span {
+.ow-time-divider span {
     display: inline-block; -webkit-inline-block;
     font-size: 12px;
     line-height: 20px;
     padding: 0 10px;
     border-radius: 10px;
-    color: var(--ha-text-sub);
-    background: var(--ha-bg-sub);
+    color: var(--ow-text-sub);
+    background: var(--ow-bg-sub);
 }
 /* 窄屏下时间戳文字相对更抢眼，缩一档字号并收窄留白 */
 @media (max-width: 640px) {
-    .ha-time-divider { margin: 12px 0 10px; }
-    .ha-time-divider span { font-size: 11px; padding: 0 8px; }
+    .ow-time-divider { margin: 12px 0 10px; }
+    .ow-time-divider span { font-size: 11px; padding: 0 8px; }
 }
-.ha-msg {
+.ow-msg {
     display: flex; display: -webkit-flex;
     gap: 10px;
     margin-bottom: 14px;
 }
-.ha-msg-body { min-width: 0; max-width: 78%; }
+.ow-msg-body { min-width: 0; max-width: 78%; }
 /* 消息头像可点（v1.1.8）：与昵称同行为——左击打开该用户资料卡。
-   align-self:flex-start 必须写 —— .ha-msg 是 flex 容器，子项默认 align-self:stretch，
+   align-self:flex-start 必须写 —— .ow-msg 是 flex 容器，子项默认 align-self:stretch，
    而本元素是 inline-block，被拉伸后高度会跟着消息行一起变高（实测 278px），
    点击热区会变成一条竖长条而不是圆形头像。 */
-.ha-msg-av {
+.ow-msg-av {
     cursor: pointer; border-radius: 50%;
     display: inline-block; -webkit-inline-block: middle;
     line-height: 0;
     align-self: flex-start; -webkit-align-self: flex-start;
     flex-shrink: 0; -webkit-flex-shrink: 0;
 }
-.ha-msg-av:hover { opacity: .85; }
-.ha-msg-meta { font-size: 12px; color: var(--ha-text-sub); margin-bottom: 2px; }
+.ow-msg-av:hover { opacity: .85; }
+.ow-msg-meta { font-size: 12px; color: var(--ow-text-sub); margin-bottom: 2px; }
 /* v1.2.12：昵称色 #CCCCCC → #8E8EA0。**首次跨过 WCAG 非文本 3:1 门槛。**
    对比度：#8E8EA0 在白底上 3.22:1、消息区底 #F5F5F5 上 2.95:1，
    是本项目调色轨迹上**第一个真正达标**的昵称色（此前 #CCCCCC 只有 1.61:1）。
 
    附带优势：该色带 11% 蓝紫饱和度，在纯灰/白背景上比同亮度的纯灰更易辨识
    （人眼对有色相的浅色比对中性灰更敏感），视觉上「有颜色但不抢眼」。
-   品牌主色是蓝系（--ha-primary #00A0E9），此色相与整体调性一致；
-   hover 态用 --ha-primary-dark(#00558F 深蓝) 也能自然衔接。
+   品牌主色是蓝系（--ow-primary #00A0E9），此色相与整体调性一致；
+   hover 态用 --ow-primary-dark(#00558F 深蓝) 也能自然衔接。
 
    调色轨迹（白底对比度）：
      #E8E8E8 1.23 → #E4E4E4 1.27 → #D5D5D5 1.47 → #CCCCCC 1.61 → **#8E8EA0 3.22 ✅**
    ⚠️ 再往深（#767686 4.46:1）会让昵称逐渐抢正文焦点，与「退后」的设计意图相反。
      本档既达标又不抢眼，建议就此定版。
 
-   v1.2.15：**去掉 hover 变色**（原 :hover → --ha-primary-dark）。
+   v1.2.15：**去掉 hover 变色**（原 :hover → --ow-primary-dark）。
      昵称虽然仍可点开资料卡（cursor:pointer 保留），但不再用颜色变化提示可点性 ——
      变绿/变蓝的昵称会在快速扫读时形成一串闪烁的高亮点，抢正文焦点，
      与这条昵称色「退后、不抢眼」的定版意图自相矛盾。
-     hover 反馈改由头像的 opacity 承担（.ha-msg-av:hover），语义更贴合「这是个可点对象」。 */
-.ha-msg-meta .ha-msg-nick { color: #8E8EA0; font-weight: 600; cursor: pointer; margin-right: 4px; }
+     hover 反馈改由头像的 opacity 承担（.ow-msg-av:hover），语义更贴合「这是个可点对象」。 */
+.ow-msg-meta .ow-msg-nick { color: #8E8EA0; font-weight: 600; cursor: pointer; margin-right: 4px; }
 /* meta 行 flex：时间紧跟昵称之后（v1.1.0：不再推到远离头像的一端）。
-   显隐由 JS 控制——悬停消息气泡满 2 秒才加 .ha-time-show，
+   显隐由 JS 控制——悬停消息气泡满 2 秒才加 .ow-time-show，
    CSS :hover 无法表达「持续满 N 秒」，一 hover 就出现会与快速扫读打架。 */
-.ha-msg-meta { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 6px; flex-wrap: wrap; }
-.ha-msg-meta .ha-msg-time { display: none; font-size: 12px; color: var(--ha-text-sub); }
-.ha-msg.mine .ha-msg-meta { flex-direction: row-reverse; -webkit-flex-direction: row-reverse; }
-.ha-msg.ha-time-show .ha-msg-meta .ha-msg-time { display: inline; }
+.ow-msg-meta { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 6px; flex-wrap: wrap; }
+.ow-msg-meta .ow-msg-time { display: none; font-size: 12px; color: var(--ow-text-sub); }
+.ow-msg.mine .ow-msg-meta { flex-direction: row-reverse; -webkit-flex-direction: row-reverse; }
+.ow-msg.ow-time-show .ow-msg-meta .ow-msg-time { display: inline; }
 /* 自己的消息（右侧）整行镜像：DOM 顺序 [标签, 昵称, 时间] 被row-reverse
    渲染成「时间 ← 昵称 ← 标签」，即时间落在昵称**左边** —— 这是右侧消息的
    原有观感，不要用 order 把它拉回右侧（那会让右侧与左侧的相对位置反而不一致）。 */
-.ha-msg-content {
+.ow-msg-content {
     display: inline-block;
     padding: 8px 12px;
     border-radius: 8px;
-    /* v1.2.7：气泡底色 #FFFFFF（纯白）。原为 --ha-bg-sub(#F5F7FA) 浅灰。
-       依赖边框（--ha-border #E0E4E8）与消息区底色（--ha-bg-chat #F5F5F5）区分层次，
+    /* v1.2.7：气泡底色 #FFFFFF（纯白）。原为 --ow-bg-sub(#F5F7FA) 浅灰。
+       依赖边框（--ow-border #E0E4E8）与消息区底色（--ow-bg-chat #F5F5F5）区分层次，
        白底 + 1px 边框在 #F5F5F5 底上仍有足够可辨的轮廓。 */
     background: #FFFFFF;
-    border: 1px solid var(--ha-border);
+    border: 1px solid var(--ow-border);
     word-break: break-word;
     word-wrap: break-word;          /* 老内核 */
     overflow-wrap: anywhere;        /* 超长无空格串（URL/长串数字）强制断行 */
@@ -1088,45 +1088,45 @@ input[type=range] {
     max-width: 100%;
     position: relative;
 }
-.ha-msg.mine { flex-direction: row-reverse; -webkit-flex-direction: row-reverse; }
-.ha-msg.mine .ha-msg-body { text-align: right; }
-/* v1.2.7：自己消息的气泡也改为 #FFFFFF。原先是 --ha-blue-light(#E6F7FF 浅蓝)，
+.ow-msg.mine { flex-direction: row-reverse; -webkit-flex-direction: row-reverse; }
+.ow-msg.mine .ow-msg-body { text-align: right; }
+/* v1.2.7：自己消息的气泡也改为 #FFFFFF。原先是 --ow-blue-light(#E6F7FF 浅蓝)，
    靠色相区分左右；改白后左右气泡同为白底，改由**位置（左右分栏）+ 头像**区分，
-   边框色也从 #91d5ff 回到中性 --ha-border，避免与白底冲突显得脏。 */
-.ha-msg.mine .ha-msg-content { background: #FFFFFF; border-color: var(--ha-border); text-align: left; }
+   边框色也从 #91d5ff 回到中性 --ow-border，避免与白底冲突显得脏。 */
+.ow-msg.mine .ow-msg-content { background: #FFFFFF; border-color: var(--ow-border); text-align: left; }
 /* v1.2.7：@ 提及原为 #fffbe6（浅黄），在纯白气泡体系下与白色几乎无法分辨。
        加深到 #FFF3C4 并把边框同步加深，保留「这条是在叫我」的视觉提示。 */
-.ha-msg.mention .ha-msg-content { background: #FFF3C4; border-color: #E6B800; }
+.ow-msg.mention .ow-msg-content { background: #FFF3C4; border-color: #E6B800; }
 /* v1.1.0：私聊消息使用与群聊完全一致的气泡配色与昵称行。
    此前私聊用紫色气泡 + ::after 追加「[私信]」标签，与群聊视觉割裂，
    且在私聊会话页里「这是私信」本就是废话（页面本身就是私聊）。 */
-.ha-msg.system { justify-content: center; -webkit-justify-content: center; }
-.ha-msg.system .ha-msg-content { background: transparent; border: none; color: var(--ha-text-sub); font-size: 12px; padding: 2px 8px; }
-.ha-msg.recalled .ha-msg-content { background: transparent; border: 1px dashed var(--ha-border); color: var(--ha-text-sub); font-size: 12px; }
+.ow-msg.system { justify-content: center; -webkit-justify-content: center; }
+.ow-msg.system .ow-msg-content { background: transparent; border: none; color: var(--ow-text-sub); font-size: 12px; padding: 2px 8px; }
+.ow-msg.recalled .ow-msg-content { background: transparent; border: 1px dashed var(--ow-border); color: var(--ow-text-sub); font-size: 12px; }
 /* v1.1.0 软删除：正文已由服务端清空，前台只留占位气泡。
    与「撤回」同款虚线弱化样式——两者都表示「这里原本有内容但现在不可见」，
    文案不同（该消息已删除 / 此消息已撤回）以区分是管理删除还是用户撤回。 */
-.ha-msg.deleted .ha-msg-content { background: transparent; border: 1px dashed var(--ha-border); color: var(--ha-text-sub); font-size: 12px; }
-/* v1.2.13：图片 / 文件消息的**无气泡容器**（取代 .ha-msg-content）。
+.ow-msg.deleted .ow-msg-content { background: transparent; border: 1px dashed var(--ow-border); color: var(--ow-text-sub); font-size: 12px; }
+/* v1.2.13：图片 / 文件消息的**无气泡容器**（取代 .ow-msg-content）。
    去掉白色底座后，靠这三点保证观感不塌：
      1. overflow:hidden —— 图片按气泡圆角裁切，不出现方形硬角外露
      2. line-height:0 —— 消除 inline 元素基线间隙，避免图片下方多出几像素空白
      3. display:inline-block —— 让 overflow 裁切与圆角生效
-   背景一律 transparent：图片本身即内容，文件卡片自带白底+边框（.ha-file-card）。 */
-.ha-msg-plain {
+   背景一律 transparent：图片本身即内容，文件卡片自带白底+边框（.ow-file-card）。 */
+.ow-msg-plain {
     display: inline-block; -webkit-inline-block;
     max-width: 100%;
     line-height: 0;              /* 消掉 inline 基线间隙 */
-    overflow: hidden;             /* 让 .ha-msg-img 的圆角对容器裁切生效 */
+    overflow: hidden;             /* 让 .ow-msg-img 的圆角对容器裁切生效 */
     background: transparent;     /* 无白色底座 */
 }
-.ha-msg-img { max-width: 240px; max-height: 240px; border-radius: 6px; cursor: zoom-in; display: block; }
-.ha-msg-sticker { max-width: 120px; max-height: 120px; border-radius: 6px; cursor: zoom-in; }
-.ha-birth-row { display: flex; display: -webkit-flex; gap: 8px; }
-.ha-birth-row .ha-input { flex: 1; -webkit-flex: 1; min-width: 0; }
+.ow-msg-img { max-width: 240px; max-height: 240px; border-radius: 6px; cursor: zoom-in; display: block; }
+.ow-msg-sticker { max-width: 120px; max-height: 120px; border-radius: 6px; cursor: zoom-in; }
+.ow-birth-row { display: flex; display: -webkit-flex; gap: 8px; }
+.ow-birth-row .ow-input { flex: 1; -webkit-flex: 1; min-width: 0; }
 
 /* 圆形发送按钮 + 文件消息卡片 */
-.ha-send-round {
+.ow-send-round {
     width: 40px; height: 40px;
     min-width: 40px; max-width: 40px;
     border-radius: 50%;
@@ -1136,8 +1136,8 @@ input[type=range] {
     justify-content: center; -webkit-justify-content: center;
     flex-shrink: 0; -webkit-flex-shrink: 0;
 }
-.ha-send-round svg { display: block; }
-.ha-file-card {
+.ow-send-round svg { display: block; }
+.ow-file-card {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 10px;
@@ -1147,18 +1147,18 @@ input[type=range] {
        高度不固定 —— 文件名两行、大小一行，行数固定，实际高度自然一致。 */
     width: 260px; max-width: 100%;
     padding: 10px 12px;
-    background: var(--ha-bg);
-    border: 1px solid var(--ha-border);
+    background: var(--ow-bg);
+    border: 1px solid var(--ow-border);
     border-radius: 8px;
 }
-.ha-file-ico { flex-shrink: 0; -webkit-flex-shrink: 0; color: var(--ha-primary-strong); }
+.ow-file-ico { flex-shrink: 0; -webkit-flex-shrink: 0; color: var(--ow-primary-strong); }
 /* 文件图标统一 block：inline SVG 的基线间隙会让卡片高度多出几像素 */
-.ha-file-ico svg { display: block; }
-/* 彩色文件图标自带 fill，不继承 .ha-file-ico 的 currentColor 描边色 */
-.ha-file-meta {
+.ow-file-ico svg { display: block; }
+/* 彩色文件图标自带 fill，不继承 .ow-file-ico 的 currentColor 描边色 */
+.ow-file-meta {
     flex: 1; -webkit-flex: 1; min-width: 0;
     /* v1.2.17：**必须显式 left**。
-       .ha-msg.mine .ha-msg-body 有 text-align:right（自己发的消息整块靠右），
+       .ow-msg.mine .ow-msg-body 有 text-align:right（自己发的消息整块靠右），
        会继承进卡片，把「文件名 / 文件大小」两行一起推到右边 ——
        表现为自己的附件里两行字都贴右、与图标之间大片空白。
        卡片内部是「图标 + 文本 + 下载」的固定版式，文本必须始终从图标右侧起读，
@@ -1169,13 +1169,13 @@ input[type=range] {
    两行都是 block，左边缘天然在同一条竖线上；
    再把 line-height 统一成 18px（原来跟字号走：13px→16.9、12px→15.6，行高不等，
    两行基线节奏不一致，看起来是歪的）。字号仍各自保持 13/12 的主次区分。 */
-.ha-file-name {
-    font-size: 13px; line-height: 18px; color: var(--ha-text-title);
+.ow-file-name {
+    font-size: 13px; line-height: 18px; color: var(--ow-text-title);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     display: block;
 }
-.ha-file-size {
-    font-size: 12px; line-height: 18px; color: var(--ha-text-sub);
+.ow-file-size {
+    font-size: 12px; line-height: 18px; color: var(--ow-text-sub);
     display: block;
     /* v1.2.15：2px → 8px，与卡片 gap 对齐；**必须先有 display:block**。
        本元素是 <span>，默认 display:inline —— **内联元素的垂直 margin 不生效**，
@@ -1183,290 +1183,290 @@ input[type=range] {
        所以调大 margin-top 之前必须先把 display 改成 block，否则改了等于没改。 */
     margin-top: 8px;
 }
-.ha-file-dl { flex-shrink: 0; -webkit-flex-shrink: 0; color: var(--ha-primary-strong); text-decoration: none; }
-.ha-file-dl svg { display: block; }
-.ha-file-dl:hover { color: var(--ha-primary-dark); }
+.ow-file-dl { flex-shrink: 0; -webkit-flex-shrink: 0; color: var(--ow-primary-strong); text-decoration: none; }
+.ow-file-dl svg { display: block; }
+.ow-file-dl:hover { color: var(--ow-primary-dark); }
 
 /* 群聊创建弹窗的提示条 */
-.ha-room-form-tip {
-    font-size: 12px; color: var(--ha-text-sub);
-    background: var(--ha-bg-sub);
-    border: 1px solid var(--ha-border);
+.ow-room-form-tip {
+    font-size: 12px; color: var(--ow-text-sub);
+    background: var(--ow-bg-sub);
+    border: 1px solid var(--ow-border);
     border-radius: 6px;
     padding: 8px 10px;
     margin-bottom: 12px;
     line-height: 1.6;
 }
-.ha-room-form-tip b { color: var(--ha-primary-dark); }
+.ow-room-form-tip b { color: var(--ow-primary-dark); }
 /* 浮层遮罩：默认隐藏，仅窄屏（<=720px）由 .show 显示 */
-.ha-mask { display: none; }
-.ha-ctx-menu {
+.ow-mask { display: none; }
+.ow-ctx-menu {
     position: fixed;
     z-index: 400;
-    background: var(--ha-bg);
-    border: 1px solid var(--ha-border);
+    background: var(--ow-bg);
+    border: 1px solid var(--ow-border);
     border-radius: 6px;
     padding: 4px 0;
     min-width: 136px;
 }
-.ha-ctx-menu a { display: block; padding: 6px 14px; font-size: 13px; color: var(--ha-text); white-space: nowrap; }
-.ha-ctx-menu a:hover { background: var(--ha-hover-bg); color: var(--ha-primary-dark); }
+.ow-ctx-menu a { display: block; padding: 6px 14px; font-size: 13px; color: var(--ow-text); white-space: nowrap; }
+.ow-ctx-menu a:hover { background: var(--ow-hover-bg); color: var(--ow-primary-dark); }
 
 /* ---------- v1.1.15 品牌区（站点名右侧竖三点）菜单 ----------
-   与右键菜单共用 .ha-ctx-menu 外壳，因此下面三条只覆盖差异部分。 */
+   与右键菜单共用 .ow-ctx-menu 外壳，因此下面三条只覆盖差异部分。 */
 /* 首行「头像 + 昵称」：padding 压到 8px14px，让 28px 头像不显拥挤 */
-.ha-ctx-menu a.ha-ctx-head { padding: 8px 14px; }
-.ha-ctx-head-in { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 8px; }
-.ha-ctx-head-in .ha-me-name { font-size: 13px; }
+.ow-ctx-menu a.ow-ctx-head { padding: 8px 14px; }
+.ow-ctx-head-in { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 8px; }
+.ow-ctx-head-in .ow-me-name { font-size: 13px; }
 /* 分隔线：与「聊天」列表标题的层次感一致，不引额外变量 */
-.ha-ctx-menu .ha-ctx-sep { height: 1px; margin: 4px 0; background: var(--ha-border); }
+.ow-ctx-menu .ow-ctx-sep { height: 1px; margin: 4px 0; background: var(--ow-border); }
 /* 禁用态（游客）：**不能只靠降低透明度**——那看着仍像可点。
    明确给 not-allowed 光标并去掉 hover 高亮，避免「点得动但没反应」的错觉。 */
-.ha-ctx-menu a.ha-ctx-dis { color: var(--ha-text-sub); cursor: not-allowed; }
-.ha-ctx-menu a.ha-ctx-dis:hover { background: transparent; color: var(--ha-text-sub); }
+.ow-ctx-menu a.ow-ctx-dis { color: var(--ow-text-sub); cursor: not-allowed; }
+.ow-ctx-menu a.ow-ctx-dis:hover { background: transparent; color: var(--ow-text-sub); }
 
 /* 输入区 */
 /* 输入栏底色与群聊界面一致（v1.0.120），靠上边框区分。v1.1.4 改用统一变量 */
-.ha-inputbar {
-    border-top: 1px solid var(--ha-border);
-    background-color: var(--ha-bg-chat);
-    background-image: var(--ha-bg-chat-grad);
+.ow-inputbar {
+    border-top: 1px solid var(--ow-border);
+    background-color: var(--ow-bg-chat);
+    background-image: var(--ow-bg-chat-grad);
     padding: 8px 12px 12px;
     flex-shrink: 0; -webkit-flex-shrink: 0;
 }
-.ha-toolbar { display: flex; display: -webkit-flex; gap: 4px; margin-bottom: 6px; }
-.ha-input-row { display: flex; display: -webkit-flex; gap: 10px; align-items: flex-end; -webkit-align-items: flex-end; }
+.ow-toolbar { display: flex; display: -webkit-flex; gap: 4px; margin-bottom: 6px; }
+.ow-input-row { display: flex; display: -webkit-flex; gap: 10px; align-items: flex-end; -webkit-align-items: flex-end; }
 /* 输入框底色与群聊界面一致（v1.0.118）：沿用消息区同款浅灰渐变，仅靠边框区分输入区域。v1.1.4 改用统一变量 */
-.ha-input-row .ha-input {
+.ow-input-row .ow-input {
     resize: none;
     max-height: 320px;
-    background-color: var(--ha-bg-chat);
-    background-image: var(--ha-bg-chat-grad);
+    background-color: var(--ow-bg-chat);
+    background-image: var(--ow-bg-chat-grad);
 }
-.ha-input-row { position: relative; }
+.ow-input-row { position: relative; }
 /* 输入框拖拽手柄（右下角，避开发送按钮） */
 /* 引用条：嵌入输入框内部第一行（绝对定位固定在顶部，不随内容滚动/输入量变化） */
 /* 引用条：嵌入输入框内部第一行，宽度自适应内容（不强制横跨整行） */
-.ha-quote-bar {
+.ow-quote-bar {
     position: absolute;
     top: 5px; left: 4px;
     right: auto;                       /* 宽度随内容收缩 */
     max-width: calc(100% - 86px);      /* 上限：不遮到右侧发送按钮 */
     z-index: 5;
-    border: 1px solid var(--ha-border);
+    border: 1px solid var(--ow-border);
     border-radius: 5px;
     overflow: hidden;
 }
-.ha-quote-inner {
+.ow-quote-inner {
     position: relative;
     padding: 5px 28px 5px 8px;
-    border-left: 3px solid var(--ha-primary);
-    background: var(--ha-bg-sub);
+    border-left: 3px solid var(--ow-primary);
+    background: var(--ow-bg-sub);
     font-size: 12px;
     line-height: 1.5;
-    color: var(--ha-text-sub);
+    color: var(--ow-text-sub);
     white-space: nowrap;               /* 单行展示，超长省略 */
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.ha-quote-text { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.ow-quote-text { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
 /* 有引用时输入框顶部留出引用条的空间，保证引用始终独占第一行 */
-.ha-input-row .ha-input.ha-has-quote { padding-top: 42px; }
-.ha-quote-nick { color: var(--ha-text); font-weight: 600; }
-.ha-quote-text { word-break: break-all; }
-.ha-quote-del {
+.ow-input-row .ow-input.ow-has-quote { padding-top: 42px; }
+.ow-quote-nick { color: var(--ow-text); font-weight: 600; }
+.ow-quote-text { word-break: break-all; }
+.ow-quote-del {
     position: absolute; right: 4px; top: 50%; margin-top: -11px;
     width: 22px; height: 22px; line-height: 20px; padding: 0;
     background: transparent; border: none; cursor: pointer;
-    font-size: 13px; color: var(--ha-text-sub);
+    font-size: 13px; color: var(--ow-text-sub);
 }
-.ha-quote-del:hover { color: var(--ha-text); }
+.ow-quote-del:hover { color: var(--ow-text); }
 /* 消息气泡内的引用块 */
-.ha-msg-quote {
+.ow-msg-quote {
     display: block;
     margin: 0 0 4px;
     padding: 4px 8px;
-    border-left: 3px solid var(--ha-primary);
+    border-left: 3px solid var(--ow-primary);
     background: rgba(0, 0, 0, .05);
     font-size: 12px;
     line-height: 1.5;
     opacity: .85;
     word-break: break-all;
 }
-.ha-msg-quote b { font-weight: 600; }
+.ow-msg-quote b { font-weight: 600; }
 /* 可跳转的引用块（带原消息 id） */
-.ha-msg-quote.ha-quote-link { cursor: pointer; }
-.ha-msg-quote.ha-quote-link:hover { opacity: 1; background: rgba(0, 160, 233, .12); }
-/* v1.2.36：原消息高亮统一走 .ha-msg-hit（见搜索/消息定位一节），
-   这里删除旧的 haMsgJump 动画 —— 引用跳转与搜索跳转已合并为同一个轮子
-   （HaChat.locateMsg），两处高亮样式必须一致，不能各留一套。 */
+.ow-msg-quote.ow-quote-link { cursor: pointer; }
+.ow-msg-quote.ow-quote-link:hover { opacity: 1; background: rgba(0, 160, 233, .12); }
+/* v1.2.36：原消息高亮统一走 .ow-msg-hit（见搜索/消息定位一节），
+   这里删除旧的 owMsgJump 动画 —— 引用跳转与搜索跳转已合并为同一个轮子
+   （OwChat.locateMsg），两处高亮样式必须一致，不能各留一套。 */
 
 /* v1.2.37：第三方应用授权的样式已随该功能一起移入插件 oauth-core/style.css
-   （作用域靠 ha-oa- 前缀限定，插件未启用时根本不加载） */
+   （作用域靠 ow-oa- 前缀限定，插件未启用时根本不加载） */
 
-.ha-input-resize {
+.ow-input-resize {
     position: absolute;
     right: 50px; bottom: 2px;
     width: 18px; height: 14px;
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     justify-content: center; -webkit-justify-content: center;
-    color: var(--ha-text-sub);
+    color: var(--ow-text-sub);
     opacity: .45;
     cursor: ns-resize;
     user-select: none; -webkit-user-select: none;
 }
-.ha-input-resize:hover { opacity: .9; color: var(--ha-primary-strong); }
-@media (max-width: 720px) { .ha-input-resize { display: none; } }
-.ha-send { width: 46px; height: 40px; padding: 0; font-size: 18px; border-radius: 50%; flex-shrink: 0; -webkit-flex-shrink: 0; }
+.ow-input-resize:hover { opacity: .9; color: var(--ow-primary-strong); }
+@media (max-width: 720px) { .ow-input-resize { display: none; } }
+.ow-send { width: 46px; height: 40px; padding: 0; font-size: 18px; border-radius: 50%; flex-shrink: 0; -webkit-flex-shrink: 0; }
 
 /* 表情面板 */
-.ha-emoji-panel {
+.ow-emoji-panel {
     position: absolute;
     bottom: 110px;
     left: 12px;
     width: 320px;
     max-height: 300px;
-    background: var(--ha-bg);
-    border: 1px solid var(--ha-border);
+    background: var(--ow-bg);
+    border: 1px solid var(--ow-border);
     border-radius: 8px;
     overflow: hidden;
     z-index: 30;
 }
-.ha-emoji-tabs { display: flex; display: -webkit-flex; border-bottom: 1px solid var(--ha-border); }
-.ha-emoji-tab { flex: 1; -webkit-flex: 1; padding: 8px; text-align: center; font-size: 13px; background: var(--ha-bg-sub); border: none; color: var(--ha-text-sub); }
-.ha-emoji-tab.active { background: var(--ha-bg); color: var(--ha-primary-dark); font-weight: 600; }
-.ha-emoji-grid { display: flex; display: -webkit-flex; flex-wrap: wrap; -webkit-flex-wrap: wrap; padding: 8px; max-height: 240px; overflow-y: auto; }
-.ha-emoji-item { width: 34px; height: 34px; line-height: 34px; text-align: center; font-size: 20px; cursor: pointer; border-radius: 4px; }
-.ha-emoji-item:hover { background: var(--ha-hover-bg); }
-.ha-sticker-item { width: 64px; height: 64px; margin: 4px; cursor: pointer; border-radius: 6px; border: 1px solid var(--ha-border); object-fit: cover; }
-.ha-sticker-item:hover { border-color: var(--ha-primary); }
+.ow-emoji-tabs { display: flex; display: -webkit-flex; border-bottom: 1px solid var(--ow-border); }
+.ow-emoji-tab { flex: 1; -webkit-flex: 1; padding: 8px; text-align: center; font-size: 13px; background: var(--ow-bg-sub); border: none; color: var(--ow-text-sub); }
+.ow-emoji-tab.active { background: var(--ow-bg); color: var(--ow-primary-dark); font-weight: 600; }
+.ow-emoji-grid { display: flex; display: -webkit-flex; flex-wrap: wrap; -webkit-flex-wrap: wrap; padding: 8px; max-height: 240px; overflow-y: auto; }
+.ow-emoji-item { width: 34px; height: 34px; line-height: 34px; text-align: center; font-size: 20px; cursor: pointer; border-radius: 4px; }
+.ow-emoji-item:hover { background: var(--ow-hover-bg); }
+.ow-sticker-item { width: 64px; height: 64px; margin: 4px; cursor: pointer; border-radius: 6px; border: 1px solid var(--ow-border); object-fit: cover; }
+.ow-sticker-item:hover { border-color: var(--ow-primary); }
 
 /* 右侧栏（v1.1.1）：上方群聊设置 + 下方所有成员 */
-.ha-online {
+.ow-online {
     width: 240px;
-    border-left: 1px solid var(--ha-border);
-    background: var(--ha-bg-chat);   /* v1.1.4：与聊天区底色一致，同左侧栏 */
+    border-left: 1px solid var(--ow-border);
+    background: var(--ow-bg-chat);   /* v1.1.4：与聊天区底色一致，同左侧栏 */
     flex-shrink: 0; -webkit-flex-shrink: 0;
     display: flex; display: -webkit-flex;
     flex-direction: column; -webkit-flex-direction: column;
     overflow: hidden;
 }
 /* 宽屏：常驻侧栏，点按钮可收起 */
-.ha-online.hidden { display: none; }
+.ow-online.hidden { display: none; }
 /* 两个区块：设置区按内容高度（可长可短），成员区吃掉剩余空间并独立滚动 */
-.ha-panel-sec { display: flex; display: -webkit-flex; flex-direction: column; -webkit-flex-direction: column; min-height: 0; }
+.ow-panel-sec { display: flex; display: -webkit-flex; flex-direction: column; -webkit-flex-direction: column; min-height: 0; }
 /* v1.1.10：群资料表单已搬回弹窗，本区块只剩两行入口，max-height 收紧到 24%
    （原来 62% 是为内联表单预留的，现在两行永远放得下） */
-.ha-panel-room { flex-shrink: 0; -webkit-flex-shrink: 0; max-height: 24%; overflow-y: auto; -webkit-overflow-scrolling: touch; border-bottom: 1px solid var(--ha-border); }
+.ow-panel-room { flex-shrink: 0; -webkit-flex-shrink: 0; max-height: 24%; overflow-y: auto; -webkit-overflow-scrolling: touch; border-bottom: 1px solid var(--ow-border); }
 /* v1.1.16：右侧栏「群聊信息」标题已删，这个容器只剩收起按钮（JS 定位用）。
-   ⚠️ **不要写 height:0 / overflow:hidden** —— 收起按钮 .ha-online-close 是
+   ⚠️ **不要写 height:0 / overflow:hidden** —— 收起按钮 .ow-online-close 是
    position:absolute 定位到这个容器上的，压掉高度会让按钮在窄屏彻底不可见
    （Playwright 判 hidden，点不到）。这里只清掉标题留下的上下内边距。
    v1.1.17：桌面端下这 20px 会把首行分隔线顶偏，窄屏仍需保留，故在末尾
    的对齐块里用 min-height:0 单独归零（窄屏不受影响）。 */
-#haPanelTitle { padding: 0; position: relative; min-height: 20px; }
-#haPanelTitle .ha-online-close { position: absolute; top: 2px; right: 8px; float: none; }
-.ha-panel-members { flex: 1; -webkit-flex: 1; overflow: hidden; }
+#owPanelTitle { padding: 0; position: relative; min-height: 20px; }
+#owPanelTitle .ow-online-close { position: absolute; top: 2px; right: 8px; float: none; }
+.ow-panel-members { flex: 1; -webkit-flex: 1; overflow: hidden; }
 /* v1.1.17：底部留白从 14px 收到 10px。原先 14px 是配合「群聊信息」标题的
    呼吸感，标题删掉后这段空白只会让首行分隔线离顶栏更远。 */
-.ha-panel-room-body { padding: 0 16px 10px; }
-.ha-panel-hint { padding: 4px 0 10px; font-size: 13px; color: var(--ha-text-sub); }
+.ow-panel-room-body { padding: 0 16px 10px; }
+.ow-panel-hint { padding: 4px 0 10px; font-size: 13px; color: var(--ow-text-sub); }
 /* 空态文案（群简介未填写）：弱化颜色，与有值时形成对比 */
-.ha-panel-empty { color: var(--ha-text-sub); }
+.ow-panel-empty { color: var(--ow-text-sub); }
 
 /* ---------- 侧栏入口行（v1.1.10） ----------
    「群聊信息」区的统一行外观：图标 + 文案 + 右箭头，整行可点。
-   「群聊设置」由核心渲染，「群公告」等插件入口走 #haREExtras 容器、
+   「群聊设置」由核心渲染，「群公告」等插件入口走 #owREExtras 容器、
    复用同一套类，因此两行视觉完全一致（同款 hover / 同款箭头）。
 
-   分隔线的关键约束：**线画在容器（.ha-panel-entry-row）上，不画在行上**。
-   早先把它写成 .ha-panel-entry{border-top}，结果第一行（:first-child 去掉边框）
+   分隔线的关键约束：**线画在容器（.ow-panel-entry-row）上，不画在行上**。
+   早先把它写成 .ow-panel-entry{border-top}，结果第一行（:first-child 去掉边框）
    与第二行相差 1px —— 实测高度 40.4 vs 41.4，肉眼就是两行没对齐。
    现在两行的 padding/边框完全相同，高度严格一致（均为 40.4px）。 */
-.ha-panel-entry-row { margin: 0; border-top: 1px solid var(--ha-border); }
+.ow-panel-entry-row { margin: 0; border-top: 1px solid var(--ow-border); }
 /* 容器为空（插件没填内容）时不占位，也不画线 */
-.ha-panel-entry-row:empty { display: none; }
-.ha-panel-entry {
+.ow-panel-entry-row:empty { display: none; }
+.ow-panel-entry {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 8px;
     padding: 9px 0;
     border: none;
     font-size: 14px;
-    color: var(--ha-text);
+    color: var(--ow-text);
     cursor: pointer;
     user-select: none; -webkit-user-select: none;
     -webkit-tap-highlight-color: transparent;
 }
-.ha-panel-entry-ico { flex-shrink: 0; -webkit-flex-shrink: 0; color: var(--ha-text-sub); }
-.ha-panel-entry-t { flex: 1; -webkit-flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ha-panel-entry-arrow { flex-shrink: 0; -webkit-flex-shrink: 0; font-size: 16px; line-height: 1; color: var(--ha-text-sub); }
-.ha-panel-entry:hover, .ha-panel-entry:focus { color: var(--ha-primary-dark); outline: none; }
-.ha-panel-entry:hover .ha-panel-entry-ico, .ha-panel-entry:hover .ha-panel-entry-arrow { color: var(--ha-primary-dark); }
+.ow-panel-entry-ico { flex-shrink: 0; -webkit-flex-shrink: 0; color: var(--ow-text-sub); }
+.ow-panel-entry-t { flex: 1; -webkit-flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ow-panel-entry-arrow { flex-shrink: 0; -webkit-flex-shrink: 0; font-size: 16px; line-height: 1; color: var(--ow-text-sub); }
+.ow-panel-entry:hover, .ow-panel-entry:focus { color: var(--ow-primary-dark); outline: none; }
+.ow-panel-entry:hover .ow-panel-entry-ico, .ow-panel-entry:hover .ow-panel-entry-arrow { color: var(--ow-primary-dark); }
 /* 静态行（无 onclick）：保留外观但不可点，用于纯展示项 */
-.ha-panel-entry.is-static { cursor: default; }
-.ha-panel-entry.is-static:hover { color: var(--ha-text); }
-.ha-panel-entry.is-static:hover .ha-panel-entry-ico, .ha-panel-entry.is-static:hover .ha-panel-entry-arrow { color: var(--ha-text-sub); }
+.ow-panel-entry.is-static { cursor: default; }
+.ow-panel-entry.is-static:hover { color: var(--ow-text); }
+.ow-panel-entry.is-static:hover .ow-panel-entry-ico, .ow-panel-entry.is-static:hover .ow-panel-entry-arrow { color: var(--ow-text-sub); }
 /* 关闭按钮仅在窄屏浮层模式下出现 */
-.ha-online-close {
+.ow-online-close {
     display: none;
     float: right;
     border: none;
     background: none;
     font-size: 18px;
     line-height: 1;
-    color: var(--ha-text-sub);
+    color: var(--ow-text-sub);
     padding: 0 2px;
     margin-top: -2px;
 }
-.ha-online-close:hover { color: var(--ha-primary-dark); }
-.ha-online-item {
+.ow-online-close:hover { color: var(--ow-primary-dark); }
+.ow-online-item {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 8px;
     padding: 7px 14px;
 }
 /* 成员区独立滚动：ul 默认 margin/padding 会让滚动区上下留白、边框错位 */
-.ha-online-list { flex: 1; -webkit-flex: 1; margin: 0; padding: 0 0 10px; list-style: none; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.ha-online-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ha-green); flex-shrink: 0; -webkit-flex-shrink: 0; }
+.ow-online-list { flex: 1; -webkit-flex: 1; margin: 0; padding: 0 0 10px; list-style: none; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.ow-online-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ow-green); flex-shrink: 0; -webkit-flex-shrink: 0; }
 /* v1.2.27：「所有成员」改成显示**加入的成员全量**（含离线），
    离线成员同样占位 8px 画灰点 —— 不画点会让整列名字左边缩进对不齐。 */
-.ha-online-dot.is-off { background: var(--ha-border); }
-.ha-online-name { flex: 1; -webkit-flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-.ha-online-name:hover { color: var(--ha-primary-dark); }
+.ow-online-dot.is-off { background: var(--ow-border); }
+.ow-online-name { flex: 1; -webkit-flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.ow-online-name:hover { color: var(--ow-primary-dark); }
 /* 游客行：名字不可点（游客没有资料卡），去掉 hover 变色与手型以免误导 */
-.ha-online-item.is-guest .ha-online-name { cursor: default; }
-.ha-online-item.is-guest .ha-online-name:hover { color: inherit; }
-.ha-online-empty { padding: 10px 14px; font-size: 12px; color: var(--ha-text-sub); }
+.ow-online-item.is-guest .ow-online-name { cursor: default; }
+.ow-online-item.is-guest .ow-online-name:hover { color: inherit; }
+.ow-online-empty { padding: 10px 14px; font-size: 12px; color: var(--ow-text-sub); }
 /* 未加入群聊时的输入框闸门（v1.2.27） */
-.ha-join-gate {
+.ow-join-gate {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 10px;
     padding: 8px 12px;
     margin-bottom: 6px;
     font-size: 12px;
-    color: var(--ha-text-sub);
-    background: var(--ha-bg-sub);
-    border: 1px solid var(--ha-border);
+    color: var(--ow-text-sub);
+    background: var(--ow-bg-sub);
+    border: 1px solid var(--ow-border);
     border-radius: 6px;
 }
-.ha-join-gate span { flex: 1; -webkit-flex: 1; min-width: 0; }
-.ha-input:disabled { background: var(--ha-bg-sub); color: var(--ha-text-sub); cursor: not-allowed; }
+.ow-join-gate span { flex: 1; -webkit-flex: 1; min-width: 0; }
+.ow-input:disabled { background: var(--ow-bg-sub); color: var(--ow-text-sub); cursor: not-allowed; }
 
 /* ---------- v1.1.17：首行分隔线与顶栏下边框水平对齐（仅宽屏） ----------
    现象（1440×900 实测）：右侧栏「群聊设置」下方的分隔线在 y=[60.39, 61.39]，
-   而 .ha-topbar 的下边框在 y=[56, 57] —— **差 4.39px**，肉眼可见两条线不在同一水平。
+   而 .ow-topbar 的下边框在 y=[56, 57] —— **差 4.39px**，肉眼可见两条线不在同一水平。
 
-   根因：.ha-panel-room 顶部由三段累加而成，而它们的总高不是顶栏高度：
-     #haPanelTitle          20px（v1.1.16 删标题后残留的空占位，宽屏下纯浪费）
-     .ha-panel-entry 首行   40.39px（padding 9×2 + 图标行 22.39）
-     .ha-panel-entry-row    41.39px（首行 + 自己的 border-top 1px）
+   根因：.ow-panel-room 顶部由三段累加而成，而它们的总高不是顶栏高度：
+     #owPanelTitle          20px（v1.1.16 删标题后残留的空占位，宽屏下纯浪费）
+     .ow-panel-entry 首行   40.39px（padding 9×2 + 图标行 22.39）
+     .ow-panel-entry-row    41.39px（首行 + 自己的 border-top 1px）
      ───────────────────── 合计 60.39px = 分隔线的 y
    而顶栏是 57px（10 + 36 + 10 + 1）。两者各自独立算高度，差值就固化成了 4.39px。
 
-   修法：**不让高度靠内容自然累加**，而是把顶部区块的总高钉死为 --ha-topbar-h，
+   修法：**不让高度靠内容自然累加**，而是把顶部区块的总高钉死为 --ow-topbar-h，
    多出来的高度给首行（min-height 撑开，flex 居中），少掉的高度从空占位里扣。
 
    ⚠️ 这里的 -1px 不是凑数，是**像素账的必然结果**（第一版就漏了它，实测 delta=1）：
@@ -1475,26 +1475,26 @@ input[type=range] {
      要两条线**占同一像素行**，必须 H + 1 == 57，即 H = 56 = 57 - 1。
      写 57 会让分隔线落到 [57, 58]，比顶栏整整低 1px —— 依然肉眼可见不齐。
 
-   于是分隔线落在 y=[56, 57]，与顶栏、左侧栏 .ha-brand 三线齐平。
+   于是分隔线落在 y=[56, 57]，与顶栏、左侧栏 .ow-brand 三线齐平。
 
    ⚠️ 为什么必须限定 min-width:961px：
-     窄屏（≤960px）侧栏是 fixed 浮层（top:52px），此时 #haPanelTitle 是
-     .ha-online-close 的定位父级，min-height:20px **必须保留** ——
+     窄屏（≤960px）侧栏是 fixed 浮层（top:52px），此时 #owPanelTitle 是
+     .ow-online-close 的定位父级，min-height:20px **必须保留** ——
      归零会让收起按钮彻底不可见（Playwright 判 hidden，点不到）。
      窄屏下侧栏与顶栏本就不在同一坐标系，无需对齐。 */
 @media (min-width: 961px) {
-    /* 空占位归零：宽屏下 .ha-online-close 是 display:none，这里没有任何可见内容 */
-    #haPanelTitle { min-height: 0; }
-    /* 首行（.ha-panel-entry）撑满顶部区块：区块总高 = 0 + 首行高 = 顶栏高度。
+    /* 空占位归零：宽屏下 .ow-online-close 是 display:none，这里没有任何可见内容 */
+    #owPanelTitle { min-height: 0; }
+    /* 首行（.ow-panel-entry）撑满顶部区块：区块总高 = 0 + 首行高 = 顶栏高度。
        ⚠️ 用 min-height 而非 height：内容若换行变高，行会向下顶而不是被裁切。
        ⚠️ 减 1px：让下一行的 border-top 正好落进顶栏 border-bottom 的那个像素行。
-       ⚠️ 群公告行（.ha-panel-entry-row）的 min-height **不要动** —— 它带
+       ⚠️ 群公告行（.ow-panel-entry-row）的 min-height **不要动** —— 它带
          border-top，撑高会连带把它自己的下边框也推走，破坏下面那条线。 */
-    .ha-panel-room > .ha-panel-room-body > .ha-panel-entry { min-height: calc(var(--ha-topbar-h) - 1px); }
+    .ow-panel-room > .ow-panel-room-body > .ow-panel-entry { min-height: calc(var(--ow-topbar-h) - 1px); }
 }
 
 /* ---------- 弹层 ---------- */
-.ha-modal-mask {
+.ow-modal-mask {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     /* v1.2.32：灰色遮蔽层 → 半透明 + 背景模糊。
        遮罩色降到 .32（模糊本身会削弱对比，再深就看不见弹窗了）。
@@ -1509,8 +1509,8 @@ input[type=range] {
     justify-content: center; -webkit-justify-content: center;
     padding: 20px;
 }
-.ha-modal {
-    background: var(--ha-bg);
+.ow-modal {
+    background: var(--ow-bg);
     border-radius: 10px;
     padding: 24px;
     width: 100%;
@@ -1518,19 +1518,19 @@ input[type=range] {
     max-height: 85vh;
     overflow-y: auto;
 }
-.ha-modal h3 { font-size: 18px; font-weight: 600; color: var(--ha-text-title); margin-bottom: 16px; }
-.ha-modal-close { float: right; border: none; background: none; font-size: 18px; color: var(--ha-text-sub); }
+.ow-modal h3 { font-size: 18px; font-weight: 600; color: var(--ow-text-title); margin-bottom: 16px; }
+.ow-modal-close { float: right; border: none; background: none; font-size: 18px; color: var(--ow-text-sub); }
 /* 弹窗说明文字与底部按钮行（密码房弹窗等复用） */
-.ha-modal-desc { font-size: 13px; color: var(--ha-text-sub); line-height: 1.6; margin-bottom: 14px; }
-.ha-modal-actions { display: flex; display: -webkit-flex; justify-content: flex-end; -webkit-justify-content: flex-end; gap: 8px; margin-top: 16px; }   /* 与上方输入框/说明文字保持一致间隔（相邻兄弟 margin 折叠取大值） */
+.ow-modal-desc { font-size: 13px; color: var(--ow-text-sub); line-height: 1.6; margin-bottom: 14px; }
+.ow-modal-actions { display: flex; display: -webkit-flex; justify-content: flex-end; -webkit-justify-content: flex-end; gap: 8px; margin-top: 16px; }   /* 与上方输入框/说明文字保持一致间隔（相邻兄弟 margin 折叠取大值） */
 @media (max-width: 720px) {
-    .ha-modal-actions .ha-btn { flex: 1; -webkit-flex: 1; }
+    .ow-modal-actions .ow-btn { flex: 1; -webkit-flex: 1; }
     /* split 行里左边的「成员管理」不该跟着撑满：让它按内容宽，
        占位符继续吃掉剩余空间，右半组照常右对齐。 */
-    .ha-modal-actions-split .ha-btn { flex: 0 0 auto; -webkit-flex: 0 0 auto; }
+    .ow-modal-actions-split .ow-btn { flex: 0 0 auto; -webkit-flex: 0 0 auto; }
 }
 
-.ha-img-viewer {
+.ow-img-viewer {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0, 0, 0, .8);
     z-index: 200;
@@ -1539,14 +1539,14 @@ input[type=range] {
     justify-content: center; -webkit-justify-content: center;
     cursor: zoom-out;
 }
-.ha-img-viewer img { max-width: 92%; max-height: 92%; }
+.ow-img-viewer img { max-width: 92%; max-height: 92%; }
 
-.ha-toast {
+.ow-toast {
     position: fixed;
     top: 20px; left: 50%;
     transform: translateX(-50%);
     -webkit-transform: translateX(-50%);
-    background: var(--ha-text-title);
+    background: var(--ow-text-title);
     color: #fff;
     padding: 8px 18px;
     border-radius: 6px;
@@ -1557,107 +1557,107 @@ input[type=range] {
 /* ==========================================================================
    管理后台
    ========================================================================== */
-.ha-admin-layout { display: flex; display: -webkit-flex; min-height: 100vh; }
-.ha-admin-side {
+.ow-admin-layout { display: flex; display: -webkit-flex; min-height: 100vh; }
+.ow-admin-side {
     width: 220px;
-    /* v1.2.55：与前台两侧栏（.ha-sidebar / .ha-online）同一底色 --ha-bg-chat(#F5F5F5)。
-       原来是 var(--ha-bg) 纯白 —— 前后台侧栏一白一灰，切过去像换了个站。
+    /* v1.2.55：与前台两侧栏（.ow-sidebar / .ow-online）同一底色 --ow-bg-chat(#F5F5F5)。
+       原来是 var(--ow-bg) 纯白 —— 前后台侧栏一白一灰，切过去像换了个站。
        内容区保持白卡片（「内容岛」浮在灰底上），靠 1px 右边框分界，与前台同款处理。 */
-    background: var(--ha-bg-chat);
-    border-right: 1px solid var(--ha-border);
+    background: var(--ow-bg-chat);
+    border-right: 1px solid var(--ow-border);
     padding: 16px 12px;
     flex-shrink: 0; -webkit-flex-shrink: 0;
     /* 纵向布局：「返回前台」始终沉在侧栏底部（v1.0.42） */
     display: flex; display: -webkit-flex; flex-direction: column; -webkit-flex-direction: column;
 }
-.ha-admin-brand { font-size: 11px; color: var(--ha-text-sub); letter-spacing: 2px; padding: 4px 8px 14px; }
-.ha-admin-brand strong { font-size: 20px; color: var(--ha-text-title); letter-spacing: 0; }
-.ha-admin-menu { margin-top: 14px; flex: 1; -webkit-flex: 1; }
-.ha-admin-exit { margin-top: 10px; }
-.ha-admin-menu li {
+.ow-admin-brand { font-size: 11px; color: var(--ow-text-sub); letter-spacing: 2px; padding: 4px 8px 14px; }
+.ow-admin-brand strong { font-size: 20px; color: var(--ow-text-title); letter-spacing: 0; }
+.ow-admin-menu { margin-top: 14px; flex: 1; -webkit-flex: 1; }
+.ow-admin-exit { margin-top: 10px; }
+.ow-admin-menu li {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 8px;
     padding: 9px 12px;
     border-radius: 6px;
     cursor: pointer;
-    color: var(--ha-text);
+    color: var(--ow-text);
     font-size: 14px;
 }
-/* v1.2.55：侧栏底色改为灰后，--ha-bg-sub(#F5F5F5) 与底色同色 → hover 看不见。
-   灰底区域上的 hover 一律用 --ha-bg-chat-hover(#EBEBEB)，比底色深一档。 */
-.ha-admin-menu li:hover { background: var(--ha-bg-chat-hover); }
-.ha-admin-menu li.active { background: var(--ha-active-bg); color: var(--ha-primary-dark); font-weight: 600; }
-.ha-admin-ico { font-size: 15px; }
+/* v1.2.55：侧栏底色改为灰后，--ow-bg-sub(#F5F5F5) 与底色同色 → hover 看不见。
+   灰底区域上的 hover 一律用 --ow-bg-chat-hover(#EBEBEB)，比底色深一档。 */
+.ow-admin-menu li:hover { background: var(--ow-bg-chat-hover); }
+.ow-admin-menu li.active { background: var(--ow-active-bg); color: var(--ow-primary-dark); font-weight: 600; }
+.ow-admin-ico { font-size: 15px; }
 /* 菜单分类：标题占满剩余宽度，使折叠箭头贴右侧 */
-.ha-admin-label { flex: 1; -webkit-flex: 1; min-width: 0; }
-.ha-admin-tog { display: flex; display: -webkit-flex; color: var(--ha-text-sub); transition: transform .15s; -webkit-transition: -webkit-transform .15s; }
-.ha-admin-group.ha-group-open .ha-admin-tog { transform: rotate(180deg); -webkit-transform: rotate(180deg); }
+.ow-admin-label { flex: 1; -webkit-flex: 1; min-width: 0; }
+.ow-admin-tog { display: flex; display: -webkit-flex; color: var(--ow-text-sub); transition: transform .15s; -webkit-transition: -webkit-transform .15s; }
+.ow-admin-group.ow-group-open .ow-admin-tog { transform: rotate(180deg); -webkit-transform: rotate(180deg); }
 /* 插件子页面：默认收起，父项展开后才显示（缩进对齐到图标右侧） */
-.ha-admin-menu li.ha-admin-sub { display: none; padding-left: 34px; font-size: 13.5px; }
-.ha-admin-menu li.ha-admin-sub.ha-sub-open { display: flex; display: -webkit-flex; }
+.ow-admin-menu li.ow-admin-sub { display: none; padding-left: 34px; font-size: 13.5px; }
+.ow-admin-menu li.ow-admin-sub.ow-sub-open { display: flex; display: -webkit-flex; }
 /* 未启用插件的子项：置灰提示（点进去提供一键启用，v1.0.45） */
-.ha-admin-menu li.ha-admin-sub.ha-admin-off { color: var(--ha-text-sub); opacity: .75; }
-.ha-admin-main { flex: 1; -webkit-flex: 1; padding: 24px 28px; min-width: 0; }
+.ow-admin-menu li.ow-admin-sub.ow-admin-off { color: var(--ow-text-sub); opacity: .75; }
+.ow-admin-main { flex: 1; -webkit-flex: 1; padding: 24px 28px; min-width: 0; }
 /* 移动端顶栏与抽屉遮罩：桌面端隐藏（见 720px 媒体查询） */
-.ha-admin-bar { display: none; }
-.ha-admin-bar-title { flex: 1; -webkit-flex: 1; font-size: 15px; font-weight: 600; color: var(--ha-text-title); }
-.ha-admin-mask { position: fixed; left: 0; right: 0; top: 0; bottom: 0; background: rgba(0,0,0,.35); z-index: 89; }
+.ow-admin-bar { display: none; }
+.ow-admin-bar-title { flex: 1; -webkit-flex: 1; font-size: 15px; font-weight: 600; color: var(--ow-text-title); }
+.ow-admin-mask { position: fixed; left: 0; right: 0; top: 0; bottom: 0; background: rgba(0,0,0,.35); z-index: 89; }
 /* 插件卡片列表（v1.0.47）：名称+状态 / 标识·版本·来源·计数 / 说明 / 操作按钮 */
-.ha-plugin-list { display: flex; display: -webkit-flex; flex-direction: column; -webkit-flex-direction: column; gap: 10px; }
-.ha-plugin-card { background: var(--ha-bg); border: 1px solid var(--ha-border); border-radius: 8px; padding: 12px 14px; }
-.ha-plugin-head { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 8px; }
-.ha-plugin-head b { font-size: 15px; color: var(--ha-text-title); }
+.ow-plugin-list { display: flex; display: -webkit-flex; flex-direction: column; -webkit-flex-direction: column; gap: 10px; }
+.ow-plugin-card { background: var(--ow-bg); border: 1px solid var(--ow-border); border-radius: 8px; padding: 12px 14px; }
+.ow-plugin-head { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 8px; }
+.ow-plugin-head b { font-size: 15px; color: var(--ow-text-title); }
 /* v1.2.57：有后台页的插件，标题可点直达设置页。用主色 + 手型
    表达「可点」；没有后台页的插件不加这个类。v1.2.58 起取消 hover 下划线（按需求）。 */
-.ha-plugin-head b.ha-plugin-title-link {
-    color: var(--ha-primary-dark);
+.ow-plugin-head b.ow-plugin-title-link {
+    color: var(--ow-primary-dark);
     cursor: pointer;
     text-decoration: none;
 }
-.ha-plugin-meta { font-size: 12px; color: var(--ha-text-sub); margin-top: 5px; word-break: break-all; }
-.ha-plugin-desc { font-size: 13px; color: var(--ha-text); margin-top: 6px; line-height: 1.6; word-break: break-all; }
-.ha-plugin-actions { display: flex; display: -webkit-flex; gap: 8px; flex-wrap: wrap; -webkit-flex-wrap: wrap; margin-top: 10px; }
-.ha-plugin-actions .ha-btn { padding: 5px 14px; font-size: 13px; text-decoration: none; }
+.ow-plugin-meta { font-size: 12px; color: var(--ow-text-sub); margin-top: 5px; word-break: break-all; }
+.ow-plugin-desc { font-size: 13px; color: var(--ow-text); margin-top: 6px; line-height: 1.6; word-break: break-all; }
+.ow-plugin-actions { display: flex; display: -webkit-flex; gap: 8px; flex-wrap: wrap; -webkit-flex-wrap: wrap; margin-top: 10px; }
+.ow-plugin-actions .ow-btn { padding: 5px 14px; font-size: 13px; text-decoration: none; }
 /* 自研文件上传行：隐藏原生 input，按钮 + 文件名回显 + 主操作右对齐 */
-.ha-upload-row { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 10px; }
-.ha-upload-name { font-size: 13px; color: var(--ha-text-sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46%; }
-.ha-upload-name.ha-has-file { color: var(--ha-text); }
-.ha-plugin-actions .ha-btn[disabled] { opacity: .45; cursor: not-allowed; }
-.ha-admin-main h2 { font-size: 24px; font-weight: 600; color: var(--ha-text-title); line-height: 1.3; }
-.ha-admin-main .ha-admin-desc { font-size: 12px; color: var(--ha-text-sub); margin-bottom: 20px; }
-.ha-card {
-    background: var(--ha-bg);
-    border: 1px solid var(--ha-border);
+.ow-upload-row { display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center; gap: 10px; }
+.ow-upload-name { font-size: 13px; color: var(--ow-text-sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46%; }
+.ow-upload-name.ow-has-file { color: var(--ow-text); }
+.ow-plugin-actions .ow-btn[disabled] { opacity: .45; cursor: not-allowed; }
+.ow-admin-main h2 { font-size: 24px; font-weight: 600; color: var(--ow-text-title); line-height: 1.3; }
+.ow-admin-main .ow-admin-desc { font-size: 12px; color: var(--ow-text-sub); margin-bottom: 20px; }
+.ow-card {
+    background: var(--ow-bg);
+    border: 1px solid var(--ow-border);
     border-radius: 8px;
     padding: 18px;
     margin-bottom: 16px;
 }
-.ha-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--ha-bg); }
-.ha-table th, .ha-table td { padding: 8px 10px; border-bottom: 1px solid var(--ha-border); text-align: left; }
-.ha-table th { color: var(--ha-text-sub); font-weight: 400; font-size: 12px; background: var(--ha-bg-sub); }
-.ha-table tr:hover td { background: var(--ha-hover-bg); }
-.ha-table .ha-input { padding: 4px 8px; font-size: 13px; }
-.ha-form-row { display: flex; display: -webkit-flex; gap: 10px; flex-wrap: wrap; -webkit-flex-wrap: wrap; align-items: flex-end; -webkit-align-items: flex-end; }
-.ha-form-row .ha-form-item { margin-bottom: 10px; min-width: 140px; }
+.ow-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--ow-bg); }
+.ow-table th, .ow-table td { padding: 8px 10px; border-bottom: 1px solid var(--ow-border); text-align: left; }
+.ow-table th { color: var(--ow-text-sub); font-weight: 400; font-size: 12px; background: var(--ow-bg-sub); }
+.ow-table tr:hover td { background: var(--ow-hover-bg); }
+.ow-table .ow-input { padding: 4px 8px; font-size: 13px; }
+.ow-form-row { display: flex; display: -webkit-flex; gap: 10px; flex-wrap: wrap; -webkit-flex-wrap: wrap; align-items: flex-end; -webkit-align-items: flex-end; }
+.ow-form-row .ow-form-item { margin-bottom: 10px; min-width: 140px; }
 /* 表单行内的裸按钮与输入框等高：输入框 padding 9px，按钮默认 8px，
    底对齐时顶部会差 4px（用户搜索框问题，v1.0.43） */
-.ha-form-row > .ha-btn { padding-top: 9px; padding-bottom: 9px; margin-bottom: 10px; }
+.ow-form-row > .ow-btn { padding-top: 9px; padding-bottom: 9px; margin-bottom: 10px; }
 
 /* ---------- 响应式 ---------- */
-.ha-only-mobile { display: none; }
+.ow-only-mobile { display: none; }
 
 @media (max-width: 960px) {
     /* 浮层遮罩：成员面板为浮层模式，遮罩跟随同一断点 */
-    .ha-mask {
+    .ow-mask {
         display: none;
         position: fixed;
         left: 0; right: 0; top: 52px; bottom: 0;
         background: rgba(0, 0, 0, .25);
         z-index: 85;
     }
-    .ha-mask.show { display: block; }
-    .ha-online {
+    .ow-mask.show { display: block; }
+    .ow-online {
         position: fixed;
         /* 顶部留出工具栏高度，避免浮层盖住「群聊信息」按钮导致无法收起 */
         right: -260px; top: 52px; bottom: 0;
@@ -1665,32 +1665,62 @@ input[type=range] {
         transition: right .2s;
         width: 240px;
     }
-    .ha-online-close { display: block; }
+    .ow-online-close { display: block; }
 }
 
 /* 后台表格：移动端横向滚动容器（防多列压碎错乱） */
-.ha-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.ha-table td a { white-space: nowrap; }
+.ow-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.ow-table td a { white-space: nowrap; }
 /* 后台批量操作按钮区：按钮间 8px 间隙，移动端换行后上下也有 row-gap */
-.ha-admin-batch { display: flex; display: -webkit-flex; flex-wrap: wrap; -webkit-flex-wrap: wrap; gap: 8px; align-items: center; -webkit-align-items: center; margin-bottom: 10px; }
+.ow-admin-batch { display: flex; display: -webkit-flex; flex-wrap: wrap; -webkit-flex-wrap: wrap; gap: 8px; align-items: center; -webkit-align-items: center; margin-bottom: 10px; }
+/* 批量下拉本体（v1.2.60）：限宽 + 文字省略，选项再长也不会把「执行」按钮顶出可视区。
+   自绘箭头：原生下拉箭头在 Windows 上过粗、与 32px 行高不匹配。 */
+.ow-batch-select { width: auto; min-width: 190px; max-width: 280px; height: 32px; padding: 4px 26px 4px 8px; line-height: 1.2; cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235C5C5C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 6px center; background-size: 14px; }
+.ow-batch-select option.ow-batch-danger { color: #C41D1F; }   /* 危险动作在选项里就标红，选之前先看见 */
+.ow-admin-batch .ow-btn { flex: none; }                        /* 执行按钮不参与压缩，禁用态也不变形 */
+/* 后台页头：标题与右侧操作按钮同行；窄屏换行后按钮靠左（避免与内容栏产生视觉错位） */
+.ow-admin-head { display: flex; display: -webkit-flex; flex-wrap: wrap; -webkit-flex-wrap: wrap; align-items: center; -webkit-align-items: center; gap: 10px; margin-bottom: 6px; }
+.ow-admin-head h2 { margin: 0; }
+.ow-admin-head-act { display: flex; display: -webkit-flex; flex-wrap: wrap; -webkit-flex-wrap: wrap; gap: 8px; margin-left: auto; }
+@media (max-width: 720px) { .ow-admin-head-act { margin-left: 0; } .ow-batch-select { flex: 1 1 100%; max-width: none; } }
+/* 通用提示条：warn 用于「开关导致的现象解释」 */
+.ow-notice { padding: 10px 12px; border-radius: 6px; font-size: 13px; line-height: 1.7; margin-bottom: 12px; border: 1px solid; }
+.ow-notice code { padding: 1px 4px; border-radius: 3px; background: rgba(0,0,0,.06); font-size: 12px; }
+.ow-notice-warn { background: #FFF7E6; border-color: #FFD591; color: #A05000; }
+/* 系统日志：文件 tab 横向排列 + 等宽正文块（保留换行、不解析 HTML） */
+.ow-syslog-tabs { display: flex; display: -webkit-flex; flex-wrap: wrap; -webkit-flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.ow-syslog-tab { display: flex; display: -webkit-flex; -webkit-flex-direction: column; flex-direction: column; gap: 2px;
+    padding: 7px 12px; border: 1px solid var(--ow-border-control); border-radius: 4px;
+    background: var(--ow-bg); color: var(--ow-text); text-align: left; cursor: pointer; min-width: 0; }
+.ow-syslog-tab b { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.ow-syslog-tab span { font-size: 11px; color: var(--ow-text-sub); white-space: nowrap; }
+.ow-syslog-tab.active { border-color: var(--ow-primary-strong); background: #E6F7FF; }
+.ow-syslog-tab.active b { color: var(--ow-primary-dark); }
+.ow-syslog-body { margin-top: 4px; padding: 12px; background: var(--ow-bg-sub); border: 1px solid var(--ow-border); border-radius: 4px;
+    font-family: Consolas, Monaco, "Courier New", monospace; font-size: 12px; line-height: 1.6;
+    white-space: pre-wrap; word-break: break-all; max-height: 62vh; overflow: auto; color: var(--ow-text); }
+.ow-syslog-line { padding: 12px; color: var(--ow-text-sub); font-size: 13px; }
 /* 分页条 */
-.ha-pager { display: flex; display: -webkit-flex; gap: 8px; align-items: center; -webkit-align-items: center; flex-wrap: wrap; justify-content: center; -webkit-justify-content: center; margin-top: 14px; }
-.ha-pager .ha-btn { padding: 5px 10px; min-width: 36px; font-size: 13px; text-align: center; }
-.ha-pager-info { font-size: 12px; color: var(--ha-text-sub); }
-.ha-pager-dots { color: var(--ha-text-sub); padding: 0 2px; align-self: center; line-height: 1; }
-.ha-pager-jump { font-size: 12px; color: var(--ha-text-sub); margin-left: 10px; display: inline-flex; display: -webkit-inline-flex; align-items: center; -webkit-align-items: center; gap: 6px; }
-.ha-pager-jump-input { width: 56px; padding: 5px 6px; border: 1px solid var(--ha-border-control); border-radius: 4px; text-align: center; font-size: 12px; background: var(--ha-bg-sub); color: var(--ha-text); box-sizing: border-box; line-height: 1.2; }
-.ha-pager-jump-input:focus { outline: none; border-color: var(--ha-primary-strong); }
+.ow-pager { display: flex; display: -webkit-flex; gap: 8px; align-items: center; -webkit-align-items: center; flex-wrap: wrap; justify-content: center; -webkit-justify-content: center; margin-top: 14px; }
+.ow-pager .ow-btn { padding: 5px 10px; min-width: 36px; font-size: 13px; text-align: center; }
+.ow-pager-info { font-size: 12px; color: var(--ow-text-sub); }
+.ow-pager-dots { color: var(--ow-text-sub); padding: 0 2px; align-self: center; line-height: 1; }
+.ow-pager-jump { font-size: 12px; color: var(--ow-text-sub); margin-left: 10px; display: inline-flex; display: -webkit-inline-flex; align-items: center; -webkit-align-items: center; gap: 6px; }
+.ow-pager-jump-input { width: 56px; padding: 5px 6px; border: 1px solid var(--ow-border-control); border-radius: 4px; text-align: center; font-size: 12px; background: var(--ow-bg-sub); color: var(--ow-text); box-sizing: border-box; line-height: 1.2; }
+.ow-pager-jump-input:focus { outline: none; border-color: var(--ow-primary-strong); }
 
 @media (max-width: 720px) {
     /* 后台内容层：窄屏收窄留白 + 表格保证最小列宽后横向滚动 */
-    .ha-admin-main { padding: 12px; }
-    .ha-admin-main h2 { font-size: 18px; }
-    .ha-admin-main .ha-card { padding: 12px; }
-    .ha-table { min-width: 620px; }
-    .ha-table th, .ha-table td { padding: 7px 8px; }
-    .ha-only-mobile { display: block; }
-    .ha-sidebar {
+    .ow-admin-main { padding: 12px; }
+    .ow-admin-main h2 { font-size: 18px; }
+    .ow-admin-main .ow-card { padding: 12px; }
+    .ow-table { min-width: 620px; }
+    .ow-table th, .ow-table td { padding: 7px 8px; }
+    .ow-only-mobile { display: block; }
+    .ow-sidebar {
         position: fixed;
         /* 顶部留出工具栏高度，避免侧栏盖住「菜单」按钮导致无法收起 */
         left: -260px; top: 52px; bottom: 0;
@@ -1700,71 +1730,71 @@ input[type=range] {
     }
     /* 窄屏浮层（v1.0.121）：开出时的抽屉底色。
        v1.1.4：原先写死 #EBF2ED（草绿），与冷灰主题的聊天区完全跑偏，
-       且与同一元素在宽屏下的 var(--ha-bg-chat) 不一致 → 现统一引用变量 */
-    .ha-sidebar.open { left: 0; background: var(--ha-bg-chat); }
-    .ha-online.open { right: 0; background: var(--ha-bg-chat); }
-    .ha-msg-body { max-width: 85%; }
-    .ha-msg-img { max-width: 180px; max-height: 180px; }
-    .ha-emoji-panel { width: 92%; left: 4%; }
+       且与同一元素在宽屏下的 var(--ow-bg-chat) 不一致 → 现统一引用变量 */
+    .ow-sidebar.open { left: 0; background: var(--ow-bg-chat); }
+    .ow-online.open { right: 0; background: var(--ow-bg-chat); }
+    .ow-msg-body { max-width: 85%; }
+    .ow-msg-img { max-width: 180px; max-height: 180px; }
+    .ow-emoji-panel { width: 92%; left: 4%; }
     /* 后台：移动端沿用侧边栏设计——固定顶栏 + 滑出抽屉 + 遮罩 */
-    .ha-admin-bar {
+    .ow-admin-bar {
         display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center;
         gap: 10px; position: fixed; top: 0; left: 0; right: 0; height: 52px;
-        padding: 0 12px; background: var(--ha-bg); border-bottom: 1px solid var(--ha-border); z-index: 95;
+        padding: 0 12px; background: var(--ow-bg); border-bottom: 1px solid var(--ow-border); z-index: 95;
     }
-    .ha-admin-layout { padding-top: 52px; min-height: 100vh; }
-    .ha-admin-side {
+    .ow-admin-layout { padding-top: 52px; min-height: 100vh; }
+    .ow-admin-side {
         position: fixed; left: -260px; top: 52px; bottom: 0; width: 250px;
-        border-right: 1px solid var(--ha-border); transition: left .2s; -webkit-transition: left .2s;
+        border-right: 1px solid var(--ow-border); transition: left .2s; -webkit-transition: left .2s;
         z-index: 90; overflow-y: auto;
     }
-    .ha-admin-side.open { left: 0; }
-    .ha-admin-menu li { padding: 10px 12px; font-size: 13.5px; }
-    .ha-admin-main { padding: 16px; }
-    .ha-auth-card { padding: 24px 18px; }
-    .ha-auth-logo h1 { font-size: 20px; }
+    .ow-admin-side.open { left: 0; }
+    .ow-admin-menu li { padding: 10px 12px; font-size: 13.5px; }
+    .ow-admin-main { padding: 16px; }
+    .ow-auth-card { padding: 24px 18px; }
+    .ow-auth-logo h1 { font-size: 20px; }
     body { font-size: 14px; }
 }
 
 /* 旧内核兼容：无 flex 时的兜底（极简降级，保证可读可用） */
 @media screen and (max-width: 0\0) { /* IE 专属 hack，仅兜底 */
-    .ha-layout, .ha-sidebar, .ha-main { display: block; }
+    .ow-layout, .ow-sidebar, .ow-main { display: block; }
 }
 
 /* ---------- 插件前台页（v1.2.44，Plugin::page() 注册的 ?page=<slug>） ----------
    极简布局：顶栏（站点名 + 返回聊天）+ 内容区。
    不复用聊天页的三栏结构 —— 这类页面是「读一份说明」，套上侧栏与输入栏
    会让人误以为还能发消息。内容宽度按阅读舒适区收敛到 860px。 */
-.ha-page-body { background: var(--ha-bg-sub); min-height: 100vh; }
-.ha-page-top {
+.ow-page-body { background: var(--ow-bg-sub); min-height: 100vh; }
+.ow-page-top {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     height: 52px; padding: 0 16px;
-    background: #FFFFFF; border-bottom: 1px solid var(--ha-border);
+    background: #FFFFFF; border-bottom: 1px solid var(--ow-border);
 }
-.ha-page-brand { font-size: 15px; font-weight: 600; color: var(--ha-text-title); }
-.ha-page-back {
+.ow-page-brand { font-size: 15px; font-weight: 600; color: var(--ow-text-title); }
+.ow-page-back {
     margin-left: auto; -webkit-margin-start: auto;
-    font-size: 13px; color: var(--ha-primary-strong); text-decoration: none;
+    font-size: 13px; color: var(--ow-primary-strong); text-decoration: none;
 }
-.ha-page-back:hover { text-decoration: underline; }
-.ha-page-main { max-width: 860px; margin: 0 auto; padding: 20px 16px 40px; }
+.ow-page-back:hover { text-decoration: underline; }
+.ow-page-main { max-width: 860px; margin: 0 auto; padding: 20px 16px 40px; }
 @media (max-width: 640px) {
-    .ha-page-main { padding: 14px 10px 32px; }
+    .ow-page-main { padding: 14px 10px 32px; }
 }
 
 /* ---------- 表单说明气泡（v1.2.45） ----------
    把「输入框/选择框/开关下方的灰色说明」收进标题右侧的圆形 ⓘ，悬浮才显示。
-   前后台与所有插件共用：由 assets/js/chat.js 的 HaTip 自动扫 DOM 挂载，
+   前后台与所有插件共用：由 assets/js/chat.js 的 OwTip 自动扫 DOM 挂载，
    插件无需任何改动（按约定写 12px 灰色说明段落即可被自动收走）。
 
    ⚠️ 气泡用纯 CSS 悬浮显示（不靠 JS 算位置）：跟随滚动/缩放不会错位，
       老内核也不依赖。
    v1.2.49：**不再写 title 兜底** —— 兜底与正式气泡同存会导致屏幕上出现两个提示
       （原生框 + 深灰气泡），鼠标移开还在。越界问题已由 v1.2.48 的
-      HaTip.fixEdge() 实测容器边界解决，不需要原生提示兜底。 */
-.ha-form-label-tip { display: flex !important; align-items: center; gap: 2px; }
-.ha-tip {
+      OwTip.fixEdge() 实测容器边界解决，不需要原生提示兜底。 */
+.ow-form-label-tip { display: flex !important; align-items: center; gap: 2px; }
+.ow-tip {
     position: relative;
     display: inline-flex; align-items: center; justify-content: center;
     width: 14px; height: 14px; margin-left: 4px; border-radius: 50%;
@@ -1773,9 +1803,9 @@ input[type=range] {
     cursor: help; flex-shrink: 0; -webkit-flex-shrink: 0;
     vertical-align: middle; -webkit-user-select: none; user-select: none;
 }
-.ha-tip > i { font-style: normal; }
-.ha-tip:hover, .ha-tip:focus { background: var(--ha-primary-strong); outline: none; }
-.ha-tip-box {
+.ow-tip > i { font-style: normal; }
+.ow-tip:hover, .ow-tip:focus { background: var(--ow-primary-strong); outline: none; }
+.ow-tip-box {
     display: none;
     position: absolute; left: 50%; bottom: 20px;
     -webkit-transform: translateX(-50%); transform: translateX(-50%);
@@ -1787,18 +1817,18 @@ input[type=range] {
     border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, .22);
     z-index: 130;
 }
-.ha-tip-box::after {   /* 小箭头，指向 ⓘ */
+.ow-tip-box::after {   /* 小箭头，指向 ⓘ */
     content: ''; position: absolute;
-    /* v1.2.47：箭头位置由 HaTip.fixEdge() 实测后写入 --ha-tip-arrow（相对气泡左缘），
+    /* v1.2.47：箭头位置由 OwTip.fixEdge() 实测后写入 --ow-tip-arrow（相对气泡左缘），
        默认退回 50%（无 JS 时也能看）。用 var 就不必为每种对齐再写一套 ::after 规则。 */
-    left: var(--ha-tip-arrow, 50%);
+    left: var(--ow-tip-arrow, 50%);
     bottom: -5px;
     width: 0; height: 0; margin-left: -5px;
     border-left: 5px solid transparent; border-right: 5px solid transparent;
     border-top: 5px solid #2C2C2E;
 }
-.ha-tip:hover > .ha-tip-box, .ha-tip:focus > .ha-tip-box { display: block; }
+.ow-tip:hover > .ow-tip-box, .ow-tip:focus > .ow-tip-box { display: block; }
 
 /* v1.2.47：气泡宽度上限再钳一道视口 —— 窄屏（手机）下 260px 会超出屏幕。
-   min() 在老内核不生效时忽略整条，退回 halou.css 上方的 max-width:260px，不会更糟。 */
-.ha-tip-box { max-width: min(260px, calc(100vw - 32px)); }
+   min() 在老内核不生效时忽略整条，退回 owlsgo.css 上方的 max-width:260px，不会更糟。 */
+.ow-tip-box { max-width: min(260px, calc(100vw - 32px)); }

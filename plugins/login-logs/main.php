@@ -27,12 +27,12 @@
  * 安全约束：所有路由第一步做管理员鉴权；SQL 全部参数化；
  *           跨驱动建表（SQLite / MySQL / PostgreSQL）。
  */
-if (!defined('HALOU_VERSION')) exit;   // 禁止直接 HTTP 访问本文件
+if (!defined('OWLSGO_VERSION')) exit;   // 禁止直接 HTTP 访问本文件
 
 /* ===================== 数据库表 ===================== */
 
 /** 跨驱动建表（与核心 autoId()/t() 同策略，内联以避免依赖私有方法） */
-function haLLEnsureTable(): void
+function owLLEnsureTable(): void
 {
     static $done = false;
     if ($done) return;
@@ -65,7 +65,7 @@ function haLLEnsureTable(): void
     DB::ensureColumn('plugin_login_logs', 'identity', $str, "''");   // 失败时用户提交的标识
     DB::ensureColumn('plugin_login_logs', 'reason', $str, "''");     // fail / locked / disabled / manual
 }
-haLLEnsureTable();
+owLLEnsureTable();
 
 /* ===================== 登录 / 登出钩子 ===================== */
 
@@ -177,7 +177,7 @@ Plugin::on('session.destroyed', function (array $info) use ($llWrite): void {
 // 后台页面已自动引入 ?action=assets&type=js，但 CSS 不会自动加载，
 // 通过 page.head 注入 <link>（与 attachment-manager 同样做法）。
 Plugin::on('page.head', function () {
-    echo '<link rel="stylesheet" href="?action=assets&type=css&ll=' . HALOU_VERSION . '">';
+    echo '<link rel="stylesheet" href="?action=assets&type=css&ll=' . OWLSGO_VERSION . '">';
 });
 
 /* ===================== 公共鉴权 ===================== */
@@ -191,45 +191,45 @@ $llGuard = function (array $ctx): void {
 
 Plugin::adminPage('login-logs', '登录日志', function () {
     return '<h2>登录日志</h2>'
-        . '<p class="ha-admin-desc">记录登录成功、登录失败与主动登出（IP、浏览器、方式、时间）。'
+        . '<p class="ow-admin-desc">记录登录成功、登录失败与主动登出（IP、浏览器、方式、时间）。'
         . '数据来自核心钩子 <code>login.after_verify</code> / <code>login.failed</code> / '
         . '<code>logout.before_destroy</code> / <code>session.destroyed</code>，'
         . '仅记录启用本插件之后的事件。「指纹不符」表示会话被服务端销毁（疑似 Cookie 被盗用），'
         . '与主动登出是两回事。系统每天自动清理 90 天前的旧日志（计划任务 <code>purge_old</code>，可在「计划任务」页启停）。</p>'
         // 统计卡
-        . '<div class="ha-card" id="haLLStatCard" style="margin-bottom:12px"></div>'
+        . '<div class="ow-card" id="owLLStatCard" style="margin-bottom:12px"></div>'
         // 筛选
-        . '<div class="ha-card"><div class="ha-form-row">'
-        . '<div class="ha-form-item" style="flex:1;min-width:120px"><label>用户 ID</label>'
-        . '<input class="ha-input" id="haLLU" type="number" min="1" placeholder="精确用户 ID" onkeydown="if(event.key===\'Enter\')HaLL.load(1)"></div>'
-        . '<div class="ha-form-item" style="flex:2;min-width:180px"><label>关键词</label>'
-        . '<input class="ha-input" id="haLLQ" placeholder="昵称 / 邮箱 / 登录标识" onkeydown="if(event.key===\'Enter\')HaLL.load(1)"></div>'
-        . '<div class="ha-form-item" style="min-width:130px"><label>结果</label>'
-        . '<select class="ha-input" id="haLLR" onchange="HaLL.load(1)">'
+        . '<div class="ow-card"><div class="ow-form-row">'
+        . '<div class="ow-form-item" style="flex:1;min-width:120px"><label>用户 ID</label>'
+        . '<input class="ow-input" id="owLLU" type="number" min="1" placeholder="精确用户 ID" onkeydown="if(event.key===\'Enter\')OwLL.load(1)"></div>'
+        . '<div class="ow-form-item" style="flex:2;min-width:180px"><label>关键词</label>'
+        . '<input class="ow-input" id="owLLQ" placeholder="昵称 / 邮箱 / 登录标识" onkeydown="if(event.key===\'Enter\')OwLL.load(1)"></div>'
+        . '<div class="ow-form-item" style="min-width:130px"><label>结果</label>'
+        . '<select class="ow-input" id="owLLR" onchange="OwLL.load(1)">'
         . '<option value="">全部</option>'
         . '<option value="ok">登录成功</option>'
         . '<option value="fail">登录失败</option>'
         . '<option value="logout">主动登出</option>'
         . '</select></div>'
-        . '<div class="ha-form-item" style="min-width:150px"><label>开始日期</label>'
-        . '<input class="ha-input" id="haLLD1" type="date"></div>'
-        . '<div class="ha-form-item" style="min-width:150px"><label>结束日期</label>'
-        . '<input class="ha-input" id="haLLD2" type="date"></div>'
-        . '<button class="ha-btn ha-btn-primary" onclick="HaLL.load(1)">搜索</button>'
-        . '<button class="ha-btn ha-btn-ghost" onclick="HaLL.resetFilter()">重置</button>'
+        . '<div class="ow-form-item" style="min-width:150px"><label>开始日期</label>'
+        . '<input class="ow-input" id="owLLD1" type="date"></div>'
+        . '<div class="ow-form-item" style="min-width:150px"><label>结束日期</label>'
+        . '<input class="ow-input" id="owLLD2" type="date"></div>'
+        . '<button class="ow-btn ow-btn-primary" onclick="OwLL.load(1)">搜索</button>'
+        . '<button class="ow-btn ow-btn-ghost" onclick="OwLL.resetFilter()">重置</button>'
         . '</div></div>'
         // 列表
-        . '<div class="ha-card">'
+        . '<div class="ow-card">'
         . '<div style="margin-bottom:10px">'
-        . '<button class="ha-btn ha-btn-danger" onclick="HaLL.clearOld()">清理 90 天前日志</button>'
-        . '<span id="haLLStat" style="margin-left:12px;color:var(--ha-text-sub,#999);font-size:12px"></span>'
+        . '<button class="ow-btn ow-btn-danger" onclick="OwLL.clearOld()">清理 90 天前日志</button>'
+        . '<span id="owLLStat" style="margin-left:12px;color:var(--ow-text-sub,#999);font-size:12px"></span>'
         . '</div>'
         . '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">'
-        . '<table class="ha-table" id="haLLTable">'
+        . '<table class="ow-table" id="owLLTable">'
         . '<tr><th>ID</th><th>结果</th><th>用户 ID</th><th>昵称</th><th>邮箱</th>'
         . '<th>IP</th><th>方式</th><th>原因 / 登录标识</th><th>User-Agent</th><th>时间</th></tr>'
         . '</table></div>'
-        . '<div id="haLLPager" style="margin-top:12px"></div>'
+        . '<div id="owLLPager" style="margin-top:12px"></div>'
         . '</div>';
 });
 

@@ -14,18 +14,18 @@
  *     - $ctx['scene'] 为 register / profile / install。
  *
  * 列表存储：settings 表 plugin_nickname_guard_list（英文逗号 + 空格分隔的归一化串）。
- * 分隔符：输入支持英文 , 与中文 ， 逗号，保存时 haNGNormalize 统一为英文逗号（去空、去重）。
+ * 分隔符：输入支持英文 , 与中文 ， 逗号，保存时 owNGNormalize 统一为英文逗号（去空、去重）。
  * 首次状态：plugin_nickname_guard_init 为 '0' 时，展示与拦截均回退到内置默认列表；
  *           管理员首次保存后置 '1'，之后以保存值为准（可为空 = 不保留任何昵称）。
  */
-if (!defined('HALOU_VERSION')) exit;
+if (!defined('OWLSGO_VERSION')) exit;
 
 /* ---------- 设置键 ---------- */
-function haNGKeyList(): string { return 'plugin_nickname_guard_list'; }  // 逗号分隔原始字符串
-function haNGKeyInit(): string { return 'plugin_nickname_guard_init'; }  // '1' 已首次保存 / '0' 未保存
+function owNGKeyList(): string { return 'plugin_nickname_guard_list'; }  // 逗号分隔原始字符串
+function owNGKeyInit(): string { return 'plugin_nickname_guard_init'; }  // '1' 已首次保存 / '0' 未保存
 
 /** 内置默认保留昵称（小写键 => true），首次展示与首次保存前拦截的回退来源 */
-function haNGDefaults(): array
+function owNGDefaults(): array
 {
     static $d = null;
     if ($d !== null) return $d;
@@ -45,7 +45,7 @@ function haNGDefaults(): array
  *   - 去除首尾空格与空白项；
  *   - 按小写去重，保留首次出现的大小写形式。
  */
-function haNGNormalize(string $raw): array
+function owNGNormalize(string $raw): array
 {
     $out = [];
     $seen = [];
@@ -64,14 +64,14 @@ function haNGNormalize(string $raw): array
  * 当前生效的保留昵称集合（小写键 => true），请求内缓存。
  * 未首次保存（init=0）时回退内置默认；已保存则用保存值归一化解析。
  */
-function haNGCurrentList(): array
+function owNGCurrentList(): array
 {
     static $list = null;
     if ($list !== null) return $list;
-    if (DB::setting(haNGKeyInit(), '0') === '1') {
-        $names = haNGNormalize((string)DB::setting(haNGKeyList(), ''));
+    if (DB::setting(owNGKeyInit(), '0') === '1') {
+        $names = owNGNormalize((string)DB::setting(owNGKeyList(), ''));
     } else {
-        $names = array_keys(haNGDefaults());
+        $names = array_keys(owNGDefaults());
     }
     $list = [];
     foreach ($names as $n) {
@@ -82,7 +82,7 @@ function haNGCurrentList(): array
 
 /* ---------- 钩子：命中保留列表即拒绝（插件启用时才注册） ---------- */
 Plugin::on('nickname.before_save', function (string &$nick, ?string &$err, array $ctx): void {
-    $list = haNGCurrentList();
+    $list = owNGCurrentList();
     if (!$list) return;
     $key = mb_strtolower(trim($nick), 'UTF-8');
     if ($key === '') return;
@@ -95,19 +95,19 @@ Plugin::on('nickname.before_save', function (string &$nick, ?string &$err, array
 /* ---------- 后台页面：保留昵称列表（可增删） ---------- */
 Plugin::adminPage('nickname-guard', '昵称保留', function () {
     // 未首次保存时回退内置默认，便于管理员在此基础上增删
-    if (DB::setting(haNGKeyInit(), '0') === '1') {
-        $list = (string)DB::setting(haNGKeyList(), '');
+    if (DB::setting(owNGKeyInit(), '0') === '1') {
+        $list = (string)DB::setting(owNGKeyList(), '');
     } else {
-        $list = implode(', ', array_keys(haNGDefaults()));
+        $list = implode(', ', array_keys(owNGDefaults()));
     }
     return '<h2>昵称保留</h2>'
-        . '<p class="ha-admin-desc">维护保留昵称列表（逗号分隔，可自由增删）。启用本插件后，用户注册或修改昵称时命中列表即拒绝。默认已填入一组常见保留昵称，可按需修改。</p>'
-        . '<div class="ha-card">'
-        . '<div class="ha-form-item"><label>保留昵称列表</label>'
-        . '<textarea class="ha-input" id="haNGList" rows="8" style="width:100%;resize:vertical;font-family:var(--ha-mono,Consolas,monospace)" placeholder="例如：管理员, 客服, admin, root">' . Sec::e($list) . '</textarea>'
-        . '<p style="font-size:12px;color:var(--ha-text-sub,#999);margin-top:4px">多个昵称用英文逗号或中文逗号分隔；保存时自动统一为英文逗号；匹配不区分大小写；自动去除首尾空格与重复项。清空并保存 = 不保留任何昵称。</p></div>'
-        . '<div class="ha-form-row" style="margin-top:10px"><button class="ha-btn ha-btn-primary" onclick="HaNG.save()">保存设置</button></div>'
-        . '<div id="haNGMsg" style="margin-top:10px"></div>'
+        . '<p class="ow-admin-desc">维护保留昵称列表（逗号分隔，可自由增删）。启用本插件后，用户注册或修改昵称时命中列表即拒绝。默认已填入一组常见保留昵称，可按需修改。</p>'
+        . '<div class="ow-card">'
+        . '<div class="ow-form-item"><label>保留昵称列表</label>'
+        . '<textarea class="ow-input" id="owNGList" rows="8" style="width:100%;resize:vertical;font-family:var(--ow-mono,Consolas,monospace)" placeholder="例如：管理员, 客服, admin, root">' . Sec::e($list) . '</textarea>'
+        . '<p style="font-size:12px;color:var(--ow-text-sub,#999);margin-top:4px">多个昵称用英文逗号或中文逗号分隔；保存时自动统一为英文逗号；匹配不区分大小写；自动去除首尾空格与重复项。清空并保存 = 不保留任何昵称。</p></div>'
+        . '<div class="ow-form-row" style="margin-top:10px"><button class="ow-btn ow-btn-primary" onclick="OwNG.save()">保存设置</button></div>'
+        . '<div id="owNGMsg" style="margin-top:10px"></div>'
         . '</div>';
 });
 
@@ -120,10 +120,10 @@ Plugin::route('plugin_nickname_guard_save', function (array $ctx) use ($ngGuard)
     $ngGuard($ctx);
     $raw = (string)($ctx['post']['list'] ?? '');
     // 归一化：中英文逗号都识别，去空、去重，统一存为英文逗号 + 空格分隔
-    $store = implode(', ', haNGNormalize($raw));
+    $store = implode(', ', owNGNormalize($raw));
     if (strlen($store) > 2000) Api::json(['ok' => false, 'msg' => '保留昵称列表过长（上限 2000 字符）']);
-    DB::setSetting(haNGKeyList(), $store);
-    DB::setSetting(haNGKeyInit(), '1');
+    DB::setSetting(owNGKeyList(), $store);
+    DB::setSetting(owNGKeyInit(), '1');
     Sec::log('nickname_reserve_save', $ctx['actor']['nickname']);
     Api::json(['ok' => true, 'msg' => '已保存']);
 });

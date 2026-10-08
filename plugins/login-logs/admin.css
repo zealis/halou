@@ -1,27 +1,27 @@
 /**
  * 登录日志插件 - 后台样式（v1.0.0）
- * 复用主程序 ha- 前缀变量，移动端适配表格横向滚动。
- * 选择器限定 #haLLTable，避免影响其他后台表格。
+ * 复用主程序 ow- 前缀变量，移动端适配表格横向滚动。
+ * 选择器限定 #owLLTable，避免影响其他后台表格。
  */
 
-/* 覆盖主程序 .ha-table{width:100%}，让表格按内容撑开，
+/* 覆盖主程序 .ow-table{width:100%}，让表格按内容撑开，
    外层容器 overflow-x:auto 负责横向滚动 */
-#haLLTable {
+#owLLTable {
     width: auto;
     min-width: 100%;
     table-layout: auto;
 }
 
 /* 单元格不换行，中文不逐字拆分 */
-#haLLTable th,
-#haLLTable td {
+#owLLTable th,
+#owLLTable td {
     white-space: nowrap;
     word-break: keep-all;
     overflow-wrap: normal;
 }
 
 /* 邮箱列（第 4 列）允许超长省略 */
-#haLLTable td:nth-child(4) {
+#owLLTable td:nth-child(4) {
     max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -29,7 +29,7 @@
 }
 
 /* User-Agent 列（第 7 列）允许超长省略 */
-#haLLTable td:nth-child(7) {
+#owLLTable td:nth-child(7) {
     max-width: 280px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -37,7 +37,7 @@
 }
 
 /* 统计卡片三栏自适应 */
-#haLLStatCard {
+#owLLStatCard {
     display: flex;
     display: -webkit-flex;
     flex-wrap: wrap;
@@ -45,43 +45,43 @@
     gap: 12px;
     padding: 12px 16px;
 }
-.haLLStatItem {
+.owLLStatItem {
     flex: 1 1 160px;
     -webkit-flex: 1 1 160px;
     min-width: 140px;
 }
-.haLLStatItem .num {
+.owLLStatItem .num {
     font-size: 22px;
     font-weight: 600;
-    color: var(--ha-text, #333);
+    color: var(--ow-text, #333);
     line-height: 1.2;
 }
-.haLLStatItem .lbl {
+.owLLStatItem .lbl {
     font-size: 12px;
-    color: var(--ha-text-sub, #999);
+    color: var(--ow-text-sub, #999);
     margin-top: 2px;
 }
 
 /* 移动端：筛选表单纵向堆叠 */
 @media (max-width: 720px) {
-    .ha-form-row {
+    .ow-form-row {
         flex-direction: column;
         -webkit-flex-direction: column;
         align-items: stretch;
         -webkit-align-items: stretch;
     }
-    .ha-form-row .ha-form-item {
+    .ow-form-row .ow-form-item {
         min-width: 0 !important;
         width: 100%;
     }
-    .ha-form-row > .ha-btn {
+    .ow-form-row > .ow-btn {
         width: 100%;
     }
-    #haLLStat {
+    #owLLStat {
         display: block;
         margin-left: 0 !important;
         margin-top: 8px;
     }
-    #haLLTable td:nth-child(4) { max-width: 130px; }
-    #haLLTable td:nth-child(7) { max-width: 160px; }
+    #owLLTable td:nth-child(4) { max-width: 130px; }
+    #owLLTable td:nth-child(7) { max-width: 160px; }
 }

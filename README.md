@@ -1,4 +1,4 @@
-# Halou-Chat
+# Owlsgo-Chat
 
 纯原生 PHP 8.1+ 即时通讯聊天室 —— **零框架、零 Composer 依赖**，单入口 `index.php`，开箱即用。
 支持 SQLite / MySQL / PostgreSQL，适合 Web 在线聊天、低成本部署与 AI 二次开发。
@@ -21,7 +21,7 @@
 
 鸟瞰图：`.birdview/architecture.html`
 
-核心分层：`index.php`（页面 + AJAX API + 安装向导统一分发）→ `core/`（配置 / DB / 安全 / 认证 / 聊天 / 后台 / 上传 / 插件）→ `plugins/`（可选功能）→ `assets/`（ha- 前缀自研扁平 UI）。
+核心分层：`index.php`（页面 + AJAX API + 安装向导统一分发）→ `core/`（配置 / DB / 安全 / 认证 / 聊天 / 后台 / 上传 / 插件）→ `plugins/`（可选功能）→ `assets/`（ow- 前缀自研扁平 UI）。
 
 ## 功能
 
@@ -61,7 +61,7 @@ nginx-server.conf      随程序走的 Nginx 站点配置（含安全屏蔽规�
 
 ## 二次开发
 
-- 所有 API 走 `index.php?action=<动作>`，POST 携带 `ts` + `sign=md5(key|ts|action)`；敏感操作另需先取 `?action=ticket` 的票据并随请求提交（`HaApi.secure` 已封装）。
+- 所有 API 走 `index.php?action=<动作>`，POST 携带 `ts` + `sign=md5(key|ts|action)`；敏感操作另需先取 `?action=ticket` 的票据并随请求提交（`OwApi.secure` 已封装）。
 - 插件示例：在 `plugins/<name>/` 放 `plugin.json` 与 `main.php`，用 `Plugin::on('message.after_send', fn)` 挂载钩子、`Plugin::route('plugin_<name>_xxx', fn, ['sensitive' => true])` 注册路由、`Plugin::adminPage('<slug>', '标题', fn)` 挂后台页、`Plugin::asset('js'|'css', '<name>/file')` 注入资源。
-- 前端扩展钩子：`HaChat.onRoomSwitch(fn)`（切群/进群）、`HaChat.onRoomEdit(fn)`（群聊设置弹窗，往 `#haREExtras` 加入口）。
+- 前端扩展钩子：`OwChat.onRoomSwitch(fn)`（切群/进群）、`OwChat.onRoomEdit(fn)`（群聊设置弹窗，往 `#owREExtras` 加入口）。
 - 发版流程：只改根目录 `VERSION` → 提交 → 合并主仓 → 运行 `.tools/sync-www.sh`；随后执行 `python .tools/gen_changelog.py` 更新 `设计文档/CHANGELOG.md`。

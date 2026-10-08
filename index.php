@@ -1,6 +1,6 @@
 <?php
 /**
- * Halou-Chat — 根目录统一入口
+ * Owlsgo-Chat — 根目录统一入口
  * 纯原生 PHP 8.1+，无框架 / 无 Composer 依赖，支持 SQLite / MySQL / PostgreSQL。
  * 页面渲染与 AJAX API 统一由本文件分发（?page= / ?action=）。
  */
@@ -8,7 +8,7 @@ declare(strict_types=1);
 
 // 版本号以根目录 VERSION 文件为准（历次发版只改 VERSION，此处不再硬编码，
 // 避免 CSS/JS 缓存参数 ?v= 永远停在旧版本）；文件缺失时兜底 1.0.33
-define('HALOU_VERSION', trim((string)@file_get_contents(__DIR__ . '/VERSION')) ?: '1.0.33');
+define('OWLSGO_VERSION', trim((string)@file_get_contents(__DIR__ . '/VERSION')) ?: '1.0.33');
 
 // ⚠️ DevTools 探测请求短路（v1.0.115）：Chrome 打开开发者工具时会自动请求
 // /.well-known/appspecific/com.chrome.devtools.json，该请求经 try_files 落入本入口，
@@ -53,15 +53,15 @@ Sec::init($CFG);
 
 // 匿名会话密钥（登录前 API 签名用）：同时写入 cookie 备份，
 // 避免 php-cgi 多进程下 PHP session 偶发丢失/重建导致签名对不上
-if (empty($_COOKIE['hal_akey']) || !preg_match('/^[a-f0-9]{32}$/', (string)$_COOKIE['hal_akey'])) {
+if (empty($_COOKIE['owl_akey']) || !preg_match('/^[a-f0-9]{32}$/', (string)$_COOKIE['owl_akey'])) {
     $akey = Sec::clientKey();
-    setcookie('hal_akey', $akey, [
+    setcookie('owl_akey', $akey, [
         'expires' => time() + 86400 * 7, 'path' => '/', 'httponly' => true,
         'secure' => Sec::isHttps(), 'samesite' => 'Lax',
     ]);
-    $_COOKIE['hal_akey'] = $akey;
+    $_COOKIE['owl_akey'] = $akey;
 }
-if (empty($_SESSION['anon_key'])) $_SESSION['anon_key'] = $_COOKIE['hal_akey'];
+if (empty($_SESSION['anon_key'])) $_SESSION['anon_key'] = $_COOKIE['owl_akey'];
 
 $LOCK = $CFG['data_dir'] . '/install.lock';
 $installed = is_file($LOCK);
@@ -97,6 +97,8 @@ if ($installed && $dbOk && !$user) {
 }
 $actor = Auth::actor($user, $guest);
 if ($installed && $dbOk) Plugin::init($CFG['plugin_dir'], $CFG['data_dir'] . '/cache');
+// v1.2.60：后台需要定位 data/logs（系统日志页），与 Upload::init / Plugin::init 同一模式注入配置
+Admin::init($CFG);
 
 // v1.2.42：用户活跃钩子 —— 等级信任插件据此把「今日已登录」计入每日任务。
 // 为什么放在这里而不是只挂 login.after_verify：登录态是**会话**，用户开着页面
@@ -116,7 +118,7 @@ $page = $_GET['page'] ?? 'chat';
 //      否则一段 PHP 报错混进 JSON 会把前端接口全部打挂，比不看报错更糟）；
 //   ③ 出错细节可能暴露路径 / SQL / 配置，用完请及时在后台关闭。
 if ($installed && $dbOk && DB::setting('debug_mode', '0') === '1') {
-    define('HALOU_DEBUG', true);
+    define('OWLSGO_DEBUG', true);
     error_reporting(E_ALL);
     ini_set('log_errors', '1');
     @mkdir($CFG['data_dir'] . '/logs', 0775, true);
@@ -151,7 +153,7 @@ if (!$installed) {
             $src = preg_replace("/'driver'\s*=>\s*'[a-z]*'/", "'driver'   => '$driver'", $src, 1);
             if ($driver !== 'sqlite') {
                 $map = ['host' => $_POST['db_host'] ?? '127.0.0.1', 'port' => (int)($_POST['db_port'] ?? 3306),
-                        'name' => $_POST['db_name'] ?? 'halou', 'user' => $_POST['db_user'] ?? 'root',
+                        'name' => $_POST['db_name'] ?? 'owlsgo', 'user' => $_POST['db_user'] ?? 'root',
                         'pass' => $_POST['db_pass'] ?? ''];
                 foreach ($map as $k => $v) {
                     $src = preg_replace("/'$k'\s*=>\s*'[^']*'/", "'$k'     => '" . addslashes((string)$v) . "'", $src, 1);
@@ -204,7 +206,7 @@ if (!$installed) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
                 throw $e;
             }
-            file_put_contents($LOCK, date('c') . ' v' . HALOU_VERSION);
+            file_put_contents($LOCK, date('c') . ' v' . OWLSGO_VERSION);
             Api::json(['ok' => true, 'msg' => '安装完成']);
         } catch (Throwable $e) {
             Api::json(['ok' => false, 'msg' => '安装失败：' . $e->getMessage()]);
@@ -258,6 +260,41 @@ if ($action !== '') {
         exit;
     }
 
+    // 安全日志导出 CSV（GET 免签名：只读操作；鉴权在下方校验管理员会话）
+    // 与插件打包下载同理——导出必须走浏览器直下，POST 拿不到响应头里的 Content-Disposition。
+    if ($action === 'admin_logs_export') {
+        if (($actor['role'] ?? '') !== 'admin') Api::json(['ok' => false, 'msg' => '需要管理员权限'], 403);
+        // 先把正文攒完整，再发头——header() 之前一旦有任何输出就会报「headers already sent」。
+        // 单次上限 20000 行：够日常审计，又不至于把内存一次性打爆。
+        $rowsE = DB::all('SELECT * FROM security_logs ORDER BY id DESC LIMIT 20000');
+        $buf = fopen('php://temp', 'r+');
+        fputcsv($buf, ['ID', '动作', '操作者', 'IP', '数据', '时间']);
+        foreach ($rowsE as $rE) {
+            $cells = [
+                (string)$rE['id'],
+                (string)$rE['action'],
+                (string)($rE['actor'] ?? ''),
+                (string)($rE['ip'] ?? ''),
+                (string)($rE['data'] ?? ''),
+                date('Y-m-d H:i:s', (int)$rE['created_at']),
+            ];
+            // CSV 注入防护：= + - @ 开头的单元格会被 Excel 当成公式执行（可拖外链、发请求），
+            // 前置单引号强制按文本处理。fputcsv 只管引号转义，不做这层。
+            foreach ($cells as $k => $c) {
+                if ($k >= 1 && $c !== '' && in_array($c[0], ['=', '+', '-', '@', "\t", "\r"], true)) $cells[$k] = "'" . $c;
+            }
+            fputcsv($buf, $cells);
+        }
+        rewind($buf);
+        $csv = stream_get_contents($buf);
+        fclose($buf);
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="security-logs-' . date('Ymd-His') . '.csv"');
+        header('Cache-Control: no-store');
+        echo "\xEF\xBB\xBF" . $csv;   // 前置 UTF-8 BOM，否则 Excel 打开中文全是乱码
+        exit;
+    }
+
     // 插件静态资源合并输出（GET 引用，无敏感数据、无写操作）：与 captcha 同样免签名放行，
     // 否则 <script src="?action=assets&type=js"> 无法在页面加载
     if ($action === 'assets') {
@@ -272,7 +309,7 @@ if ($action !== '') {
     $signKeys = array_values(array_unique(array_filter([
         (string)($actor['key'] ?? ''),
         (string)($_SESSION['anon_key'] ?? ''),
-        (string)($_COOKIE['hal_akey'] ?? ''),
+        (string)($_COOKIE['owl_akey'] ?? ''),
     ])));
     if (!Sec::verifySignAny($signKeys, $action)) {
         Api::json(['ok' => false, 'msg' => '签名验证失败，请刷新页面'], 403);
@@ -296,6 +333,9 @@ if ($action !== '') {
         // ⚠️ 添加（friend_add）**不走**票据：它只影响自己，且是纯新增无破坏性，
         //   走票据会让「加好友」多一次往返，徒增摩擦。
         'friend_remove',
+        // v1.2.60 日志管理：批量删安全日志会抹掉审计流水、清空文件日志会抹掉排错线索，
+        // 都属不可恢复操作，与 cron 日志清理同档，一律走一次性票据。
+        'admin_logs_batch', 'admin_syslog_clear',
     ];
     $isSensitive = in_array($action, $SENSITIVE, true) || Plugin::isSensitive($action);
     if ($isSensitive) {
@@ -850,7 +890,9 @@ if (isset($frontPages[$page])) {
         case 'register': renderAuth('register'); break;
         case 'forgot':   renderAuth('forgot'); break;
         case 'admin':
-            if ($actor['role'] !== 'admin') { header('Location: ?page=login'); exit; }
+            // 用 ?? 兜底：未安装 / 数据库未连通时 Auth::actor() 返回的数组没有 role 键，
+            // 直接取会抛 Undefined array key warning（并污染 debug.log）
+            if (($actor['role'] ?? '') !== 'admin') { header('Location: ?page=login'); exit; }
             renderAdmin($actor);
             break;
         default:
@@ -867,29 +909,29 @@ if (isset($frontPages[$page])) {
  * 不复用聊天页那套三栏结构 —— 插件页的用途是「看一份说明」，
  * 套上侧栏与输入栏反而让人以为还能发消息。
  *
- * ⚠️ 同样要引入合并资源包并打 HALOU_ASSETS_JS_EMITTED 标记：
+ * ⚠️ 同样要引入合并资源包并打 OWLSGO_ASSETS_JS_EMITTED 标记：
  *    插件页也可能需要前端脚本（等级页的任务进度刷新就用到）。
  */
 function renderPluginPage(string $slug, array $pg, array $actor, ?array $user): void
 {
     pageHead((string)$pg['title']);
-    $site = Sec::e(DB::setting('site_name', 'Halou-Chat'));
-    echo '<body class="ha-page-body">'
-       . '<div class="ha-page-top">'
-       . '<span class="ha-page-brand">' . $site . '</span>'
-       . '<a class="ha-page-back" href="?page=chat">返回聊天</a>'
+    $site = Sec::e(DB::setting('site_name', 'Owlsgo-Chat'));
+    echo '<body class="ow-page-body">'
+       . '<div class="ow-page-top">'
+       . '<span class="ow-page-brand">' . $site . '</span>'
+       . '<a class="ow-page-back" href="?page=chat">返回聊天</a>'
        . '</div>'
-       . '<main class="ha-page-main">';
+       . '<main class="ow-page-main">';
     try {
         echo (string)call_user_func($pg['fn'], $actor, $user);
     } catch (Throwable $e) {
         Sec::log('plugin_page_error', $slug, ['error' => $e->getMessage()]);
-        echo '<div class="ha-card">页面加载失败，请联系管理员。</div>';
+        echo '<div class="ow-card">页面加载失败，请联系管理员。</div>';
     }
     echo '</main>'
-       . '<div class="ha-toast" id="haToast" style="display:none"></div>'
-       . '<script src="assets/js/chat.js?v=' . HALOU_VERSION . '"></script>';
-    define('HALOU_ASSETS_JS_EMITTED', true);
+       . '<div class="ow-toast" id="owToast" style="display:none"></div>'
+       . '<script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>';
+    define('OWLSGO_ASSETS_JS_EMITTED', true);
     echo '<script src="?action=assets&type=js"></script>'
        . '</body></html>';
 }
@@ -1000,7 +1042,7 @@ function ow_icon(string $name, int $size = 18): string
         'search' => '<circle cx="11" cy="11" r="6.6"/><path d="M20.2 20.2l-4.5-4.5"/>',
     ];
     $d = $paths[$name] ?? $paths['chat'];
-    return '<svg class="ha-ico" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $d . '</svg>';
+    return '<svg class="ow-ico" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $d . '</svg>';
 }
 
 /**
@@ -1018,10 +1060,10 @@ function ageFieldHtml(): string
     for ($m = 1; $m <= 12; $m++) $ms .= '<option value="' . $m . '">' . $m . '</option>';
     $ds = '<option value="">日</option>';
     for ($d = 1; $d <= 31; $d++) $ds .= '<option value="' . $d . '">' . $d . '</option>';
-    return '<div class="ha-form-item"><label>出生日期</label>'
-        . '<div class="ha-birth-row"><select class="ha-input" name="birth_y" required>' . $ys . '</select>'
-        . '<select class="ha-input" name="birth_m" required>' . $ms . '</select>'
-        . '<select class="ha-input" name="birth_d" required>' . $ds . '</select></div>'
+    return '<div class="ow-form-item"><label>出生日期</label>'
+        . '<div class="ow-birth-row"><select class="ow-input" name="birth_y" required>' . $ys . '</select>'
+        . '<select class="ow-input" name="birth_m" required>' . $ms . '</select>'
+        . '<select class="ow-input" name="birth_d" required>' . $ds . '</select></div>'
         . '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">注册需年满 ' . $min . ' 周岁（按出生日期精确计算）。</p></div>';
 }
 
@@ -1033,13 +1075,13 @@ function pageHead(string $title): void
     // v1.2.32：全站 noindex —— 聊天内容/昵称/私聊页面一律不进搜索引擎索引。
     // meta 与响应头同时给：meta 覆盖主流爬虫，X-Robots-Tag 对会忽略 meta 的爬虫也有效。
     header('X-Robots-Tag: noindex, nofollow, noarchive', true);
-    $site = Sec::e(DB::setting('site_name', 'Halou-Chat'));
+    $site = Sec::e(DB::setting('site_name', 'Owlsgo-Chat'));
     echo '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'
        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
        . '<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">'
        . '<title>' . Sec::e($title) . ' - ' . $site . '</title>'
        . '<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">'
-       . '<link rel="stylesheet" href="assets/css/halou.css?v=' . HALOU_VERSION . '">';
+       . '<link rel="stylesheet" href="assets/css/owlsgo.css?v=' . OWLSGO_VERSION . '">';
     Plugin::fire('page.head');
     echo '</head>';
 }
@@ -1048,29 +1090,29 @@ function renderInstall(string $err): void
 {
     echo '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'
        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
-       . '<title>安装 Halou-Chat</title><link rel="stylesheet" href="assets/css/halou.css?v=' . HALOU_VERSION . '"></head>'
-       . '<body class="ha-auth-body"><div class="ha-auth-card" style="max-width:520px">'
-       . '<div class="ha-auth-logo"><img src="assets/img/logo.svg" alt="Halou-Chat"><h1>安装 Halou-Chat</h1><p>纯原生 PHP · 零依赖 · v' . HALOU_VERSION . '</p></div>'
-       . ($err ? '<div class="ha-alert ha-alert-error">数据库连接失败：' . Sec::e($err) . '（SQLite 模式无需配置，可直接继续）</div>' : '')
-       . '<form id="haInstallForm">'
-       . '<div class="ha-form-item"><label>数据库类型</label><select name="driver" class="ha-input" onchange="document.getElementById(\'haDbMore\').style.display=this.value===\'sqlite\'?\'none\':\'block\'">'
+       . '<title>安装 Owlsgo-Chat</title><link rel="stylesheet" href="assets/css/owlsgo.css?v=' . OWLSGO_VERSION . '"></head>'
+       . '<body class="ow-auth-body"><div class="ow-auth-card" style="max-width:520px">'
+       . '<div class="ow-auth-logo"><img src="assets/img/logo.svg" alt="Owlsgo-Chat"><h1>安装 Owlsgo-Chat</h1><p>纯原生 PHP · 零依赖 · v' . OWLSGO_VERSION . '</p></div>'
+       . ($err ? '<div class="ow-alert ow-alert-error">数据库连接失败：' . Sec::e($err) . '（SQLite 模式无需配置，可直接继续）</div>' : '')
+       . '<form id="owInstallForm">'
+       . '<div class="ow-form-item"><label>数据库类型</label><select name="driver" class="ow-input" onchange="document.getElementById(\'owDbMore\').style.display=this.value===\'sqlite\'?\'none\':\'block\'">'
        . '<option value="sqlite">SQLite（零配置，推荐）</option><option value="mysql">MySQL</option><option value="pgsql">PostgreSQL</option></select></div>'
-       . '<div id="haDbMore" style="display:none">'
-       . '<div class="ha-form-item"><label>数据库主机</label><input class="ha-input" name="db_host" value="127.0.0.1"></div>'
-       . '<div class="ha-form-item"><label>端口</label><input class="ha-input" name="db_port" value="3306"></div>'
-       . '<div class="ha-form-item"><label>数据库名</label><input class="ha-input" name="db_name" value="halou"></div>'
-       . '<div class="ha-form-item"><label>数据库用户</label><input class="ha-input" name="db_user" value="root"></div>'
-       . '<div class="ha-form-item"><label>数据库密码</label><input class="ha-input" type="password" name="db_pass"></div></div>'
-       . '<div class="ha-form-item"><label>管理员昵称</label><input class="ha-input" name="nickname" required placeholder="2-20 个字符"></div>'
-       . '<div class="ha-form-item"><label>管理员邮箱</label><input class="ha-input" type="email" name="email" required></div>'
-       . '<div class="ha-form-item"><label>管理员密码</label><input class="ha-input" type="password" name="password" required></div>'
-       . '<button type="submit" class="ha-btn ha-btn-primary ha-btn-block">开始安装</button>'
-       . '<div id="haInstallMsg" class="ha-form-msg"></div></form></div>'
-       . '<script>document.getElementById("haInstallForm").onsubmit=function(e){e.preventDefault();'
+       . '<div id="owDbMore" style="display:none">'
+       . '<div class="ow-form-item"><label>数据库主机</label><input class="ow-input" name="db_host" value="127.0.0.1"></div>'
+       . '<div class="ow-form-item"><label>端口</label><input class="ow-input" name="db_port" value="3306"></div>'
+       . '<div class="ow-form-item"><label>数据库名</label><input class="ow-input" name="db_name" value="owlsgo"></div>'
+       . '<div class="ow-form-item"><label>数据库用户</label><input class="ow-input" name="db_user" value="root"></div>'
+       . '<div class="ow-form-item"><label>数据库密码</label><input class="ow-input" type="password" name="db_pass"></div></div>'
+       . '<div class="ow-form-item"><label>管理员昵称</label><input class="ow-input" name="nickname" required placeholder="2-20 个字符"></div>'
+       . '<div class="ow-form-item"><label>管理员邮箱</label><input class="ow-input" type="email" name="email" required></div>'
+       . '<div class="ow-form-item"><label>管理员密码</label><input class="ow-input" type="password" name="password" required></div>'
+       . '<button type="submit" class="ow-btn ow-btn-primary ow-btn-block">开始安装</button>'
+       . '<div id="owInstallMsg" class="ow-form-msg"></div></form></div>'
+       . '<script>document.getElementById("owInstallForm").onsubmit=function(e){e.preventDefault();'
        . 'var f=new FormData(this);var x=new XMLHttpRequest();'
        . 'x.open("POST","?action=install",true);x.onreadystatechange=function(){if(x.readyState===4){'
-       . 'try{var r=JSON.parse(x.responseText);if(r.ok){document.getElementById("haInstallMsg").innerHTML="<span style=\"color:#237804\">安装成功，正在跳转...</span>";setTimeout(function(){location.href="?page=login"},800);}'
-       . 'else{document.getElementById("haInstallMsg").innerHTML="<span style=\"color:#C41D1F\">"+r.msg+"</span>";}}catch(_){}}};x.send(f);};</script>'
+       . 'try{var r=JSON.parse(x.responseText);if(r.ok){document.getElementById("owInstallMsg").innerHTML="<span style=\"color:#237804\">安装成功，正在跳转...</span>";setTimeout(function(){location.href="?page=login"},800);}'
+       . 'else{document.getElementById("owInstallMsg").innerHTML="<span style=\"color:#C41D1F\">"+r.msg+"</span>";}}catch(_){}}};x.send(f);};</script>'
        . '</body></html>';
 }
 
@@ -1078,55 +1120,55 @@ function renderAuth(string $mode): void
 {
     pageHead(['login' => '登录', 'register' => '注册', 'forgot' => '找回密码'][$mode]);
     $titles = ['login' => '欢迎回来', 'register' => '创建账号', 'forgot' => '找回密码'];
-    echo '<body class="ha-auth-body"><div class="ha-auth-card">'
-       . '<div class="ha-auth-logo"><img src="assets/img/logo.svg" alt="Halou-Chat"><h1>' . $titles[$mode] . '</h1>'
-       . '<p>' . Sec::e(DB::setting('site_name', 'Halou-Chat')) . '</p></div>';
+    echo '<body class="ow-auth-body"><div class="ow-auth-card">'
+       . '<div class="ow-auth-logo"><img src="assets/img/logo.svg" alt="Owlsgo-Chat"><h1>' . $titles[$mode] . '</h1>'
+       . '<p>' . Sec::e(DB::setting('site_name', 'Owlsgo-Chat')) . '</p></div>';
     if ($mode === 'login') {
         // 从注册页跳转而来：提示注册成功、需手动登录（注册不自动登录）
         $regTip = isset($_GET['registered'])
             ? '<p style="color:#237804;font-size:13px;margin:0 0 10px">注册成功，请使用注册邮箱或用户 ID 登录。</p>'
             : '';
-        echo '<form class="ha-auth-form" data-mode="login">'
+        echo '<form class="ow-auth-form" data-mode="login">'
            . $regTip
            . Sec::signField($_SESSION['anon_key'], 'login')
-           . '<div class="ha-form-item"><label>邮箱或用户 ID</label><input class="ha-input" name="identity" required autocomplete="username" placeholder="注册邮箱或用户 ID"></div>'
-           . '<div class="ha-form-item"><label>密码</label><input class="ha-input" type="password" name="password" required autocomplete="current-password"></div>'
-           . '<div class="ha-form-item" id="haCaptchaRow" style="display:none"><label>图形验证码</label>'
-           . '<div class="ha-captcha-row"><input class="ha-input" name="captcha"><img src="?action=captcha" id="haCaptchaImg" alt="验证码" title="点击刷新"></div></div>'
-           . '<button class="ha-btn ha-btn-primary ha-btn-block" type="submit">登 录</button><div class="ha-form-msg"></div></form>'
-           . '<div class="ha-auth-links"><a href="?page=register">注册账号</a><a href="?page=forgot">忘记密码</a><a href="?page=chat">返回聊天</a></div>';
+           . '<div class="ow-form-item"><label>邮箱或用户 ID</label><input class="ow-input" name="identity" required autocomplete="username" placeholder="注册邮箱或用户 ID"></div>'
+           . '<div class="ow-form-item"><label>密码</label><input class="ow-input" type="password" name="password" required autocomplete="current-password"></div>'
+           . '<div class="ow-form-item" id="owCaptchaRow" style="display:none"><label>图形验证码</label>'
+           . '<div class="ow-captcha-row"><input class="ow-input" name="captcha"><img src="?action=captcha" id="owCaptchaImg" alt="验证码" title="点击刷新"></div></div>'
+           . '<button class="ow-btn ow-btn-primary ow-btn-block" type="submit">登 录</button><div class="ow-form-msg"></div></form>'
+           . '<div class="ow-auth-links"><a href="?page=register">注册账号</a><a href="?page=forgot">忘记密码</a><a href="?page=chat">返回聊天</a></div>';
     } elseif ($mode === 'register') {
         // 是否要求邮箱验证由后台设置决定：关闭时不再显示验证码输入框与发码按钮
         $needMail = DB::setting('reg_email_verify', '1') === '1';
-        echo '<form class="ha-auth-form" data-mode="register">'
+        echo '<form class="ow-auth-form" data-mode="register">'
            . Sec::signField($_SESSION['anon_key'], 'register')
-           . '<div class="ha-form-item"><label>昵称</label><input class="ha-input" name="nickname" required placeholder="2-20 个字符，支持中英文"></div>'
-           . '<div class="ha-form-item"><label>邮箱</label>'
+           . '<div class="ow-form-item"><label>昵称</label><input class="ow-input" name="nickname" required placeholder="2-20 个字符，支持中英文"></div>'
+           . '<div class="ow-form-item"><label>邮箱</label>'
            . ($needMail
-               ? '<div class="ha-captcha-row"><input class="ha-input" type="email" name="email" required>'
-                 . '<button type="button" class="ha-btn ha-btn-ghost" data-sendcode="register">发验证码</button></div>'
-               : '<input class="ha-input" type="email" name="email" required>')
+               ? '<div class="ow-captcha-row"><input class="ow-input" type="email" name="email" required>'
+                 . '<button type="button" class="ow-btn ow-btn-ghost" data-sendcode="register">发验证码</button></div>'
+               : '<input class="ow-input" type="email" name="email" required>')
            . '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">'
            . ($needMail ? '注册需要邮箱验证码。' : '当前未开启邮箱验证，邮箱仅用于找回密码。')
            . '</p></div>'
-           . ($needMail ? '<div class="ha-form-item"><label>邮箱验证码</label><input class="ha-input" name="code" required></div>' : '')
+           . ($needMail ? '<div class="ow-form-item"><label>邮箱验证码</label><input class="ow-input" name="code" required></div>' : '')
            // 年龄限制：开启时要求选择出生日期（年/月/日，兼容不支持 date 类型的老浏览器）
            . ageFieldHtml()
-           . '<div class="ha-form-item"><label>密码</label><input class="ha-input" type="password" name="password" required placeholder="至少 6 位"></div>'
-           . '<button class="ha-btn ha-btn-primary ha-btn-block" type="submit">注 册</button><div class="ha-form-msg"></div></form>'
-           . '<div class="ha-auth-links"><a href="?page=login">已有账号，去登录</a><a href="?page=chat">返回聊天</a></div>';
+           . '<div class="ow-form-item"><label>密码</label><input class="ow-input" type="password" name="password" required placeholder="至少 6 位"></div>'
+           . '<button class="ow-btn ow-btn-primary ow-btn-block" type="submit">注 册</button><div class="ow-form-msg"></div></form>'
+           . '<div class="ow-auth-links"><a href="?page=login">已有账号，去登录</a><a href="?page=chat">返回聊天</a></div>';
     } else {
-        echo '<form class="ha-auth-form" data-mode="reset">'
+        echo '<form class="ow-auth-form" data-mode="reset">'
            . Sec::signField($_SESSION['anon_key'], 'reset')
-           . '<div class="ha-form-item"><label>注册邮箱</label><div class="ha-captcha-row"><input class="ha-input" type="email" name="email" required>'
-           . '<button type="button" class="ha-btn ha-btn-ghost" data-sendcode="reset">发验证码</button></div></div>'
-           . '<div class="ha-form-item"><label>邮箱验证码</label><input class="ha-input" name="code" required></div>'
-           . '<div class="ha-form-item"><label>新密码</label><input class="ha-input" type="password" name="password" required></div>'
-           . '<button class="ha-btn ha-btn-primary ha-btn-block" type="submit">重置密码</button><div class="ha-form-msg"></div></form>'
-           . '<div class="ha-auth-links"><a href="?page=login">返回登录</a></div>';
+           . '<div class="ow-form-item"><label>注册邮箱</label><div class="ow-captcha-row"><input class="ow-input" type="email" name="email" required>'
+           . '<button type="button" class="ow-btn ow-btn-ghost" data-sendcode="reset">发验证码</button></div></div>'
+           . '<div class="ow-form-item"><label>邮箱验证码</label><input class="ow-input" name="code" required></div>'
+           . '<div class="ow-form-item"><label>新密码</label><input class="ow-input" type="password" name="password" required></div>'
+           . '<button class="ow-btn ow-btn-primary ow-btn-block" type="submit">重置密码</button><div class="ow-form-msg"></div></form>'
+           . '<div class="ow-auth-links"><a href="?page=login">返回登录</a></div>';
     }
-    echo '</div><script src="assets/js/chat.js?v=' . HALOU_VERSION . '"></script>'
-       . '<script>HaAuth.init(' . json_encode(['key' => $_SESSION['anon_key'], 'ts' => time()]) . ');</script>';
+    echo '</div><script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>'
+       . '<script>OwAuth.init(' . json_encode(['key' => $_SESSION['anon_key'], 'ts' => time()]) . ');</script>';
     Plugin::fire('page.footer');
     echo '</body></html>';
 }
@@ -1154,79 +1196,79 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
         ) ? '1' : '0',
     ];
     pageHead('群聊');
-    echo '<body class="ha-chat-body">';
-    echo '<div class="ha-layout">';
+    echo '<body class="ow-chat-body">';
+    echo '<div class="ow-layout">';
 
     // 左侧栏
-    echo '<aside class="ha-sidebar" id="haSidebar">'
-       // v1.2.31：站点名右侧的**竖三点菜单已删除**（含插件扩展点 HaChat.onBrandMenu，
-       // 全项目零引用；打开自己资料的入口在侧栏底部资料区 #haMe，不受影响），
+    echo '<aside class="ow-sidebar" id="owSidebar">'
+       // v1.2.31：站点名右侧的**竖三点菜单已删除**（含插件扩展点 OwChat.onBrandMenu，
+       // 全项目零引用；打开自己资料的入口在侧栏底部资料区 #owMe，不受影响），
        // 改为**搜索图标** → 弹搜索窗，默认搜「当前聊天」，下方可切换
        // 当前聊天 / 找人·群 / 消息 / 好友。
-       // ⚠️ 服务端只放按钮，弹窗与搜索逻辑全在前端 HaChat.openSearch()。
-       . '<div class="ha-brand"><img src="assets/img/logo.svg" alt="logo"><span>' . Sec::e(DB::setting('site_name', 'Halou-Chat')) . '</span>'
-       . '<button class="ha-icon-btn ha-brand-search" id="haBrandSearch" aria-label="搜索" title="搜索">' . ow_icon('search', 16) . '</button></div>'
+       // ⚠️ 服务端只放按钮，弹窗与搜索逻辑全在前端 OwChat.openSearch()。
+       . '<div class="ow-brand"><img src="assets/img/logo.svg" alt="logo"><span>' . Sec::e(DB::setting('site_name', 'Owlsgo-Chat')) . '</span>'
+       . '<button class="ow-icon-btn ow-brand-search" id="owBrandSearch" aria-label="搜索" title="搜索">' . ow_icon('search', 16) . '</button></div>'
        // v1.1.0：列表已是「群聊 + 私聊」聚合，标题改为「聊天」；
        // 徽标数字含义同步改为「会话总数」，由 conversations 接口返回的 total 在前端回填
        // v1.2.20：「聊天」标题 + 数量徽标整体**换成 Tabs 标签条**。
        //   ① 「消息 / 联系人」从「品牌区下拉菜单里的一个菜单项」上移为常驻标签，
        //      切换路径从「点下拉 → 找菜单项 → 点」缩短为「点标签」，也顺带
        //      解决了「联系人是菜单里一个不起眼的入口、没人发现」的问题。
-       //   ② 数量徽标（#haRoomCount）**取消**：会话数在列表本身就一目了然，
+       //   ② 数量徽标（#owRoomCount）**取消**：会话数在列表本身就一目了然，
        //      这个数字既不稳定也不重要，占着标题行右侧反而抢视线。
-       //   ③ 标签条下方留 #haSideTabs 容器，插件通过 Plugin::fire('sidebar.tabs')
-       //      或前端 HaChat.onSideTabs 追加自己的标签页（见插件文档）。
-       // ⚠️ 标签的 data-tab 值是**面板标识**，JS 侧据此切 .ha-tab-panel 显隐；
+       //   ③ 标签条下方留 #owSideTabs 容器，插件通过 Plugin::fire('sidebar.tabs')
+       //      或前端 OwChat.onSideTabs 追加自己的标签页（见插件文档）。
+       // ⚠️ 标签的 data-tab 值是**面板标识**，JS 侧据此切 .ow-tab-panel 显隐；
        //    核心只认 chat / friends 两个，插件可加自己的。
-       . '<div class="ha-tabs" id="haSideTabs">'
-       . '<button class="ha-tab is-active" data-tab="chat" type="button"><span class="ha-tab-lb">消息</span></button>'
-       . '<button class="ha-tab" data-tab="friends" type="button"><span class="ha-tab-lb">联系人</span></button>'
+       . '<div class="ow-tabs" id="owSideTabs">'
+       . '<button class="ow-tab is-active" data-tab="chat" type="button"><span class="ow-tab-lb">消息</span></button>'
+       . '<button class="ow-tab" data-tab="friends" type="button"><span class="ow-tab-lb">联系人</span></button>'
        . Plugin::collect('sidebar.tabs')
        . '</div>'
        // 聊天面板（核心两个面板之一是「消息」，另一个是「联系人」）
-       . '<ul class="ha-room-list ha-tab-panel is-active" id="haRoomList" data-panel="chat"></ul>'
-       // 插件面板容器：由 HaChat 在切换时创建/复用，插件标签对应的内容挂这里
-       . '<div class="ha-tab-panels" id="haSidePanels" style="display:none"></div>'
-       . '<div class="ha-me" id="haMe"></div>'
-       // 登录用户的操作入口收进个人资料区菜单（点击 haMe 弹出）；游客仍直接给登录按钮
-       . ($user ? '' : '<div class="ha-side-actions"><a class="ha-btn ha-btn-ghost" href="?page=register">注册</a><a class="ha-btn ha-btn-primary" href="?page=login">登录</a></div>')
+       . '<ul class="ow-room-list ow-tab-panel is-active" id="owRoomList" data-panel="chat"></ul>'
+       // 插件面板容器：由 OwChat 在切换时创建/复用，插件标签对应的内容挂这里
+       . '<div class="ow-tab-panels" id="owSidePanels" style="display:none"></div>'
+       . '<div class="ow-me" id="owMe"></div>'
+       // 登录用户的操作入口收进个人资料区菜单（点击 owMe 弹出）；游客仍直接给登录按钮
+       . ($user ? '' : '<div class="ow-side-actions"><a class="ow-btn ow-btn-ghost" href="?page=register">注册</a><a class="ow-btn ow-btn-primary" href="?page=login">登录</a></div>')
        . '</aside>';
 
     // 主聊天区
-    echo '<main class="ha-main">'
-       . '<header class="ha-topbar">'
-       . '<button class="ha-icon-btn ha-only-mobile" id="haToggleSide" aria-label="菜单">' . ow_icon('menu') . '</button>'
-       . '<h2 class="ha-room-name" id="haRoomName">' . Sec::e($first['name']) . '</h2>'
-       . '<span class="ha-tag ha-tag-green" id="haSpeakTag">可发言</span>'
-       . '<span class="ha-latency" id="haLatency"></span>'
+    echo '<main class="ow-main">'
+       . '<header class="ow-topbar">'
+       . '<button class="ow-icon-btn ow-only-mobile" id="owToggleSide" aria-label="菜单">' . ow_icon('menu') . '</button>'
+       . '<h2 class="ow-room-name" id="owRoomName">' . Sec::e($first['name']) . '</h2>'
+       . '<span class="ow-tag ow-tag-green" id="owSpeakTag">可发言</span>'
+       . '<span class="ow-latency" id="owLatency"></span>'
        // 右侧「竖三点」：打开群聊信息侧栏（v1.1.1 替代原在线成员人形图标）
-       . '<button class="ha-icon-btn" id="haTogglePanel" aria-label="群聊信息" title="群聊信息">' . ow_icon('more-v') . '</button>'
+       . '<button class="ow-icon-btn" id="owTogglePanel" aria-label="群聊信息" title="群聊信息">' . ow_icon('more-v') . '</button>'
        . '</header>'
        // v1.2.6：消息区初始为空，更早的消息靠向上滚动懒加载（不再有「加载更早消息…」入口）
-       . '<div class="ha-messages" id="haMessages"></div>'
-       . '<div class="ha-inputbar">'
-       // v1.2.27：未加入群聊时的闸门提示（默认隐藏，由 HaChat.applyJoinGate 控制）。
+       . '<div class="ow-messages" id="owMessages"></div>'
+       . '<div class="ow-inputbar">'
+       // v1.2.27：未加入群聊时的闸门提示（默认隐藏，由 OwChat.applyJoinGate 控制）。
        // 正常流程下点击公开群聊会先弹「是否加入」，取消则不进入；这里是 URL 直达 /
        // 已被移出成员 / 服务端拒绝发言等异常态的兜底入口。
-       . '<div class="ha-join-gate" id="haJoinGate" style="display:none"></div>'
-       . '<div class="ha-toolbar">'
+       . '<div class="ow-join-gate" id="owJoinGate" style="display:none"></div>'
+       . '<div class="ow-toolbar">'
        // 工具栏图标统一 16px（比消息区图标小一号，避免抢视觉重心）
-       . '<button class="ha-icon-btn" id="haBtnEmoji" title="表情">' . ow_icon('smile', 16) . '</button>'
+       . '<button class="ow-icon-btn" id="owBtnEmoji" title="表情">' . ow_icon('smile', 16) . '</button>'
        // v1.2.41：图片/文件两个按钮**移入附件上传插件**，这里只留一个空锚点。
        //   插件启用时由其 chat.js 往这里注入按钮（含 file input）；插件停用则按钮不出现 ——
        //   核心因此不需要任何「插件是否启用」的判断。
-       . '<span id="haAttachTools"></span>'
-       . '<button class="ha-icon-btn" id="haBtnSound" title="提示音" data-on="' . Sec::e(ow_icon('bell', 16)) . '" data-off="' . Sec::e(ow_icon('bell-off', 16)) . '">' . ow_icon('bell', 16) . '</button>'
+       . '<span id="owAttachTools"></span>'
+       . '<button class="ow-icon-btn" id="owBtnSound" title="提示音" data-on="' . Sec::e(ow_icon('bell', 16)) . '" data-off="' . Sec::e(ow_icon('bell-off', 16)) . '">' . ow_icon('bell', 16) . '</button>'
        . '</div>'
-       . '<div class="ha-input-row">'
-       // 引用条（v1.0.69）：出现在输入框上方，点 ✕ 取消；默认隐藏，由 HaChat.renderQuote 填充
-       . '<div class="ha-quote-bar" id="haQuoteBar" style="display:none"></div>'
-       . '<textarea class="ha-input" id="haInput" rows="1" placeholder="输入消息，按 Enter 发送，Ctrl+V 粘贴图片"></textarea>'
+       . '<div class="ow-input-row">'
+       // 引用条（v1.0.69）：出现在输入框上方，点 ✕ 取消；默认隐藏，由 OwChat.renderQuote 填充
+       . '<div class="ow-quote-bar" id="owQuoteBar" style="display:none"></div>'
+       . '<textarea class="ow-input" id="owInput" rows="1" placeholder="输入消息，按 Enter 发送，Ctrl+V 粘贴图片"></textarea>'
        // 拖拽手柄：手动拉高输入框（自动增高之外的人工控制方式）
-       . '<span class="ha-input-resize" id="haInputResize" title="拖动调整输入框高度">' . ow_icon('resize', 14) . '</span>'
-       . '<button class="ha-btn ha-btn-primary ha-send ha-send-round" id="haBtnSend" aria-label="发送" title="发送">' . ow_icon('send', 18) . '</button>'
+       . '<span class="ow-input-resize" id="owInputResize" title="拖动调整输入框高度">' . ow_icon('resize', 14) . '</span>'
+       . '<button class="ow-btn ow-btn-primary ow-send ow-send-round" id="owBtnSend" aria-label="发送" title="发送">' . ow_icon('send', 18) . '</button>'
        . '</div></div>'
-       . '<div class="ha-emoji-panel" id="haEmojiPanel" style="display:none"></div>'
+       . '<div class="ow-emoji-panel" id="owEmojiPanel" style="display:none"></div>'
        . '</main>';
 
     // 右侧栏（v1.1.10）：上方「群聊信息」入口区、下方所有成员
@@ -1235,31 +1277,31 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
     //   · 本区块**不再常驻展开群资料表单**——群聊设置恢复为点击弹出的模态框
     //     （v1.1.1~v1.1.9 曾把它内联常驻在侧栏，本次按需求回退到弹窗形态）。
     //   · 本区块只放**两行入口**：第一行「群聊设置」、第二行「群公告」。
-    //     两行同款样式（.ha-panel-entry），群公告行由 announcements 插件经
-    //     onRoomEdit 钩子填进 #haREExtras，位于「群聊设置」下方、
+    //     两行同款样式（.ow-panel-entry），群公告行由 announcements 插件经
+    //     onRoomEdit 钩子填进 #owREExtras，位于「群聊设置」下方、
     //     「所有成员」区块上方 —— 插件入口因此不再与群资料表单耦合。
     //   · 私聊（room_id=0）时两者都不适用，renderRoomPanel 置空并给出提示。
-    echo '<aside class="ha-online" id="haOnline">'
-       . '<div class="ha-panel-sec ha-panel-room">'
+    echo '<aside class="ow-online" id="owOnline">'
+       . '<div class="ow-panel-sec ow-panel-room">'
        // v1.1.16：删掉「群聊信息」标题文字。区块本身已有群头像/名称/入口行
        // 自带语义，标题纯属冗余；只留一个供 JS 定位的空标题容器（收起按钮仍要挂这里）。
-       . '<div class="ha-side-title" id="haPanelTitle" aria-hidden="true">'
-       . '<button class="ha-online-close" id="haOnlineClose" aria-label="收起侧栏" title="收起">×</button></div>'
-       . '<div class="ha-panel-room-body" id="haRoomPanel"></div>'
+       . '<div class="ow-side-title" id="owPanelTitle" aria-hidden="true">'
+       . '<button class="ow-online-close" id="owOnlineClose" aria-label="收起侧栏" title="收起">×</button></div>'
+       . '<div class="ow-panel-room-body" id="owRoomPanel"></div>'
        . '</div>'
-       . '<div class="ha-panel-sec ha-panel-members">'
-       . '<div class="ha-side-title">所有成员 <span class="ha-badge-num" id="haOnlineCount">0</span></div>'
-       . '<ul class="ha-online-list" id="haOnlineList"></ul>'
+       . '<div class="ow-panel-sec ow-panel-members">'
+       . '<div class="ow-side-title">所有成员 <span class="ow-badge-num" id="owOnlineCount">0</span></div>'
+       . '<ul class="ow-online-list" id="owOnlineList"></ul>'
        . '</div>'
        . '</aside>';
     echo '</div>';
 
     // 浮层：资料卡 / 图片预览 / 设置 / 密码房间
-    echo '<div class="ha-modal-mask" id="haModalMask" style="display:none"><div class="ha-modal" id="haModal"></div></div>';
-    echo '<div class="ha-img-viewer" id="haImgViewer" style="display:none"><img id="haImgViewerImg" alt="预览"></div>';
-    echo '<div class="ha-ctx-menu" id="haCtxMenu" style="display:none"></div>';
-    echo '<div class="ha-mask" id="haMask"></div>';
-    echo '<div class="ha-toast" id="haToast" style="display:none"></div>';
+    echo '<div class="ow-modal-mask" id="owModalMask" style="display:none"><div class="ow-modal" id="owModal"></div></div>';
+    echo '<div class="ow-img-viewer" id="owImgViewer" style="display:none"><img id="owImgViewerImg" alt="预览"></div>';
+    echo '<div class="ow-ctx-menu" id="owCtxMenu" style="display:none"></div>';
+    echo '<div class="ow-mask" id="owMask"></div>';
+    echo '<div class="ow-toast" id="owToast" style="display:none"></div>';
 
     $boot = [
         'key' => $actor['key'],
@@ -1277,15 +1319,15 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
             'avatar' => $user['avatar'] ?? '', 'points' => (int)($user['points'] ?? 0),
         ] : null,
         'ts' => time(),
-        'version' => HALOU_VERSION,
+        'version' => OWLSGO_VERSION,
     ];
-    // 插件资源必须在 HaChat.init 之后引入：插件脚本依赖 HaChat.cfg 判断场景
+    // 插件资源必须在 OwChat.init 之后引入：插件脚本依赖 OwChat.cfg 判断场景
     // ⚠️ 打标记：插件（如 twofa）会用 page.footer 再补一份合并资源给「登录页」用，
     //    不标记的话聊天页会**加载两遍**合并包 —— 插件 JS 跑两次，
     //    凡「往数组里注册」的扩展点（onCardMetaTop 等）都会重复注册一行。
-    define('HALOU_ASSETS_JS_EMITTED', true);
-    echo '<script src="assets/js/chat.js?v=' . HALOU_VERSION . '"></script>'
-       . '<script>HaChat.init(' . json_encode($boot, JSON_UNESCAPED_UNICODE) . ');</script>'
+    define('OWLSGO_ASSETS_JS_EMITTED', true);
+    echo '<script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>'
+       . '<script>OwChat.init(' . json_encode($boot, JSON_UNESCAPED_UNICODE) . ');</script>'
        . '<script src="?action=assets&type=js"></script>';
     Plugin::fire('page.footer');
     echo '</body></html>';
@@ -1303,54 +1345,56 @@ function renderAdmin(array $actor): void
     foreach (Plugin::listAll() as $pl) {
         if (!$pl['enabled'] && !isset($pluginPages[$pl['id']])) $offPlugins[] = $pl['id'];
     }
-    $pluginMenu = '<li data-apage="plugins"' . (($pluginPages || $offPlugins) ? ' class="ha-admin-group"' : '') . '>'
-        . '<span class="ha-admin-ico">' . ow_icon('puzzle', 16) . '</span>'
-        . '<span class="ha-admin-label">插件管理</span>'
-        . ($pluginPages ? '<span class="ha-admin-tog">' . ow_icon('chevron', 14) . '</span>' : '')
+    $pluginMenu = '<li data-apage="plugins"' . (($pluginPages || $offPlugins) ? ' class="ow-admin-group"' : '') . '>'
+        . '<span class="ow-admin-ico">' . ow_icon('puzzle', 16) . '</span>'
+        . '<span class="ow-admin-label">插件管理</span>'
+        . ($pluginPages ? '<span class="ow-admin-tog">' . ow_icon('chevron', 14) . '</span>' : '')
         . '</li>';
     foreach ($pluginPages as $slug => $pg) {
         // v1.2.57：子菜单不再重复放 puzzle 图标 —— 每个插件都是同一个图标，
         // 一排下来像一串无意义的方块，去掉后名称更清爽（缩进 padding-left:34px 不变，
         // 仍与父级「插件管理」的文字起始位置对齐）。
-        $pluginMenu .= '<li class="ha-admin-sub" data-apage="plugin:' . Sec::e($slug) . '">'
-            . '<span class="ha-admin-label">' . Sec::e($pg['title']) . '</span></li>';
+        $pluginMenu .= '<li class="ow-admin-sub" data-apage="plugin:' . Sec::e($slug) . '">'
+            . '<span class="ow-admin-label">' . Sec::e($pg['title']) . '</span></li>';
     }
     foreach ($offPlugins as $offName) {
-        $pluginMenu .= '<li class="ha-admin-sub ha-admin-off" data-apage="plugin:' . Sec::e($offName) . '">'
-            . '<span class="ha-admin-label">' . Sec::e($offName) . '（未启用）</span></li>';
+        $pluginMenu .= '<li class="ow-admin-sub ow-admin-off" data-apage="plugin:' . Sec::e($offName) . '">'
+            . '<span class="ow-admin-label">' . Sec::e($offName) . '（未启用）</span></li>';
     }
     // ⚠️ 同 renderChat()：标记「合并资源已输出」，阻止插件在 page.footer 里再补一份
     //    （否则后台页也会把插件 JS 跑两遍）。用 if 包裹避免同请求内重复 define 报警告。
-    if (!defined('HALOU_ASSETS_JS_EMITTED')) define('HALOU_ASSETS_JS_EMITTED', true);
-    echo '<body class="ha-admin-body">'
+    if (!defined('OWLSGO_ASSETS_JS_EMITTED')) define('OWLSGO_ASSETS_JS_EMITTED', true);
+    echo '<body class="ow-admin-body">'
        // 移动端顶栏：汉堡开关 + 标题 + 返回前台（桌面端隐藏，侧栏常驻）
-       . '<div class="ha-admin-bar">'
-       . '<button class="ha-icon-btn" id="haAdminToggle" aria-label="菜单">' . ow_icon('menu') . '</button>'
-       . '<span class="ha-admin-bar-title">管理后台</span>'
+       . '<div class="ow-admin-bar">'
+       . '<button class="ow-icon-btn" id="owAdminToggle" aria-label="菜单">' . ow_icon('menu') . '</button>'
+       . '<span class="ow-admin-bar-title">管理后台</span>'
        . '</div>'
-       . '<div class="ha-admin-layout">'
-       . '<aside class="ha-admin-side" id="haAdminSide">'
-       . '<div class="ha-admin-brand">ADMIN CONSOLE<br><strong>管理后台</strong></div>'
-       . '<ul class="ha-admin-menu" id="haAdminMenu">'
-       . '<li data-apage="rooms" class="active"><span class="ha-admin-ico">' . ow_icon('chat', 16) . '</span>群聊审核</li>'
+       . '<div class="ow-admin-layout">'
+       . '<aside class="ow-admin-side" id="owAdminSide">'
+       . '<div class="ow-admin-brand">ADMIN CONSOLE<br><strong>管理后台</strong></div>'
+       . '<ul class="ow-admin-menu" id="owAdminMenu">'
+       . '<li data-apage="rooms" class="active"><span class="ow-admin-ico">' . ow_icon('chat', 16) . '</span>群聊审核</li>'
        // 敏感词过滤（v1.0.104）、群聊公告（v1.0.102）已剥离为插件，菜单由插件 adminPage 自动挂载
-       . '<li data-apage="logs"><span class="ha-admin-ico">' . ow_icon('shield', 16) . '</span>安全日志</li>'
+       . '<li data-apage="logs"><span class="ow-admin-ico">' . ow_icon('shield', 16) . '</span>安全日志</li>'
+       // 注：系统日志（PHP 报错文件日志，v1.2.60）**不进侧栏**——只在「安全日志」页
+       // 右上角提供入口。它是排错时才用的抽屉内容，常驻菜单会占位又几乎点不到。
        // 计划任务（v1.1.13）：插件通过 Plugin::cron() 注册的任务在此集中查看 / 启停 / 手动触发
-       . '<li data-apage="cron"><span class="ha-admin-ico">' . ow_icon('gear', 16) . '</span>计划任务</li>'
-       . '<li data-apage="settings"><span class="ha-admin-ico">' . ow_icon('gear', 16) . '</span>系统设置</li>'
+       . '<li data-apage="cron"><span class="ow-admin-ico">' . ow_icon('gear', 16) . '</span>维护任务</li>'
+       . '<li data-apage="settings"><span class="ow-admin-ico">' . ow_icon('gear', 16) . '</span>系统设置</li>'
        // 插件管理置于系统设置之下，作为分类，其下挂载各插件自己的设置页面
        . $pluginMenu
        . '</ul>'
        // 返回前台沉在侧栏底部（桌面常驻、移动端展开抽屉可见）
-       . '<a class="ha-btn ha-btn-ghost ha-btn-block ha-admin-exit" href="?page=chat">返回前台</a>'
+       . '<a class="ow-btn ow-btn-ghost ow-btn-block ow-admin-exit" href="?page=chat">返回前台</a>'
        . '</aside>'
-       . '<main class="ha-admin-main" id="haAdminMain"></main></div>'
+       . '<main class="ow-admin-main" id="owAdminMain"></main></div>'
        // 移动端抽屉遮罩：点空白收起侧栏（桌面端不显示）
-       . '<div class="ha-admin-mask" id="haAdminMask" style="display:none"></div>'
-       . '<div class="ha-toast" id="haToast" style="display:none"></div>'
-       . '<script src="assets/js/chat.js?v=' . HALOU_VERSION . '"></script>'
+       . '<div class="ow-admin-mask" id="owAdminMask" style="display:none"></div>'
+       . '<div class="ow-toast" id="owToast" style="display:none"></div>'
+       . '<script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>'
        // 插件注册的 JS 资源合并输出（用户管理等插件的后台交互脚本）
        . '<script src="?action=assets&type=js"></script>'
-       . '<script>HaAdmin.init(' . json_encode(['key' => $actor['key'], 'ts' => time()]) . ');</script>'
+       . '<script>OwAdmin.init(' . json_encode(['key' => $actor['key'], 'ts' => time()]) . ');</script>'
        . '</body></html>';
 }

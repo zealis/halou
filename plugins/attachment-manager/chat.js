@@ -1,32 +1,32 @@
 /* 附件上传 · 前端（attachment-manager 插件）
  *
- * 职责：把「图片 / 文件」两个按钮注入核心留的锚点 #haAttachTools，并实现上传。
+ * 职责：把「图片 / 文件」两个按钮注入核心留的锚点 #owAttachTools，并实现上传。
  * 插件停用 → 本文件不加载 → 按钮不注入 → 输入框自然只剩表情。
  *
  * 为什么不直接在核心渲染按钮：按钮显隐是**功能是否存在**的体现，
  * 由插件自己决定，核心就不需要任何 `if (插件已启用)` 判断
- * （与第三方授权的 window.HaOauth 同一思路）。
+ * （与第三方授权的 window.OwOauth 同一思路）。
  */
 (function (w, d) {
-    if (!w.HaChat || !HaChat.cfg) return;
-    if (w.HaAttach) return;          // 防重复加载
-    var HaApi = w.HaApi;
-    if (!HaApi) return;
+    if (!w.OwChat || !OwChat.cfg) return;
+    if (w.OwAttach) return;          // 防重复加载
+    var OwApi = w.OwApi;
+    if (!OwApi) return;
 
     var toast = w.toast || function (s) { w.alert(s); };
 
     /** 注入按钮（核心给的是空锚点；插不进去就安静退出，不报错） */
     function mount() {
-        var box = d.getElementById('haAttachTools');
+        var box = d.getElementById('owAttachTools');
         if (!box) return;
         box.innerHTML =
-            '<input type="file" id="haFileInput" accept="image/*" style="display:none">' +
-            '<input type="file" id="haFileAttach" style="display:none">' +
-            '<button class="ha-icon-btn" id="haBtnImage" title="发送图片">' + icon('image') + '</button>' +
-            '<button class="ha-icon-btn" id="haBtnFile" title="发送文件">' + icon('paperclip') + '</button>';
+            '<input type="file" id="owFileInput" accept="image/*" style="display:none">' +
+            '<input type="file" id="owFileAttach" style="display:none">' +
+            '<button class="ow-icon-btn" id="owBtnImage" title="发送图片">' + icon('image') + '</button>' +
+            '<button class="ow-icon-btn" id="owBtnFile" title="发送文件">' + icon('paperclip') + '</button>';
 
-        var bi = d.getElementById('haBtnImage'), bf = d.getElementById('haBtnFile');
-        var fi = d.getElementById('haFileInput'), fa = d.getElementById('haFileAttach');
+        var bi = d.getElementById('owBtnImage'), bf = d.getElementById('owBtnFile');
+        var fi = d.getElementById('owFileInput'), fa = d.getElementById('owFileAttach');
         if (bi) bi.onclick = function () { if (fi) fi.click(); };
         if (bf) bf.onclick = function () { if (fa) fa.click(); };
         if (fi) fi.onchange = function () { if (this.files && this.files[0]) uploadImage(this.files[0]); this.value = ''; };
@@ -44,7 +44,7 @@
         paperclip: '<g transform="scale(0.82) translate(2.6 2.6)"><path d="M16.5 7.5l-7 7a3.5 3.5 0 0 0 5 5l7-7a5.5 5.5 0 0 0-8-8L6 12a7.5 7.5 0 0 0 11 11"/></g>'
     };
     function icon(name) {
-        return '<svg class="ha-ico" width="16" height="16" viewBox="0 0 24 24" fill="none"'
+        return '<svg class="ow-ico" width="16" height="16" viewBox="0 0 24 24" fill="none"'
             + ' stroke="currentColor" stroke-width="1.8" stroke-linecap="round"'
             + ' stroke-linejoin="round" aria-hidden="true">' + (SVG[name] || '') + '</svg>';
     }
@@ -52,9 +52,9 @@
     /** 上传文件附件 → 发 file 消息 */
     function uploadFile(file) {
         toast('文件上传中…');
-        HaApi.upload('plugin_attachment_manager_upload_file', file, {}, function (r) {
+        OwApi.upload('plugin_attachment_manager_upload_file', file, {}, function (r) {
             if (!r.ok) { toast(r.msg); return; }
-            HaChat.send({
+            OwChat.send({
                 type: 'file',
                 content: JSON.stringify({ name: r.file.name, size: r.file.size, ext: r.file.ext, path: r.file.path })
             });
@@ -64,15 +64,15 @@
     /** 上传图片 → 发 image 消息 */
     function uploadImage(file) {
         toast('图片上传中…');
-        HaApi.upload('plugin_attachment_manager_upload', file, { kind: 'image' }, function (r) {
-            if (r.ok) HaChat.send({ type: 'image', content: r.url });
+        OwApi.upload('plugin_attachment_manager_upload', file, { kind: 'image' }, function (r) {
+            if (r.ok) OwChat.send({ type: 'image', content: r.url });
             else toast(r.msg);
         });
     }
 
-    w.HaAttach = { mount: mount, uploadFile: uploadFile, uploadImage: uploadImage };
+    w.OwAttach = { mount: mount, uploadFile: uploadFile, uploadImage: uploadImage };
 
-    // 核心在 HaChat.init 之后才引入插件脚本，此时 DOM 已就绪
+    // 核心在 OwChat.init 之后才引入插件脚本，此时 DOM 已就绪
     if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', mount);
     else mount();
 })(window, document);

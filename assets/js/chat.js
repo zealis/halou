@@ -1,6 +1,6 @@
 /* ==========================================================================
-   Halou-Chat 前端（纯原生 ES5，无框架无依赖，兼容旧内核浏览器）
-   包含：HaAuth（登录/注册/找回）、HaChat（聊天主程序，长轮询）、HaAdmin（管理后台）
+   Owlsgo-Chat 前端（纯原生 ES5，无框架无依赖，兼容旧内核浏览器）
+   包含：OwAuth（登录/注册/找回）、OwChat（聊天主程序，长轮询）、OwAdmin（管理后台）
    ========================================================================== */
 (function (w) {
     'use strict';
@@ -99,17 +99,17 @@
      * 开关（State 按钮）HTML 生成器 —— 通用样式轮子（v1.1.5）。
      *
      * 前后台与插件共用同一套结构与样式，勿各处手写：
-     *   <div class="ha-switch-row">
-     *     <span class="ha-switch-label">标签文字</span>
-     *     <input type="checkbox" class="ha-switch-input" id="...">   ← 真实状态载体，可被表单直接读取
-     *     <label class="ha-switch is-on" for="..."></label>            ← 视觉轨道（唯一可点区域）
-     *     <p class="ha-switch-hint">提示文字（可省略）</p>
+     *   <div class="ow-switch-row">
+     *     <span class="ow-switch-label">标签文字</span>
+     *     <input type="checkbox" class="ow-switch-input" id="...">   ← 真实状态载体，可被表单直接读取
+     *     <label class="ow-switch is-on" for="..."></label>            ← 视觉轨道（唯一可点区域）
+     *     <p class="ow-switch-hint">提示文字（可省略）</p>
      *   </div>
      *
      * 用原生 checkbox 承载状态：可被 FormData 收集、可 Tab 聚焦，
-     * 视觉完全交给 .ha-switch（bindSwitches 只做 class 同步）。
+     * 视觉完全交给 .ow-switch（bindSwitches 只做 class 同步）。
      *
-     * v1.2.52：⚠️ **只有 .ha-switch（轨道本身）可点**。
+     * v1.2.52：⚠️ **只有 .ow-switch（轨道本身）可点**。
      *   之前整行是 `<label for=id>` —— 浏览器原生行为会让「点击行内任何位置
      *   （标签文字、右边空白、甚至 hint）」都切换开关，与「看起来只有那个
      *   44×26 的轨道能点」的预期不符：用户想在空白处点一下什么也不做，却把开关拨了。
@@ -117,8 +117,8 @@
      *     · 点轨道 → 切换（label for 生效）
      *     · 点文字 / 行空白 / hint → 无反应
      *     · 键盘：Tab 到 checkbox + 空格仍可切换（focus-visible 描边靠
-     *       `.ha-switch-input:focus-visible + .ha-switch`，所以 input 必须**紧跟在轨道之前**）
-     *   改结构时千万别把 input 挪进 .ha-switch 里面 —— 上面那条相邻选择器会失效，
+     *       `.ow-switch-input:focus-visible + .ow-switch`，所以 input 必须**紧跟在轨道之前**）
+     *   改结构时千万别把 input 挪进 .ow-switch 里面 —— 上面那条相邻选择器会失效，
      *   而旧内核不支持 :has()，没有等价写法。
      *
      * @param {string} id      input 的 id，绑定与读取都用它
@@ -128,11 +128,11 @@
      * @param {boolean} [disabled] 是否禁用
      */
     function switchHtml(id, label, on, hint, disabled) {
-        return '<div class="ha-switch-row' + (disabled ? ' is-disabled' : '') + '">'
-            + '<span class="ha-switch-label">' + esc(label) + '</span>'
-            + '<input type="checkbox" class="ha-switch-input" id="' + esc(id) + '"' + (on ? ' checked' : '') + (disabled ? ' disabled' : '') + '>'
-            + '<label class="ha-switch' + (on ? ' is-on' : '') + '" for="' + esc(id) + '"></label>'
-            + (hint ? '<p class="ha-switch-hint">' + esc(hint) + '</p>' : '')
+        return '<div class="ow-switch-row' + (disabled ? ' is-disabled' : '') + '">'
+            + '<span class="ow-switch-label">' + esc(label) + '</span>'
+            + '<input type="checkbox" class="ow-switch-input" id="' + esc(id) + '"' + (on ? ' checked' : '') + (disabled ? ' disabled' : '') + '>'
+            + '<label class="ow-switch' + (on ? ' is-on' : '') + '" for="' + esc(id) + '"></label>'
+            + (hint ? '<p class="ow-switch-hint">' + esc(hint) + '</p>' : '')
             + '</div>';
     }
 
@@ -147,7 +147,7 @@
            不用记得调任何函数。
        因此这里是「扫 DOM + 搬文字」，不是「生成控件」。
        ================================================================== */
-    var HaTip = (function () {
+    var OwTip = (function () {
 
         /**
          * 造一个圆形 ⓘ 气泡。
@@ -163,10 +163,10 @@
          */
         function badge(text) {
             var b = document.createElement('span');
-            b.className = 'ha-tip';
+            b.className = 'ow-tip';
             b.setAttribute('aria-label', text);
-            b.innerHTML = '<i>i</i><span class="ha-tip-box"></span>';
-            b.getElementsByClassName('ha-tip-box')[0].textContent = text;
+            b.innerHTML = '<i>i</i><span class="ow-tip-box"></span>';
+            b.getElementsByClassName('ow-tip-box')[0].textContent = text;
             // v1.2.47：真正悬浮的那一刻再判一次越界方向。
             // 必须用 addEventListener 而不是 CSS —— 气泡 display:none 时量不到宽度，
             // 而且窗口缩放/滚动/换行后位置会变，绑一次就不准了。
@@ -180,15 +180,15 @@
            气泡默认 left:50% + translateX(-50%)（居中在 ⓘ 上方）。
            ⓘ 一般在 label 文字右侧靠中间，气泡宽 max 260px，向左必然溢出容器。
 
-           之前只用 CSS `.ha-form-row > .ha-form-item:last-child` 靠右兜底，
-           但**独立 .ha-form-item（不在 .ha-form-row 里）走不到那条规则** ——
+           之前只用 CSS `.ow-form-row > .ow-form-item:last-child` 靠右兜底，
+           但**独立 .ow-form-item（不在 .ow-form-row 里）走不到那条规则** ——
            实测「个人设置」的「昵称」气泡 left=463、弹窗左边界 530，**左边被裁掉 67px**，
            「第三方授权」裁掉 28px。后台多列表单同理。
 
            为什么必须用 JS：
              · CSS 拿不到「气泡实际宽度」（max-content 运行时才知道）；
              · **ⓘ 徽章本身不是 14px 宽** —— label 是 display:flex，
-               .ha-tip  作为 flex 项被拉伸到整行剩余宽度（实测 240px），
+               .ow-tip  作为 flex 项被拉伸到整行剩余宽度（实测 240px），
                所以任何 `left/right: %` 或 `right: -6px` 都是相对这个假宽度算的，
                实测会得到 left=-240px → 气泡跑到 x=346，比不修还糟。
 
@@ -198,7 +198,7 @@
            · 每次 mouseenter 重新判定 —— 窗口缩放/滚动/换行后位置会变；
            · 写 style.left 而非加类 —— 值本来就是算出来的，类表达不了。 */
         function fixEdge(b) {
-            var box = b && b.querySelector ? b.querySelector('.ha-tip-box') : null;
+            var box = b && b.querySelector ? b.querySelector('.ow-tip-box') : null;
             if (!box) return;
             // 找最近的裁剪祖先（overflow 非 visible），它才是真正的边界
             var edge = null, node = b.parentNode;
@@ -237,14 +237,14 @@
             // 箭头跟着对齐：指向 ⓘ 的中心（相对气泡左缘）
             var c = bLeft + b.offsetWidth / 2 - left;   // ⓘ 中心 - 气泡左缘
             c = Math.max(12, Math.min(c, bw - 12));     // 夹在气泡内，别跑到边上
-            box.style.setProperty('--ha-tip-arrow', c + 'px');
+            box.style.setProperty('--ow-tip-arrow', c + 'px');
 
             // 离开时清干净，避免下次内容变化/窗口缩放后沿用旧值
             if (!b.__haTipCleanup) {
                 b.__haTipCleanup = function () {
                     box.style.display = ''; box.style.left = ''; box.style.right = '';
                     box.style.maxWidth = ''; box.style.transform = '';
-                    box.style.removeProperty('--ha-tip-arrow');
+                    box.style.removeProperty('--ow-tip-arrow');
                 };
                 b.addEventListener('mouseleave', b.__haTipCleanup, false);
             }
@@ -252,23 +252,23 @@
 
         /**
          * 判断一个 <p> 是不是「说明文字」。
-         * 判据：无 class（或显式 ha-form-hint）+ 生效字号 ≤ 12.5px。
-         * ⚠️ 必须排除带 class 的 —— 那些是有语义的块（.ha-rc-note 公开性说明、
-         *    .ha-form-msg 报错、.ha-panel-empty 空态），搬走会丢信息。
+         * 判据：无 class（或显式 ow-form-hint）+ 生效字号 ≤ 12.5px。
+         * ⚠️ 必须排除带 class 的 —— 那些是有语义的块（.ow-rc-note 公开性说明、
+         *    .ow-form-msg 报错、.ow-panel-empty 空态），搬走会丢信息。
          */
         function isHint(node) {
             if (!node || node.tagName !== 'P') return false;
             var cn = (node.className || '').trim();
-            if (cn && cn !== 'ha-form-hint') return false;
+            if (cn && cn !== 'ow-form-hint') return false;
             var fs = parseFloat(getComputedStyle(node).fontSize) || 0;
             return fs > 0 && fs <= 12.5;
         }
 
-        /** 处理一个 .ha-form-item：把说明搬进 label 右侧的 ⓘ */
+        /** 处理一个 .ow-form-item：把说明搬进 label 右侧的 ⓘ */
         function oneItem(item) {
             if (!item) return;
             var label = item.querySelector('label');
-            if (!label || label.getElementsByClassName('ha-tip').length) return;
+            if (!label || label.getElementsByClassName('ow-tip').length) return;
             var kids = item.children, i, hint = null;
             for (i = 0; i < kids.length; i++) {
                 if (isHint(kids[i])) { hint = kids[i]; break; }
@@ -277,17 +277,17 @@
             var txt = (hint.textContent || '').replace(/^\s+|\s+$/g, '');
             if (txt) {
                 label.appendChild(badge(txt));
-                label.className += ' ha-form-label-tip';
+                label.className += ' ow-form-label-tip';
             }
             if (hint.parentNode) hint.parentNode.removeChild(hint);
         }
 
-        /** 处理一个开关行（switchHtml 生成的 .ha-switch-row + p.ha-switch-hint） */
+        /** 处理一个开关行（switchHtml 生成的 .ow-switch-row + p.ow-switch-hint） */
         function oneSwitch(row) {
-            if (!row || (row.className || '').indexOf('ha-switch-row') < 0) return;
-            if (row.getElementsByClassName('ha-tip').length) return;
-            var lb = row.querySelector('.ha-switch-label');
-            var hint = row.querySelector('.ha-switch-hint');
+            if (!row || (row.className || '').indexOf('ow-switch-row') < 0) return;
+            if (row.getElementsByClassName('ow-tip').length) return;
+            var lb = row.querySelector('.ow-switch-label');
+            var hint = row.querySelector('.ow-switch-hint');
             if (!lb || !hint) return;
             var txt = (hint.textContent || '').replace(/^\s+|\s+$/g, '');
             if (txt) lb.insertAdjacentElement('afterend', badge(txt));
@@ -298,13 +298,13 @@
         function scan(root) {
             var scope = (root && root.querySelectorAll) ? root : w.document;
             if (scope.nodeType === 1) {
-                if (scope.classList && scope.classList.contains('ha-form-item')) oneItem(scope);
-                if (scope.classList && scope.classList.contains('ha-switch-row')) oneSwitch(scope);
+                if (scope.classList && scope.classList.contains('ow-form-item')) oneItem(scope);
+                if (scope.classList && scope.classList.contains('ow-switch-row')) oneSwitch(scope);
             }
             if (!scope.querySelectorAll) return;
-            var items = scope.querySelectorAll('.ha-form-item'), i;
+            var items = scope.querySelectorAll('.ow-form-item'), i;
             for (i = 0; i < items.length; i++) oneItem(items[i]);
-            var rows = scope.querySelectorAll('.ha-switch-row');
+            var rows = scope.querySelectorAll('.ow-switch-row');
             for (i = 0; i < rows.length; i++) oneSwitch(rows[i]);
         }
 
@@ -312,7 +312,7 @@
         function add(label, text) {
             if (!label || !text) return;
             label.appendChild(badge(String(text)));
-            label.className += ' ha-form-label-tip';
+            label.className += ' ow-form-label-tip';
         }
 
         // 自动启用：首屏 + 之后任何异步插入的表单（弹窗 / 后台 Ajax / 插件页）
@@ -330,9 +330,9 @@
                     for (var j = 0; j < list.length; j++) {
                         var n = list[j];
                         if (n.nodeType !== 1) continue;
-                        if ((n.classList && (n.classList.contains('ha-form-item')
-                                || n.classList.contains('ha-switch-row')))
-                            || n.querySelector('.ha-form-item, .ha-switch-row')) {
+                        if ((n.classList && (n.classList.contains('ow-form-item')
+                                || n.classList.contains('ow-switch-row')))
+                            || n.querySelector('.ow-form-item, .ow-switch-row')) {
                             scan(n);
                             // ⚠️ 这里**不能 break**：一次 innerHTML 替换会同时加入多个
                             //    顶层节点（表单容器 + 独立表单项 + 按钮…），
@@ -348,20 +348,20 @@
     })();
 
     /**
-     * 绑定开关的视觉同步：监听 change，把 .ha-switch 的 is-on 跟上 checkbox。
+     * 绑定开关的视觉同步：监听 change，把 .ow-switch 的 is-on 跟上 checkbox。
      * 必须在元素插入 DOM 后调用（可传事件委托的容器，或单个 input）。
      * @param {Element|NodeList} scope 容器（含 checkbox）或 checkbox 本身
      */
     function bindSwitches(scope) {
         var list = [];
         if (!scope) return;
-        if (scope.nodeType === 1 && scope.className && (' ' + scope.className + ' ').indexOf(' ha-switch-input ') >= 0) list.push(scope);
-        else list = [].slice.call(scope.querySelectorAll ? scope.querySelectorAll('.ha-switch-input') : []);
+        if (scope.nodeType === 1 && scope.className && (' ' + scope.className + ' ').indexOf(' ow-switch-input ') >= 0) list.push(scope);
+        else list = [].slice.call(scope.querySelectorAll ? scope.querySelectorAll('.ow-switch-input') : []);
         for (var i = 0; i < list.length; i++) {
             (function (cb) {
-                var sw = cb.parentNode.querySelector('.ha-switch');
+                var sw = cb.parentNode.querySelector('.ow-switch');
                 if (!sw) return;
-                var sync = function () { sw.className = 'ha-switch' + (cb.checked ? ' is-on' : ''); };
+                var sync = function () { sw.className = 'ow-switch' + (cb.checked ? ' is-on' : ''); };
                 cb.addEventListener ? cb.addEventListener('change', sync, false) : cb.attachEvent('onchange', sync);
                 sync();
             })(list[i]);
@@ -372,7 +372,7 @@
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
     function toast(msg, ms) {
-        var t = $('haToast'); if (!t) return;
+        var t = $('owToast'); if (!t) return;
         t.innerHTML = esc(msg); t.style.display = 'block';
         clearTimeout(t._tm);
         t._tm = setTimeout(function () { t.style.display = 'none'; }, ms || 2200);
@@ -472,7 +472,7 @@
     function fileIconSvg(ext) {
         var e = String(ext || '').toLowerCase().replace(/^\./, '');
         var t = FILE_ICON_MAP[FILE_EXT_ICON[e] || 'unknown'];
-        return haSvgFileType(t, 34);
+        return owSvgFileType(t, 34);
     }
 
     /* 文件消息卡片：图标 + 文件名 + 大小 + 下载（下载链接带签名，服务端再校验房间权限）
@@ -482,16 +482,16 @@
     function fileCardHtml(m) {
         var info = null;
         try { info = JSON.parse(m.content); } catch (e) { info = null; }
-        if (!info) return '<span class="ha-file-card">文件内容已失效</span>';
-        var s = HaApi.sign('file_download');
+        if (!info) return '<span class="ow-file-card">文件内容已失效</span>';
+        var s = OwApi.sign('file_download');
         var dl = '?action=file_download&id=' + m.id + '&ts=' + s.ts + '&sign=' + s.sign;
         var nm = info.name || '文件';
-        return '<div class="ha-file-card">'
-            + '<span class="ha-file-ico">' + fileIconSvg(info.ext) + '</span>'
-            + '<span class="ha-file-meta"><span class="ha-file-name" data-name="' + esc(nm)
+        return '<div class="ow-file-card">'
+            + '<span class="ow-file-ico">' + fileIconSvg(info.ext) + '</span>'
+            + '<span class="ow-file-meta"><span class="ow-file-name" data-name="' + esc(nm)
             + '" title="' + esc(nm) + '">' + esc(nm) + '</span>'
-            + '<span class="ha-file-size">' + esc(sizeText(info.size)) + '</span></span>'
-            + '<a class="ha-file-dl" href="' + dl + '" title="下载">' + haSvg('download', 18) + '</a></div>';
+            + '<span class="ow-file-size">' + esc(sizeText(info.size)) + '</span></span>'
+            + '<a class="ow-file-dl" href="' + dl + '" title="下载">' + owSvg('download', 18) + '</a></div>';
     }
 
     /* ---------- 文件名「中间省略」（v1.2.18） ----------
@@ -588,16 +588,16 @@
             fitRaf = 0;
             for (var i = 0; i < q.length; i++) {
                 if (!q[i] || !q[i].getElementsByClassName) continue;
-                var list = q[i].getElementsByClassName('ha-file-name');
+                var list = q[i].getElementsByClassName('ow-file-name');
                 for (var j = 0; j < list.length; j++) fitFileName(list[j]);
             }
         });
     }
     /** 重算消息区里所有文件名（窗口尺寸变化后卡片可用宽度跟着变） */
     function refitAllFileNames() {
-        var box = $('haMessages');
+        var box = $('owMessages');
         if (!box) return;
-        var list = box.getElementsByClassName('ha-file-name');
+        var list = box.getElementsByClassName('ow-file-name');
         for (var i = 0; i < list.length; i++) fitFileName(list[i]);
     }
     function sizeText(n) {
@@ -611,9 +611,9 @@
         'file': '<path d="M13 3.5H7a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V9z"/><path d="M13 3.5V9h5.5"/>',
         'download': '<path d="M12 4v11"/><path d="M7.5 11L12 15.5 16.5 11"/><path d="M4.5 19.5h15"/>'
     };
-    function haSvg(name, size) {
+    function owSvg(name, size) {
         var p = OW_SVG_PATHS[name] || '';
-        return '<svg class="ha-icon" width="' + (size || 18) + '" height="' + (size || 18) + '" viewBox="0 0 24 24" fill="none" '
+        return '<svg class="ow-icon" width="' + (size || 18) + '" height="' + (size || 18) + '" viewBox="0 0 24 24" fill="none" '
             + 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>';
     }
 
@@ -621,9 +621,9 @@
        FILE_ICON_MAP 配置，与 24 网格的 OW_SVG_PATHS 不同源，故单独一个函数。
        颜色写死在配置里，不跟随主题 currentColor（这些是文件类型的语义色，
        与界面主题无关，跟随主题反而会丢失类型辨识度）。 */
-    function haSvgFileType(t, size) {
+    function owSvgFileType(t, size) {
         var s = size || 34;
-        return '<svg class="ha-icon ha-icon-file" width="' + s + '" height="' + s + '" viewBox="0 0 1024 1024" version="1.1" '
+        return '<svg class="ow-icon ow-icon-file" width="' + s + '" height="' + s + '" viewBox="0 0 1024 1024" version="1.1" '
             + 'xmlns="http://www.w3.org/2000/svg">'
             + '<path d="' + FILE_SILHOUETTE + '" fill="' + t.c + '"/>'
             + '<path d="' + FILE_FOLD + '" fill="#FFFFFF" fill-opacity=".296"/>'
@@ -631,7 +631,7 @@
             + '</svg>';
     }
 
-    var HaApi = {
+    var OwApi = {
         key: '',
         tsOffset: 0,   // 客户端时钟与服务器的偏差（秒），由页面下发的服务器时间校正
         // 关键：签名用的 ts 以「服务器时间」为准，客户端系统时钟不准也不会导致签名失败
@@ -660,7 +660,7 @@
                 try { r = JSON.parse(x.responseText); } catch (e) {}
                 r = r || { ok: false, msg: '网络错误（' + x.status + '）' };
                 if (r.ok === false && r.msg && r.msg.indexOf('签名验证失败') >= 0) {
-                    HaApi.onSignExpired(function () { cb(r, x.status); });
+                    OwApi.onSignExpired(function () { cb(r, x.status); });
                     return;
                 }
                 cb(r, x.status);
@@ -671,7 +671,7 @@
 
         /* 签名失效自愈：会话重建/页面为旧缓存时密钥对不上，自动刷新一次取新密钥 */
         onSignExpired: function (cb) {
-            var flag = 'hal_sig_reload_at', now = new Date().getTime(), last = 0;
+            var flag = 'owl_sig_reload_at', now = new Date().getTime(), last = 0;
             try { last = parseInt(w.sessionStorage.getItem(flag) || '0', 10); } catch (e) {}
             if (last && now - last < 15000) { if (cb) cb(); return; } // 15 秒内只自动刷新一次，避免死循环
             try { w.sessionStorage.setItem(flag, String(now)); } catch (e) {}
@@ -690,7 +690,7 @@
                 try { r = JSON.parse(x.responseText); } catch (e) {}
                 r = r || { ok: false, msg: '网络错误（' + x.status + '）' };
                 if (r.ok === false && r.msg && r.msg.indexOf('签名验证失败') >= 0) {
-                    HaApi.onSignExpired(function () { cb(r, x.status); });
+                    OwApi.onSignExpired(function () { cb(r, x.status); });
                     return;
                 }
                 cb(r, x.status);
@@ -702,7 +702,7 @@
         /**
          * 敏感操作（v1.0.91）：退出登录 / 删除内容 / 管理员删·恢复 / 禁用等。
          * 先取一次性操作票据（?action=ticket，签名保护），随请求提交，服务端校验后作废，
-         * 防止签名窗口期内的请求重放与跨站劫持。用法与 post 相同：HaApi.secure(action, data, cb)
+         * 防止签名窗口期内的请求重放与跨站劫持。用法与 post 相同：OwApi.secure(action, data, cb)
          */
         secure: function (action, data, cb) {
             this.post('ticket', {}, function (t) {
@@ -710,7 +710,7 @@
                 var d = {}, k;
                 for (k in (data || {})) if (data.hasOwnProperty(k)) d[k] = data[k];
                 d.ticket = t.ticket;
-                HaApi.post(action, d, cb);
+                OwApi.post(action, d, cb);
             });
         },
     };
@@ -737,7 +737,7 @@
     /* 前台身份标签（v1.0.86）：只保留「群主 / 会员」两类身份展示——
        群主=当前群聊 owner（橙色），VIP=会员（保留 VIP 配色），普通用户与超级管理员=会员（灰色），
        游客与其它角色不再展示身份标签。超级管理员在别人创建的群聊里同样显示「会员」。 */
-    var CUR_OWNER = 0;   // 当前群聊的 owner 用户 ID（HaChat 切换群聊时同步）
+    var CUR_OWNER = 0;   // 当前群聊的 owner 用户 ID（OwChat 切换群聊时同步）
     /**
      * 身份标签。
      *
@@ -753,11 +753,11 @@
      */
     function roleTag(role, title, uid, real) {
         var h = '';
-        if (uid && uid === CUR_OWNER) h = '<span class="ha-tag ha-tag-owner">群主</span>';
-        else if (real && role === 'admin') h = '<span class="ha-tag ha-tag-admin">超级管理员</span>';
-        else if (role === 'vip') h = '<span class="ha-tag ha-tag-vip">会员</span>';
-        else if (role === 'member' || role === 'admin') h = '<span class="ha-tag ha-tag-member">会员</span>';
-        if (title) h += (h ? ' ' : '') + '<span class="ha-tag ha-tag-title">' + esc(title) + '</span>';
+        if (uid && uid === CUR_OWNER) h = '<span class="ow-tag ow-tag-owner">群主</span>';
+        else if (real && role === 'admin') h = '<span class="ow-tag ow-tag-admin">超级管理员</span>';
+        else if (role === 'vip') h = '<span class="ow-tag ow-tag-vip">会员</span>';
+        else if (role === 'member' || role === 'admin') h = '<span class="ow-tag ow-tag-member">会员</span>';
+        if (title) h += (h ? ' ' : '') + '<span class="ow-tag ow-tag-title">' + esc(title) + '</span>';
         return h;
     }
 
@@ -766,10 +766,10 @@
     function avatarHtml(url, name, sm, role) {
         // 尺寸档：'xs'=20px、true/sm=28px（列表）、'md'=32px、'lg'=64px（资料卡/个人设置）、false=40px
         // v1.1.9：新增 'lg'。原来资料卡与个人设置都用 'md'(32px)，在 380px 弹窗里偏小。
-        var sizeCls = sm === 'xs' ? ' ha-avatar-xs'
-            : (sm === 'lg' ? ' ha-avatar-lg'
-            : (sm === 'md' ? ' ha-avatar-md' : (sm ? ' ha-avatar-sm' : '')));
-        var cls = 'ha-avatar' + sizeCls;
+        var sizeCls = sm === 'xs' ? ' ow-avatar-xs'
+            : (sm === 'lg' ? ' ow-avatar-lg'
+            : (sm === 'md' ? ' ow-avatar-md' : (sm ? ' ow-avatar-sm' : '')));
+        var cls = 'ow-avatar' + sizeCls;
         if (url) return '<span class="' + cls + '"><img src="' + esc(url) + '" alt=""></span>';
         var ch = esc((name || '?').charAt(0));
         if (role === 'guest') {
@@ -791,9 +791,9 @@
          —— 直接用原图在 40px 头像里会小到几乎看不见。
          内容中心 (512,512)，正方形 viewBox 取 `180 180 664 664`（边长 664）：
          边长 = 内容半对角线 331.8 × 2，圆容器（border-radius:50%）内刚好不裁角。
-       图形已居中，容器与 <img> 的 CSS 尺寸锁由 .ha-avatar / .ha-cl-icon 负责。
+       图形已居中，容器与 <img> 的 CSS 尺寸锁由 .ow-avatar / .ow-cl-icon 负责。
 
-       带 ?v= 版本号：与 CSS/JS 的缓存参数同一套做法（index.php 用 HALOU_VERSION），
+       带 ?v= 版本号：与 CSS/JS 的缓存参数同一套做法（index.php 用 OWLSGO_VERSION），
        换图后不必手改文件名。 */
     var ROOM_DEFAULT_AVATAR = 'assets/img/room-default.svg';
 
@@ -801,14 +801,14 @@
      * 群头像 HTML。有自定义头像用图，无则回落到默认剪影图。
      * @param {string} url   rooms.avatar，空串表示未设置
      * @param {string} sm    尺寸档，同 avatarHtml
-     * @param {string} extra 额外的 class（会话列表要用 .ha-cl-icon 而非 .ha-avatar）
+     * @param {string} extra 额外的 class（会话列表要用 .ow-cl-icon 而非 .ow-avatar）
      */
     function roomAvatarHtml(url, sm, extra) {
-        var sizeCls = sm === 'xs' ? ' ha-avatar-xs'
-            : (sm === 'lg' ? ' ha-avatar-lg'
-            : (sm === 'md' ? ' ha-avatar-md' : (sm ? ' ha-avatar-sm' : '')));
-        var cls = extra || ('ha-avatar' + sizeCls);
-        var ver = (HaChat.cfg && HaChat.cfg.version) || '';
+        var sizeCls = sm === 'xs' ? ' ow-avatar-xs'
+            : (sm === 'lg' ? ' ow-avatar-lg'
+            : (sm === 'md' ? ' ow-avatar-md' : (sm ? ' ow-avatar-sm' : '')));
+        var cls = extra || ('ow-avatar' + sizeCls);
+        var ver = (OwChat.cfg && OwChat.cfg.version) || '';
         var src = url || (ROOM_DEFAULT_AVATAR + (ver ? '?v=' + ver : ''));
         return '<span class="' + cls + '"><img src="' + esc(src) + '" alt=""></span>';
     }
@@ -816,7 +816,7 @@
     /* ---------- 侧栏入口行（v1.1.10） ----------
        右侧栏「群聊信息」区的统一行样式：图标 + 文案 + 右箭头，整行可点。
        「群聊设置」由核心渲染，「群公告」等插件入口复用同一外观（announcements 插件
-       走 #haREExtras 容器并用 .ha-panel-entry 类），因此两行视觉上完全一致。
+       走 #owREExtras 容器并用 .ow-panel-entry 类），因此两行视觉上完全一致。
        icon 用内联 SVG 路径表（与 PHP 侧 ow_icon 的路径一致，避免为此新增接口）。 */
     var OW_ENTRY_ICONS = {
         gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M2.5 12h3M18.5 12h3M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/>',
@@ -833,30 +833,30 @@
     /** 生成一行侧栏入口（整行可点）。onclick 缺省时渲染为不可点的静态行 */
     function entryRow(label, icon, onclick) {
         var d = OW_ENTRY_ICONS[icon] || OW_ENTRY_ICONS.gear;
-        var svg = '<svg class="ha-ico ha-panel-entry-ico" width="16" height="16" viewBox="0 0 24 24" fill="none"'
+        var svg = '<svg class="ow-ico ow-panel-entry-ico" width="16" height="16" viewBox="0 0 24 24" fill="none"'
             + ' stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
-        var arrow = '<span class="ha-panel-entry-arrow">›</span>';
+        var arrow = '<span class="ow-panel-entry-arrow">›</span>';
         if (!onclick) {
-            return '<div class="ha-panel-entry is-static">' + svg + '<span class="ha-panel-entry-t">' + esc(label) + '</span>' + arrow + '</div>';
+            return '<div class="ow-panel-entry is-static">' + svg + '<span class="ow-panel-entry-t">' + esc(label) + '</span>' + arrow + '</div>';
         }
-        return '<div class="ha-panel-entry" role="button" tabindex="0" onclick="' + onclick + '"'
+        return '<div class="ow-panel-entry" role="button" tabindex="0" onclick="' + onclick + '"'
             + ' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();' + onclick + '}">'
-            + svg + '<span class="ha-panel-entry-t">' + esc(label) + '</span>' + arrow + '</div>';
+            + svg + '<span class="ow-panel-entry-t">' + esc(label) + '</span>' + arrow + '</div>';
     }
 
     /* ==========================================================================
-       HaAuth：登录 / 注册 / 找回密码
+       OwAuth：登录 / 注册 / 找回密码
        ========================================================================== */
-    var HaAuth = {
+    var OwAuth = {
         init: function (opt) {
-            HaApi.key = opt.key;
-            HaApi.setServerTime(opt.ts);   // 用服务器时间校正本机时钟偏差
-            var form = document.querySelector('.ha-auth-form');
+            OwApi.key = opt.key;
+            OwApi.setServerTime(opt.ts);   // 用服务器时间校正本机时钟偏差
+            var form = document.querySelector('.ow-auth-form');
             if (!form) return;
             var mode = form.getAttribute('data-mode');
-            var msg = form.querySelector('.ha-form-msg');
+            var msg = form.querySelector('.ow-form-msg');
 
-            var img = $('haCaptchaImg');
+            var img = $('owCaptchaImg');
             if (img) img.onclick = function () { img.src = '?action=captcha&_=' + new Date().getTime(); };
 
             var codeBtn = form.querySelector('[data-sendcode]');
@@ -864,7 +864,7 @@
                 var email = form.querySelector('[name=email]').value;
                 if (!email) { msg.innerHTML = '<span style="color:#C41D1F">请先填写邮箱</span>'; return; }
                 codeBtn.disabled = true;
-                HaApi.post('send_code', { email: email, type: codeBtn.getAttribute('data-sendcode') }, function (r) {
+                OwApi.post('send_code', { email: email, type: codeBtn.getAttribute('data-sendcode') }, function (r) {
                     msg.innerHTML = '<span style="color:' + (r.ok ? '#237804' : '#C41D1F') + '">' + esc(r.msg) + '</span>';
                     var n = 60;
                     if (r.ok) {
@@ -879,13 +879,13 @@
             form.onsubmit = function (e) {
                 e.preventDefault();
                 var data = {}, i, els = form.elements;
-                // 跳过服务端预置的 ts/sign 隐藏域：由 HaApi 用实时值重新签名
+                // 跳过服务端预置的 ts/sign 隐藏域：由 OwApi 用实时值重新签名
                 for (i = 0; i < els.length; i++) {
                     if (!els[i].name || els[i].name === 'ts' || els[i].name === 'sign') continue;
                     data[els[i].name] = els[i].value;
                 }
                 msg.innerHTML = '提交中…';
-                HaApi.post(mode === 'login' ? 'login' : mode, data, function (r) {
+                OwApi.post(mode === 'login' ? 'login' : mode, data, function (r) {
                     if (r.ok) {
                         msg.innerHTML = '<span style="color:#237804">' + esc(r.msg) + '</span>';
                         // 注册成功不进入聊天（后端注册本就不建会话）：跳登录页由用户手动登录
@@ -896,8 +896,8 @@
                         }, 800);
                     } else {
                         msg.innerHTML = '<span style="color:#C41D1F">' + esc(r.msg) + '</span>';
-                        if (r.captcha && $('haCaptchaRow')) {
-                            $('haCaptchaRow').style.display = 'block';
+                        if (r.captcha && $('owCaptchaRow')) {
+                            $('owCaptchaRow').style.display = 'block';
                             if (img) img.src = '?action=captcha&_=' + new Date().getTime();
                         }
                     }
@@ -907,7 +907,7 @@
     };
 
     /* ==========================================================================
-       HaChat：聊天主程序
+       OwChat：聊天主程序
        ========================================================================== */
     /**
      * 通用聊天列表轮子（v1.1.0）：群聊与私聊会话共用的列表渲染器。
@@ -929,7 +929,7 @@
             var box = typeof opts.container === 'string' ? $(opts.container) : opts.container;
             if (!box) return;
             if (!list || !list.length) {
-                box.innerHTML = '<li class="ha-cl-empty">' + esc(opts.emptyText || '暂无会话') + '</li>';
+                box.innerHTML = '<li class="ow-cl-empty">' + esc(opts.emptyText || '暂无会话') + '</li>';
                 return;
             }
             var html = '', i, c;
@@ -941,29 +941,29 @@
                 // 群聊用首字会与「群名首字随机色」的历史行为混在一起，看着像乱码。
                 var isRoom = c.conv === 'room';
                 var icon = isRoom
-                    ? roomAvatarHtml(c.avatar, true, 'ha-cl-icon')
+                    ? roomAvatarHtml(c.avatar, true, 'ow-cl-icon')
                     : (c.avatar
-                        ? '<span class="ha-cl-icon"><img src="' + esc(c.avatar) + '" alt=""></span>'
-                        : '<span class="ha-cl-icon">' + esc((c.name || '?').charAt(0)) + '</span>');
-                html += '<li class="ha-cl-item' + (key === opts.activeKey ? ' active' : '') + (c.pinned ? ' is-pinned' : '') + '" data-key="' + esc(key) + '"'
+                        ? '<span class="ow-cl-icon"><img src="' + esc(c.avatar) + '" alt=""></span>'
+                        : '<span class="ow-cl-icon">' + esc((c.name || '?').charAt(0)) + '</span>');
+                html += '<li class="ow-cl-item' + (key === opts.activeKey ? ' active' : '') + (c.pinned ? ' is-pinned' : '') + '" data-key="' + esc(key) + '"'
                       + (c.conv === 'dm' ? ' data-dm="' + esc(c.peer) + '"' : ' data-room="' + (c.conv === 'room' ? c.id : 0) + '"')
                       + ' data-name="' + esc(c.name) + '" data-pw="' + (c.need_password ? 1 : 0) + '"'
                       + ' data-pin="' + (c.pinned ? 1 : 0) + '">'
                       + icon
-                      + '<span class="ha-cl-main">'
+                      + '<span class="ow-cl-main">'
                       // v1.2.28：置顶标记放在**标题内部最前**（与微信一致）。
-                      // ⚠️ 必须放进 .ha-cl-title 里，不能放在 .ha-cl-main 下 ——
-                      //   .ha-cl-main 是 column flex，多一个子节点就**独占一行**，
+                      // ⚠️ 必须放进 .ow-cl-title 里，不能放在 .ow-cl-main 下 ——
+                      //   .ow-cl-main 是 column flex，多一个子节点就**独占一行**，
                       //   会把标题和摘要挤成三行。title 本身被 flex blockify，
                       //   里面的 inline span 才与文字同行。
-                      + '<span class="ha-cl-title">'
-                      + (c.pinned ? '<span class="ha-cl-pin" title="已置顶"></span>' : '')
-                      + esc(c.name) + (c.tag ? '<span class="ha-cl-tag">' + esc(c.tag) + '</span>' : '') + '</span>'
-                      + '<span class="ha-cl-sub">' + esc(c.last_text || '') + '</span>'
+                      + '<span class="ow-cl-title">'
+                      + (c.pinned ? '<span class="ow-cl-pin" title="已置顶"></span>' : '')
+                      + esc(c.name) + (c.tag ? '<span class="ow-cl-tag">' + esc(c.tag) + '</span>' : '') + '</span>'
+                      + '<span class="ow-cl-sub">' + esc(c.last_text || '') + '</span>'
                       + '</span>'
                       // v1.2.28：hideTime 用于联系人列表（无消息流，时间没有参考价值）。
                       // 不渲染这个 span 而不是传空串 —— 空 span 仍占位、仍可能带 margin。
-                      + (opts.hideTime ? '' : '<span class="ha-cl-time">' + ChatList.time(c.last_at) + '</span>')
+                      + (opts.hideTime ? '' : '<span class="ow-cl-time">' + ChatList.time(c.last_at) + '</span>')
                       + '</li>';
             }
             box.innerHTML = html;
@@ -986,15 +986,15 @@
     };
     w.ChatList = ChatList;
 
-    var HaChat = {
+    var OwChat = {
         cfg: null, room: 0, since: 0, polling: false, failCount: 0,
         historyDone: false, loadingHistory: false, sound: true, lastMsgId: 0,
         emojis: '😀 😁 😂 🤣 😊 😍 😘 😜 🤔 😎 😴 😷 🤒 😱 😭 😡 👍 👎 👏 🙏 💪 🤝 ❤️ 💔 🎉 🔥 ⭐ 🌹 🍀 🎂 ☕ 🍺 ⚽ 🏀 🚀 ✈️ 🐱 🐶 🦉 🌙 ☀️ 🌈'.split(' '),
 
         init: function (cfg) {
             this.cfg = cfg;
-            HaApi.key = cfg.key;
-            HaApi.setServerTime(cfg.ts);
+            OwApi.key = cfg.key;
+            OwApi.setServerTime(cfg.ts);
             this.room = cfg.room;
             this.syncRoomOwner();
             this.sound = cfg.settings.sound === '1';
@@ -1046,7 +1046,7 @@
             var first = null, i;
             for (i = 0; i < cfg.rooms.length; i++) if (cfg.rooms[i].id === this.room) first = cfg.rooms[i];
             var load = function (password) {
-                HaApi.post('room_join', { room_id: self.room, password: password || '' }, function (j) {
+                OwApi.post('room_join', { room_id: self.room, password: password || '' }, function (j) {
                     if (!j.ok) {
                         if (j.need_password) {
                             self.passForget(self.room);
@@ -1058,7 +1058,7 @@
                         self.passRemember(self.room, j.ttl);
                     }
                     if (self.dm) return;   // 等待期间用户已切到私聊
-                    HaApi.post('history', { room_id: self.room, before: 0 }, function (r) {
+                    OwApi.post('history', { room_id: self.room, before: 0 }, function (r) {
                         if (self.dm) return;
                         if (r.ok) {
                             for (var k = 0; k < r.data.length; k++) self.addMessage(r.data[k], true);
@@ -1092,10 +1092,10 @@
             var self = this;
             // v1.2.20：侧栏标签条（消息 / 联系人 / 插件标签）
             self.bindSideTabs();
-            $('haBtnSend').onclick = function () { self.send(); };
-            var input = $('haInput');
+            $('owBtnSend').onclick = function () { self.send(); };
+            var input = $('owInput');
             // 随内容自动增高；恢复上次手动拖出的高度
-            try { self.inputUserH = parseInt(w.localStorage.getItem('hal_input_h') || '0', 10) || 0; } catch (e) {}
+            try { self.inputUserH = parseInt(w.localStorage.getItem('owl_input_h') || '0', 10) || 0; } catch (e) {}
             self.bindInputResize();
             self.autoGrow();
             input.oninput = function () { self.autoGrow(); };
@@ -1110,82 +1110,82 @@
                     if (items[i].type.indexOf('image') === 0) {
                         var f = items[i].getAsFile();
                         // v1.2.41：走插件暴露的上传器；插件未启用则不粘贴上传
-                        if (f && w.HaAttach) w.HaAttach.uploadImage(f);
+                        if (f && w.OwAttach) w.OwAttach.uploadImage(f);
                     }
                 }
             };
             // v1.2.41：图片/文件按钮及其 file input 移入附件上传插件，
-            // 由插件注入到 #haAttachTools 并自行绑定。插件停用时这两个按钮不存在。
-            // ⚠️ 下方「粘贴上传图片」仍留在核心，但要走插件暴露的 HaAttach；
+            // 由插件注入到 #owAttachTools 并自行绑定。插件停用时这两个按钮不存在。
+            // ⚠️ 下方「粘贴上传图片」仍留在核心，但要走插件暴露的 OwAttach；
             //    插件未启用时静默跳过（不能因为没插件就整个粘贴功能报错）。
             // 表情面板：按钮切换 + 点击外部/Esc 关闭（原来只能靠再点一次按钮）
             var setEmoji = function (open) {
-                var p = $('haEmojiPanel');
+                var p = $('owEmojiPanel');
                 if (!p) return;
                 p.style.display = open ? 'block' : 'none';
             };
-            $('haBtnEmoji').onclick = function () {
-                var p = $('haEmojiPanel');
+            $('owBtnEmoji').onclick = function () {
+                var p = $('owEmojiPanel');
                 setEmoji(getComputedStyle(p).display === 'none');
             };
-            $('haBtnSound').onclick = function () {
+            $('owBtnSound').onclick = function () {
                 self.sound = !self.sound;
                 this.innerHTML = this.getAttribute(self.sound ? 'data-on' : 'data-off');
                 toast(self.sound ? '提示音已开启' : '提示音已关闭');
             };
             // 窄屏浮层遮罩：侧栏或成员面板打开时显示
             var syncMask = function () {
-                var m = $('haMask');
+                var m = $('owMask');
                 if (!m) return;
-                var open = $('haSidebar').className.indexOf('open') >= 0 || $('haOnline').className.indexOf('open') >= 0;
-                m.className = open ? 'ha-mask show' : 'ha-mask';
+                var open = $('owSidebar').className.indexOf('open') >= 0 || $('owOnline').className.indexOf('open') >= 0;
+                m.className = open ? 'ow-mask show' : 'ow-mask';
             };
             // 侧栏开关：真正的切换（原写法只加不减，打开后无法关闭）
             var setSide = function (open) {
-                var s = $('haSidebar');
+                var s = $('owSidebar');
                 var c = s.className.replace(' open', '');
                 s.className = c + (open ? ' open' : '');
                 syncMask();
             };
-            $('haToggleSide').onclick = function () {
-                setSide($('haSidebar').className.indexOf('open') < 0);
+            $('owToggleSide').onclick = function () {
+                setSide($('owSidebar').className.indexOf('open') < 0);
             };
             // 群聊信息面板：宽屏用 hidden 收起（常驻侧栏），窄屏用 open 浮层（默认收起）
             // v1.1.1：侧栏内容改为「上方群聊设置 + 下方所有成员」，开关时需重渲染设置区
             var isNarrow = function () { return (document.documentElement.clientWidth || w.innerWidth || 1024) <= 960; };
             var setPanel = function (open) {
-                var o = $('haOnline');
+                var o = $('owOnline');
                 var c = o.className.replace(' open', '').replace(' hidden', '');
                 var narrow = isNarrow();
                 o.className = c + (open ? (narrow ? ' open' : '') : (narrow ? '' : ' hidden'));
                 syncMask();
             };
             var togglePanel = function () {
-                var o = $('haOnline');
+                var o = $('owOnline');
                 var open = isNarrow() ? (o.className.indexOf('open') >= 0) : (o.className.indexOf('hidden') < 0);
                 setPanel(!open);
                 if (!open) self.renderRoomPanel();   // 打开时刷新设置区（切群后内容可能已过期）
             };
-            $('haTogglePanel').onclick = togglePanel;
-            $('haOnlineClose').onclick = function () { setPanel(false); };
+            $('owTogglePanel').onclick = togglePanel;
+            $('owOnlineClose').onclick = function () { setPanel(false); };
             // v1.2.31：站点名右侧 → 搜索按钮（原竖三点菜单已删除）
-            var sb = $('haBrandSearch');
+            var sb = $('owBrandSearch');
             if (sb) sb.onclick = function () { self.openSearch(); };
             // 所有成员面板默认一律不展开（v1.0.101，v1.0.119 恢复：游客入口已移到顶栏）
             setPanel(false);
-            $('haMask').onclick = function () { setSide(false); setPanel(false); };
+            $('owMask').onclick = function () { setSide(false); setPanel(false); };
             // 创建群聊：侧栏底部按钮（仅登录用户渲染）→ 弹窗
-            if ($('haBtnCreateRoom')) $('haBtnCreateRoom').onclick = function () {
+            if ($('owBtnCreateRoom')) $('owBtnCreateRoom').onclick = function () {
                 setEmoji(false);
                 self.roomCreateModal();
             };
             // 窄屏浮层：点击浮层外部时收起（成员面板 / 左侧栏 / 表情面板 / 「+」菜单）
             document.addEventListener ? document.addEventListener('click', function (e) {
-                var o = $('haOnline'), s = $('haSidebar'), em = $('haEmojiPanel');
+                var o = $('owOnline'), s = $('owSidebar'), em = $('owEmojiPanel');
                 var t = e.target || e.srcElement, inside = false, n = t;
                 while (n) {
-                    if (n === o || n === $('haTogglePanel') || n === s || n === $('haToggleSide')
-                        || n === em || n === $('haBtnEmoji')) { inside = true; break; }
+                    if (n === o || n === $('owTogglePanel') || n === s || n === $('owToggleSide')
+                        || n === em || n === $('owBtnEmoji')) { inside = true; break; }
                     n = n.parentNode;
                 }
                 if (inside) return;
@@ -1198,13 +1198,13 @@
                阈值 120px 而非 40px：触屏上手指惯性滑动很容易冲到 0，
                贴着 0 才触发会出现「已经到底了却没反应」的错觉。
                loadingHistory 是并发闸门 —— 一次请求未回前不再发第二次。 */
-            $('haMessages').onscroll = function () {
+            $('owMessages').onscroll = function () {
                 if (this.scrollTop > 120) return;
                 if (self.historyDone || self.loadingHistory) return;
                 self.loadHistory();
             };
             /* v1.2.18：窗口尺寸变化后重算文件名中间省略。
-               卡片是固定宽度，但 .ha-file-card 仍有 max-width:100% ——
+               卡片是固定宽度，但 .ow-file-card 仍有 max-width:100% ——
                视口窄于卡片时会被压缩，可用宽度随之变化，必须重排。
                去抖 120ms：拖窗口时 resize 会连续触发几十次，
                每次都遍历全部消息重排会明显卡顿。 */
@@ -1218,12 +1218,12 @@
                一 hover 就出现会与快速扫读打架，也会让昵称行一直跳。
                用父容器委托而非逐条绑定：消息频繁重渲染（innerHTML 重建），
                逐条绑定会随重建丢失。
-               计时器挂在 HaChat 上，切换会话时统一清理，避免残留。 */
-            $('haMessages').onmouseover = function (e) {
+               计时器挂在 OwChat 上，切换会话时统一清理，避免残留。 */
+            $('owMessages').onmouseover = function (e) {
                 e = e || w.event;
                 var t = e.target || e.srcElement, node = t;
                 while (node && node !== this) {
-                    if (node.className && (' ' + node.className + ' ').indexOf(' ha-msg ') >= 0) break;
+                    if (node.className && (' ' + node.className + ' ').indexOf(' ow-msg ') >= 0) break;
                     node = node.parentNode;
                 }
                 if (!node || node === this) { self.hideMsgTime(); return; }
@@ -1232,14 +1232,14 @@
                 self._timeMsg = node;
                 self._timeTimer = setTimeout(function () {
                     self._timeTimer = null;
-                    if (self._timeMsg === node) node.className += ' ha-time-show';
+                    if (self._timeMsg === node) node.className += ' ow-time-show';
                 }, 2000);
             };
-            $('haMessages').onmouseout = function (e) {
+            $('owMessages').onmouseout = function (e) {
                 e = e || w.event;
                 var t = e.target || e.srcElement, node = t, to = e.relatedTarget || e.toElement;
                 while (node && node !== this) {
-                    if (node.className && (' ' + node.className + ' ').indexOf(' ha-msg ') >= 0) break;
+                    if (node.className && (' ' + node.className + ' ').indexOf(' ow-msg ') >= 0) break;
                     node = node.parentNode;
                 }
                 if (!node || node === this) return;
@@ -1248,24 +1248,24 @@
                 self.hideMsgTime();
             };
             // v1.2.6：「加载更早消息…」入口节点已移除，改为滚动懒加载
-            // （见上面的 onscroll），故这里不再需要 haLoadMore 的点击委托。
+            // （见上面的 onscroll），故这里不再需要 owLoadMore 的点击委托。
             // 右键消息气泡 → 操作菜单（@/私信/收藏/撤回，插件可追加）
-            $('haMessages').oncontextmenu = function (e) {
+            $('owMessages').oncontextmenu = function (e) {
                 e = e || w.event;
                 var t = e.target || e.srcElement, node = t;
                 while (node && node !== this) {
-                    if (node.id && /^haMsg\d+$/.test(node.id)) break;
+                    if (node.id && /^owMsg\d+$/.test(node.id)) break;
                     node = node.parentNode;
                 }
                 if (!node || node === this || !node.id) { self.hideCtxMenu(); return; }
-                var m = self.msgCache[parseInt(node.id.replace('haMsg', ''), 10)];
+                var m = self.msgCache[parseInt(node.id.replace('owMsg', ''), 10)];
                 if (!m || m.type === 'system' || m.recalled || m.deleted) { self.hideCtxMenu(); return; }
                 if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
                 // 右键落点分流（v1.0.69）：点在头像上 → 对该「人」的操作菜单；
                 // 点在消息内容 / 其它区域 → 对该「消息」的操作菜单（复制 / 引用 / 删除）
                 var onAvatar = false, n2 = e.target || e.srcElement;
                 while (n2 && n2 !== node) {
-                    if (n2.className && String(n2.className).indexOf('ha-avatar') >= 0) { onAvatar = true; break; }
+                    if (n2.className && String(n2.className).indexOf('ow-avatar') >= 0) { onAvatar = true; break; }
                     n2 = n2.parentNode;
                 }
                 if (onAvatar) self.showUserMenu(e.clientX || 0, e.clientY || 0, m);
@@ -1274,7 +1274,7 @@
             };
             // 点击菜单外 / Esc 关闭
             document.onclick = function (e) {
-                var menu = $('haCtxMenu');
+                var menu = $('owCtxMenu');
                 if (!menu || menu.style.display === 'none') return;
                 var t = e.target || e.srcElement;
                 var inside = false, n = t;
@@ -1286,7 +1286,7 @@
                 if (e.keyCode === 27) { self.hideCtxMenu(); setEmoji(false); }
             };
             // 菜单项点击（委托）：执行对应操作后收起菜单
-            $('haCtxMenu').onclick = function (e) {
+            $('owCtxMenu').onclick = function (e) {
                 e = e || w.event;
                 var t = e.target || e.srcElement;
                 // ⚠️ 必须**向上找最近的 <a>**：品牌区菜单首行是「头像+昵称」，
@@ -1303,21 +1303,21 @@
                 self.hideCtxMenu();
                 if (it && it.run) it.run();
             };
-            $('haModalMask').onclick = function (e) { if (e.target === this) self.closeModal(); };
-            $('haImgViewer').onclick = function () { this.style.display = 'none'; };
-            var lo = $('haBtnLogout');
+            $('owModalMask').onclick = function (e) { if (e.target === this) self.closeModal(); };
+            $('owImgViewer').onclick = function () { this.style.display = 'none'; };
+            var lo = $('owBtnLogout');
             if (lo) lo.onclick = function () {
                 self.confirmModal('确定退出登录吗？', function () {
-                    HaApi.secure('logout', {}, function () { location.href = '?page=login'; });
+                    OwApi.secure('logout', {}, function () { location.href = '?page=login'; });
                 });
             };
-            var st = $('haBtnSettings');
+            var st = $('owBtnSettings');
             if (st) st.onclick = function () { self.openSettings(); };
         },
 
         /* ---------- 密码房：通行缓存 + 自研密码弹窗 ---------- */
         // 缓存键（按房间），仅存"已授权到几点"，不存密码本身
-        passCacheKey: function (roomId) { return 'hal_room_pass_' + roomId; },
+        passCacheKey: function (roomId) { return 'owl_room_pass_' + roomId; },
         passCached: function (roomId) {
             var v = 0;
             try { v = parseInt(w.sessionStorage.getItem(this.passCacheKey(roomId)) || '0', 10); } catch (e) {}
@@ -1337,20 +1337,20 @@
             var self = this;
             this.openModal(
                 '<h3>需要密码</h3>'
-                + '<p class="ha-modal-desc">进入「' + esc(roomName) + '」需要密码，验证成功后在有效期内不必重复输入。</p>'
-                + '<div class="ha-form-item"><label>房间密码</label>'
-                + '<input class="ha-input" type="password" id="haRoomPw" autocomplete="off" placeholder="请输入房间密码"></div>'
-                + '<div class="ha-modal-actions">'
-                + '<button class="ha-btn ha-btn-ghost" id="haRoomPwCancel">取消</button>'
-                + '<button class="ha-btn ha-btn-primary" id="haRoomPwOk">进 入</button></div>'
-                + '<div class="ha-form-msg" id="haRoomPwMsg"></div>'
+                + '<p class="ow-modal-desc">进入「' + esc(roomName) + '」需要密码，验证成功后在有效期内不必重复输入。</p>'
+                + '<div class="ow-form-item"><label>房间密码</label>'
+                + '<input class="ow-input" type="password" id="owRoomPw" autocomplete="off" placeholder="请输入房间密码"></div>'
+                + '<div class="ow-modal-actions">'
+                + '<button class="ow-btn ow-btn-ghost" id="owRoomPwCancel">取消</button>'
+                + '<button class="ow-btn ow-btn-primary" id="owRoomPwOk">进 入</button></div>'
+                + '<div class="ow-form-msg" id="owRoomPwMsg"></div>'
             );
-            var input = $('haRoomPw'), msg = $('haRoomPwMsg');
+            var input = $('owRoomPw'), msg = $('owRoomPwMsg');
             var submit = function () {
                 var pw = input.value;
                 if (!pw) { msg.innerHTML = '<span style="color:#C41D1F">请输入密码</span>'; return; }
                 msg.innerHTML = '验证中…';
-                HaApi.post('room_join', { room_id: roomId, password: pw }, function (r) {
+                OwApi.post('room_join', { room_id: roomId, password: pw }, function (r) {
                     if (!r.ok) {
                         msg.innerHTML = '<span style="color:#C41D1F">' + esc(r.msg) + '</span>';
                         input.select();
@@ -1361,8 +1361,8 @@
                     if (onOk) onOk();
                 });
             };
-            $('haRoomPwOk').onclick = submit;
-            $('haRoomPwCancel').onclick = function () { self.closeModal(); };
+            $('owRoomPwOk').onclick = submit;
+            $('owRoomPwCancel').onclick = function () { self.closeModal(); };
             input.onkeydown = function (e) {
                 e = e || w.event;
                 if (e.keyCode === 13) { e.preventDefault ? e.preventDefault() : (e.returnValue = false); submit(); }
@@ -1382,7 +1382,7 @@
             // 白打接口。⚠️ 判断必须写成 `!== 'chat'` 而不是 `=== 'friends'`：
             //   view 现在还可能是插件标签（如 'orders'），只挡 friends 会漏。
             if (this.view !== 'chat') return;
-            HaApi.post('conversations', {}, function (r) {
+            OwApi.post('conversations', {}, function (r) {
                 if (!r.ok) return;
                 self.conversations = r.data;
                 // v1.2.20：原「会话总数徽标」已随标题一起移除（标签条不需要计数，
@@ -1393,7 +1393,7 @@
                     var nm = self.dmNameOf(self.dm.peer);
                     if (nm && nm !== '私聊') {
                         self.roomName = nm;
-                        $('haRoomName').innerHTML = esc(nm);
+                        $('owRoomName').innerHTML = esc(nm);
                     }
                 }
                 self.renderConversations();
@@ -1405,12 +1405,12 @@
            v1.2.20 把它上移为侧栏顶部的常驻标签，与「消息」并列。
 
            面板模型：核心只有两个面板，**都不靠 DOM 创建/销毁**：
-             chat    → #haRoomList（就在 HTML 里，切换只改显隐）
-             friends → 复用同一个 #haRoomList 容器渲染联系人（ChatList 轮子）
+             chat    → #owRoomList（就在 HTML 里，切换只改显隐）
+             friends → 复用同一个 #owRoomList 容器渲染联系人（ChatList 轮子）
            所以「切面板」= 换数据源重渲染 + 切标签高亮，不涉及容器搬运。
 
            插件面板：标签由服务端 Plugin::collect('sidebar.tabs') 产出 HTML，
-           或前端 HaChat.onSideTabs 追加；其内容由插件自己往 #haSidePanels 里写。
+           或前端 OwChat.onSideTabs 追加；其内容由插件自己往 #owSidePanels 里写。
            点插件标签时核心只切换标签高亮并触发 'panel' 回调，不碰插件内容。 */
         view: 'chat',              // 当前标签：'chat' | 'friends' | 插件自定义名
         friends: [],               // 好友列表（含签名，签名可能为空串）
@@ -1427,7 +1427,7 @@
          * @param {Function} opt.onShow  切到该标签时调用，参数为面板容器节点，
          *                               插件把自己的内容写进去（可重复调用，需自行做幂等）
          * @example
-         * HaChat.onSideTabs({
+         * OwChat.onSideTabs({
          *     id: 'orders', label: '订单',
          *     onShow: function (panel) { panel.innerHTML = '<div>我的订单</div>'; }
          * });
@@ -1442,13 +1442,13 @@
         },
 
         /* ---------- 资料卡 meta 顶部扩展点（v1.2.42） ----------
-           需求：等级要**固定在 .ha-card-meta 的最上面**，不能被其它插件的行挤下去。
+           需求：等级要**固定在 .ow-card-meta 的最上面**，不能被其它插件的行挤下去。
            做法：核心在渲染 meta 时把本扩展点的输出**前置**到既有行之前，
            而不是给插件一个空 div 让它们自己 append（那样谁先注册谁在上面，
            且插件一旦改用 prepend 就会互相覆盖）。
            @example
-           HaChat.onCardMetaTop(function (u) {
-               return u.level ? '<div class="ha-card-meta-row">…</div>' : '';
+           OwChat.onCardMetaTop(function (u) {
+               return u.level ? '<div class="ow-card-meta-row">…</div>' : '';
            }, 1);   // prio 小者在前，默认 10
         */
         _cardMetaTop: [],
@@ -1475,7 +1475,7 @@
         /** 绑定标签条点击（委托，只绑一次；插件后加的标签也自动生效） */
         bindSideTabs: function () {
             if (this._tabsInited) return;
-            var bar = $('haSideTabs');
+            var bar = $('owSideTabs');
             if (!bar) return;
             var self = this;
             bar.onclick = function (e) {
@@ -1521,34 +1521,34 @@
 
         /** 只更新标签高亮 + 面板显隐（不碰数据） */
         _paintTabs: function () {
-            var bar = $('haSideTabs');
+            var bar = $('owSideTabs');
             if (bar) {
-                var btns = bar.getElementsByClassName('ha-tab'), i;
+                var btns = bar.getElementsByClassName('ow-tab'), i;
                 for (i = 0; i < btns.length; i++) {
                     var on = btns[i].getAttribute('data-tab') === this.view;
                     // ⚠️ 用 classList 逐项增删而不是整体赋值 ——
                     //   插件可能在自己标签上加了自己的类（如角标定位类），
                     //   整体覆盖 className 会把插件的类一起抹掉。
                     if (btns[i].classList) btns[i].classList[on ? 'add' : 'remove']('is-active');
-                    else btns[i].className = on ? 'ha-tab is-active' : 'ha-tab';
+                    else btns[i].className = on ? 'ow-tab is-active' : 'ow-tab';
                 }
             }
-            // 核心面板：只有「消息 / 联系人」两个，共用 #haRoomList
+            // 核心面板：只有「消息 / 联系人」两个，共用 #owRoomList
             var isCore = (this.view === 'chat' || this.view === 'friends');
-            var list = $('haRoomList'), panels = $('haSidePanels');
+            var list = $('owRoomList'), panels = $('owSidePanels');
             if (list) list.style.display = isCore ? '' : 'none';
             if (panels) panels.style.display = isCore ? 'none' : '';
         },
 
-        /** 插件面板：在 #haSidePanels 里为该标签准备一个容器并回调插件填充 */
+        /** 插件面板：在 #owSidePanels 里为该标签准备一个容器并回调插件填充 */
         _showExtPanel: function (tab) {
-            var wrap = $('haSidePanels');
+            var wrap = $('owSidePanels');
             if (!wrap) return;
-            var panel = document.getElementById('haExtPanel-' + tab);
+            var panel = document.getElementById('owExtPanel-' + tab);
             if (!panel) {
                 panel = document.createElement('div');
-                panel.className = 'ha-tab-panel is-active';
-                panel.id = 'haExtPanel-' + tab;
+                panel.className = 'ow-tab-panel is-active';
+                panel.id = 'owExtPanel-' + tab;
                 panel.setAttribute('data-panel', tab);
                 wrap.appendChild(panel);
             }
@@ -1566,7 +1566,7 @@
             }
             // 标签是服务端渲染的、但前端没注册 onShow：给个空态，不留白板
             if (!panel.innerHTML) {
-                panel.innerHTML = '<div class="ha-cl-empty">该标签页没有内容</div>';
+                panel.innerHTML = '<div class="ow-cl-empty">该标签页没有内容</div>';
             }
         },
 
@@ -1586,7 +1586,7 @@
          */
         loadFriends: function () {
             var self = this;
-            HaApi.post('friends', {}, function (r) {
+            OwApi.post('friends', {}, function (r) {
                 if (!r.ok) {
                     // 游客：服务端返回空数组（friends 对游客直接返回 []），
                     // 正常不会走到这里；真报错说明未登录等异常，给明确提示
@@ -1608,7 +1608,7 @@
             if (!list.length) { this.renderFriends(list); return; }
             var ids = [], i;
             for (i = 0; i < list.length; i++) ids.push(list[i].user_id);
-            HaApi.post('plugin_signature_bulk', { ids: ids }, function (r) {
+            OwApi.post('plugin_signature_bulk', { ids: ids }, function (r) {
                 var sigs = (r && r.ok && r.signatures) || {};
                 for (var k = 0; k < self.friends.length; k++) {
                     var uid = self.friends[k].user_id;
@@ -1631,7 +1631,7 @@
          *     正在打字的消息就发到别处去了（用户明确要求避免这个）。 */
         addFriend: function (uid) {
             var self = this;
-            HaApi.post('friend_add', { friend_id: uid }, function (r) {
+            OwApi.post('friend_add', { friend_id: uid }, function (r) {
                 toast(r.msg || (r.ok ? '已添加' : '添加失败'));
                 if (!r.ok) return;
                 // 刷新资料卡让按钮切成「删除好友」（不切换会话）
@@ -1641,10 +1641,10 @@
             });
         },
 
-        /** 删除联系人。走 HaApi.secure —— friend_remove 在 $SENSITIVE 内，需一次性票据。 */
+        /** 删除联系人。走 OwApi.secure —— friend_remove 在 $SENSITIVE 内，需一次性票据。 */
         removeFriend: function (uid) {
             var self = this;
-            HaApi.secure('friend_remove', { friend_id: uid }, function (r) {
+            OwApi.secure('friend_remove', { friend_id: uid }, function (r) {
                 toast(r.msg || (r.ok ? '已删除' : '删除失败'));
                 if (!r.ok) return;
                 self.userCard(uid);
@@ -1665,7 +1665,7 @@
          *     联系人列表没有消息流，这个时间对用户没有参考价值。
          */
         renderFriends: function (list) {
-            var self = this, box = $('haRoomList');
+            var self = this, box = $('owRoomList');
             if (!box) return;
             var rows = [], i;
             for (i = 0; i < (list || []).length; i++) {
@@ -1679,7 +1679,7 @@
             }
             // v1.2.20：联系人数量徽标一并移除（与消息标签同理，计数非必要信息）
             ChatList.render(rows, {
-                container: 'haRoomList',
+                container: 'owRoomList',
                 activeKey: this.dm ? ('dm:' + this.dm.peer) : '',
                 emptyText: '还没有联系人，去「成员管理」或资料卡添加吧',
                 hideTime: true,          // v1.2.28：取消右上角时间
@@ -1732,7 +1732,7 @@
             if (this.view !== 'chat') return;
             var activeKey = this.dm ? ('dm:' + this.dm.peer) : ('room:' + this.room);
             ChatList.render(list, {
-                container: 'haRoomList',
+                container: 'owRoomList',
                 activeKey: activeKey,
                 emptyText: '暂无会话',
                 onClick: function (el) {
@@ -1749,7 +1749,7 @@
                     // 群聊：先不带密码尝试一次（是否需要密码由服务端判定）
                     // v1.2.27：join=1 表示用户已在前台确认「加入」→ 服务端写 room_members
                     var tryJoin = function (password, join) {
-                        HaApi.post('room_join', { room_id: id, password: password || '', join: join ? 1 : 0 }, function (rr) {
+                        OwApi.post('room_join', { room_id: id, password: password || '', join: join ? 1 : 0 }, function (rr) {
                             if (!rr.ok) {
                                 if (rr.need_password) {
                                     if (password) toast(rr.msg);
@@ -1786,13 +1786,13 @@
                 }
             });
             // 密码房标签：轮子渲染后补（数据里 need_password 时显示）
-            var items = $('haRoomList').getElementsByTagName('li'), i;
+            var items = $('owRoomList').getElementsByTagName('li'), i;
             for (i = 0; i < items.length; i++) {
-                if (items[i].getAttribute('data-pw') === '1' && items[i].querySelector('.ha-cl-lock')) continue;
+                if (items[i].getAttribute('data-pw') === '1' && items[i].querySelector('.ow-cl-lock')) continue;
                 if (items[i].getAttribute('data-pw') === '1') {
-                    var t = items[i].querySelector('.ha-cl-title');
-                    if (t && !t.querySelector('.ha-cl-lock')) {
-                        t.innerHTML += '<span class="ha-cl-tag ha-cl-lock">密码房</span>';
+                    var t = items[i].querySelector('.ow-cl-title');
+                    if (t && !t.querySelector('.ow-cl-lock')) {
+                        t.innerHTML += '<span class="ow-cl-tag ow-cl-lock">密码房</span>';
                     }
                 }
             }
@@ -1813,7 +1813,7 @@
             if (this.dm && this.dm.peer === peer) {
                 if (name && name !== this.roomName && name !== '私聊') {
                     this.roomName = name;
-                    $('haRoomName').innerHTML = esc(name);
+                    $('owRoomName').innerHTML = esc(name);
                 }
                 return;
             }
@@ -1836,23 +1836,23 @@
             this.syncRoomOwner();
             this.renderMe();
             this.clearQuote();
-            $('haRoomName').innerHTML = esc(this.roomName);
+            $('owRoomName').innerHTML = esc(this.roomName);
             this.hideMsgTime();   // v1.1.0：消息区重渲染前清掉悬停计时（引用的元素已不存在）
-            $('haMessages').innerHTML = '';   // v1.2.6：改懒加载，不再放「加载更早消息…」入口节点
-            ChatList.activate('haRoomList', 'dm:' + peer);
-            $('haSidebar').className = $('haSidebar').className.replace(' open', '');
+            $('owMessages').innerHTML = '';   // v1.2.6：改懒加载，不再放「加载更早消息…」入口节点
+            ChatList.activate('owRoomList', 'dm:' + peer);
+            $('owSidebar').className = $('owSidebar').className.replace(' open', '');
             this.setDmUrl(peer);
             this.scrollBottom();
             // 历史：迟到响应需校验仍停留在同一私聊，否则丢弃（避免串到别的会话）
             var myPeer = peer;
-            HaApi.post('dm_history', { peer: myPeer, before_id: 0 }, function (r) {
+            OwApi.post('dm_history', { peer: myPeer, before_id: 0 }, function (r) {
                 if (!self.dm || self.dm.peer !== myPeer) return;
                 if (!r.ok) { toast(r.msg); return; }
                 // 服务端一并回传对方资料：首次私聊时会话列表里还没有该项，
                 // 靠这里把标题从占位「私聊」换成真实昵称
                 if (r.peer && r.peer.name && r.peer.name !== self.roomName) {
                     self.roomName = r.peer.name;
-                    $('haRoomName').innerHTML = esc(r.peer.name);
+                    $('owRoomName').innerHTML = esc(r.peer.name);
                 }
                 for (var i = 0; i < r.data.length; i++) self.addMessage(r.data[i], true);
                 if (r.data.length) self.since = r.data[r.data.length - 1].id;
@@ -1886,7 +1886,7 @@
             var alive = function () { return self.dm && self.dm.peer === peer && self.dmGen === myGen; };
             this._dmPollBusy = true;
             var t0 = new Date().getTime();
-            HaApi.post('dm_poll', { peer: peer, since_id: since }, function (r) {
+            OwApi.post('dm_poll', { peer: peer, since_id: since }, function (r) {
                 if (!alive()) { self._dmPollBusy = false; return; }
                 self._dmPollBusy = false;
                 if (r && r.ok) {
@@ -1897,8 +1897,8 @@
                         self.scrollBottom();
                         if (self.sound) beep();
                     }
-                    $('haLatency').innerHTML = '● ' + (new Date().getTime() - t0) + ' ms';
-                    $('haLatency').style.color = '#237804';
+                    $('owLatency').innerHTML = '● ' + (new Date().getTime() - t0) + ' ms';
+                    $('owLatency').style.color = '#237804';
                     // 有新消息即刷新会话列表（排序会因这条消息而变）
                     if (hasNew) self.loadConversations();
                 }
@@ -1986,10 +1986,10 @@
          * 注册「群聊信息入口区渲染」回调：fn({ roomId, ownerId, isAdmin, isOwner })。
          * v1.1.1：触发时机从「打开群聊设置弹窗」改为「右侧栏群聊信息区渲染」
          * （init / 切群 / 进私聊 / 打开侧栏 / 保存群资料后都会触发），
-         * 可往 #haREExtras 追加入口。
-         * v1.1.10：群资料表单已搬回弹窗，#haREExtras 现在是**入口行容器**
-         * （不再是表单里的一行），插件入口不再与表单耦合；请用 .ha-panel-entry
-         * 类保持与「群聊设置」行一致的外观。#haREExtras 必定存在，
+         * 可往 #owREExtras 追加入口。
+         * v1.1.10：群资料表单已搬回弹窗，#owREExtras 现在是**入口行容器**
+         * （不再是表单里的一行），插件入口不再与表单耦合；请用 .ow-panel-entry
+         * 类保持与「群聊设置」行一致的外观。#owREExtras 必定存在，
          * 但插件应按 ctx.isOwner || ctx.isAdmin 自行决定是否填充。
          */
         onRoomEdit: function (fn) { if (typeof fn === 'function') this._roomEditHooks.push(fn); },
@@ -2043,21 +2043,21 @@
             this.syncRoomOwner();
             this.renderMe();   // 资料区身份标签随群聊变化（群主/会员归属当前群）
             this.clearQuote();
-            $('haRoomName').innerHTML = esc(name);
+            $('owRoomName').innerHTML = esc(name);
             this.hideMsgTime();   // v1.1.0：消息区重渲染前清掉悬停计时（引用的元素已不存在）
-            $('haMessages').innerHTML = '';   // v1.2.6：改懒加载，不再放「加载更早消息…」入口节点
-            var items = $('haRoomList').getElementsByTagName('li'), i;
+            $('owMessages').innerHTML = '';   // v1.2.6：改懒加载，不再放「加载更早消息…」入口节点
+            var items = $('owRoomList').getElementsByTagName('li'), i;
             for (i = 0; i < items.length; i++) {
                 items[i].className = items[i].className.replace(' active', '');
                 // 未传 el（前进/后退、创建群聊跳转等）时按 data-room 自动定位高亮
                 if (!el && String(items[i].getAttribute('data-room')) === String(id)) el = items[i];
             }
             if (el) el.className += ' active';
-            $('haSidebar').className = $('haSidebar').className.replace(' open', '');
+            $('owSidebar').className = $('owSidebar').className.replace(' open', '');
             if (!fromPop) this.setRoomUrl(id, false);
             var self = this;
             var load = function () {
-                HaApi.post('history', { room_id: id, before: 0 }, function (r) {
+                OwApi.post('history', { room_id: id, before: 0 }, function (r) {
                     // 已切走（切到私聊或别的群）则丢弃迟到响应
                     if (self.dm || self.room !== id) return;
                     if (r.ok) {
@@ -2087,7 +2087,7 @@
         /* ---------- 长轮询（主通道）+ 断线降级短轮询 ----------
            v1.1.0：引入 pollGen 世代号。群聊与私聊共用同一套消息区/输入栏，
            两条长轮询必须互斥——切换视图时自增世代号，旧循环醒来即自杀，
-           避免两个 in-flight 请求同时刷新同一个 #haMessages、互相覆盖 since。 */
+           避免两个 in-flight 请求同时刷新同一个 #owMessages、互相覆盖 since。 */
         startPoll: function () {
             var self = this;
             var myGen = this.pollGen = (this.pollGen || 0) + 1;
@@ -2096,7 +2096,7 @@
                 if (!alive()) return;
                 var roomId = self.room, since = self.since;
                 var t0 = new Date().getTime();
-                HaApi.post('poll', { room_id: roomId, since: since }, function (r, status) {
+                OwApi.post('poll', { room_id: roomId, since: since }, function (r, status) {
                     if (!alive()) return;
                     if (!r || !r.ok) {
                         // 密码房授权过期：停止轮询，重新验证后继续
@@ -2108,15 +2108,15 @@
                         self.failCount++;
                         // 降级：短轮询 + 指数退避（2s → 10s 封顶）
                         var wait = Math.min(10000, 2000 * self.failCount);
-                        $('haLatency').innerHTML = '重连中…';
-                        $('haLatency').style.color = '#C41D1F';
+                        $('owLatency').innerHTML = '重连中…';
+                        $('owLatency').style.color = '#C41D1F';
                         setTimeout(loop, wait);
                         return;
                     }
                     self.failCount = 0;
                     var ms = new Date().getTime() - t0;
-                    $('haLatency').innerHTML = '● ' + ms + ' ms';
-                    $('haLatency').style.color = '#237804';
+                    $('owLatency').innerHTML = '● ' + ms + ' ms';
+                    $('owLatency').style.color = '#237804';
                     self.since = r.since;
                     var i, hasNew = false;
                     for (i = 0; i < r.messages.length; i++) {
@@ -2144,7 +2144,7 @@
         inputMaxH: 120,      // 自动增高上限（拖拽可上调）
         inputUserH: 0,       // 用户手动拖出的高度（0=未设置，走自动增高）
         autoGrow: function () {
-            var el = $('haInput');
+            var el = $('owInput');
             if (!el) return;
             el.style.height = 'auto';
             var h = el.scrollHeight + 2;
@@ -2157,7 +2157,7 @@
             el.style.height = Math.max(min, Math.min(h, this.inputMaxH)) + 'px';
         },
         bindInputResize: function () {
-            var self = this, el = $('haInput'), handle = $('haInputResize');
+            var self = this, el = $('owInput'), handle = $('owInputResize');
             if (!el || !handle) return;
             handle.onmousedown = function (e) {
                 e = e || w.event;
@@ -2169,7 +2169,7 @@
                     h = Math.max(40, Math.min(h, 320));
                     self.inputUserH = h;
                     el.style.height = h + 'px';
-                    try { w.localStorage.setItem('hal_input_h', String(h)); } catch (err) {}
+                    try { w.localStorage.setItem('owl_input_h', String(h)); } catch (err) {}
                 };
                 document.onmouseup = function () {
                     document.onmousemove = null;
@@ -2183,7 +2183,7 @@
         // 统一构建消息 DOM：头像一侧依次是「用户组标签、昵称」；
         // 时间不直接显示，悬停气泡满 2 秒才显示；操作（@/私信/收藏/撤回等）改为右键菜单
         buildMessage: function (m) {
-            var cls = 'ha-msg';
+            var cls = 'ow-msg';
             if (m.mine) cls += ' mine';
             if (m.type === 'mention') cls += ' mention';
             // v1.2.1：私聊标识来自服务端下发的 dm 位，不能再靠 m.type==='private'
@@ -2195,31 +2195,31 @@
             if (m.deleted) cls += ' deleted';
 
             var content;
-            if (m.deleted) content = '<span class="ha-msg-content">该消息已删除</span>';
-            else if (m.recalled) content = '<span class="ha-msg-content">此消息已撤回</span>';
-            // v1.2.13：图片与文件**不再套 .ha-msg-content 气泡**。
+            if (m.deleted) content = '<span class="ow-msg-content">该消息已删除</span>';
+            else if (m.recalled) content = '<span class="ow-msg-content">此消息已撤回</span>';
+            // v1.2.13：图片与文件**不再套 .ow-msg-content 气泡**。
             // v1.2.7 把气泡底改成纯白后，这两种消息就多了一层「白底座」——
-            // 图片外一圈白、文件卡片里又一层白（.ha-file-card 自带 background+border），
+            // 图片外一圈白、文件卡片里又一层白（.ow-file-card 自带 background+border），
             // 呈现为白底里再套一个白框，视觉上像「双重边框」，很脏。
-            // 两者自身都已具备完整外观：.ha-msg-img 有圆角，.ha-file-card 有白底+边框。
-            // ⚠️ 不能靠「给 .ha-msg-content 加 class 再改 CSS」绕：那类节点还要参与
-            // markRecalled 的 outerHTML 替换与引用跳转的 querySelector('.ha-msg-content')，
+            // 两者自身都已具备完整外观：.ow-msg-img 有圆角，.ow-file-card 有白底+边框。
+            // ⚠️ 不能靠「给 .ow-msg-content 加 class 再改 CSS」绕：那类节点还要参与
+            // markRecalled 的 outerHTML 替换与引用跳转的 querySelector('.ow-msg-content')，
             // 去掉节点最干净。留空 span 反而会破坏 flex 基线对齐。
-            else if (m.type === 'file') content = '<span class="ha-msg-plain">' + fileCardHtml(m) + '</span>';
-            else if (m.type === 'image') content = '<span class="ha-msg-plain"><img class="ha-msg-img" src="' + esc(m.content) + '" onclick="HaChat.viewImg(this.src)" alt="图片"></span>';
-            else content = '<span class="ha-msg-content">' + (m.quote && (m.quote.nick || m.quote.text)
-                    ? '<span class="ha-msg-quote' + (m.quote.id ? ' ha-quote-link' : '') + '"'
-                      + (m.quote.id ? ' title="点击查看原消息" onclick="HaChat.jumpToQuote(' + (m.quote.id | 0) + ')"' : '')
+            else if (m.type === 'file') content = '<span class="ow-msg-plain">' + fileCardHtml(m) + '</span>';
+            else if (m.type === 'image') content = '<span class="ow-msg-plain"><img class="ow-msg-img" src="' + esc(m.content) + '" onclick="OwChat.viewImg(this.src)" alt="图片"></span>';
+            else content = '<span class="ow-msg-content">' + (m.quote && (m.quote.nick || m.quote.text)
+                    ? '<span class="ow-msg-quote' + (m.quote.id ? ' ow-quote-link' : '') + '"'
+                      + (m.quote.id ? ' title="点击查看原消息" onclick="OwChat.jumpToQuote(' + (m.quote.id | 0) + ')"' : '')
                       + '><b>' + esc(m.quote.nick || '') + '</b>'
                       + (m.quote.nick ? '：' : '') + esc(m.quote.text || '') + '</span>'
                     : '') + esc(m.content) + '</span>';
 
             var isSys = m.type === 'system';
             // meta 行：头像一侧依次是「用户组标签、昵称」；时间不直接显示，
-            // 悬停满 2 秒才显示（见 ha-time-show 类与 hideMsgTime）
-            var timeHtml = '<span class="ha-msg-time">' + esc(m.date + ' ' + m.time) + '</span>';
+            // 悬停满 2 秒才显示（见 ow-time-show 类与 hideMsgTime）
+            var timeHtml = '<span class="ow-msg-time">' + esc(m.date + ' ' + m.time) + '</span>';
             var mainPart = roleTag(m.role, m.title, m.uid)
-                + ' <span class="ha-msg-nick" onclick="HaChat.userCard(' + (m.uid || 0) + ',\'' + esc(m.nickname) + '\')">' + esc(m.nickname) + '</span>';
+                + ' <span class="ow-msg-nick" onclick="OwChat.userCard(' + (m.uid || 0) + ',\'' + esc(m.nickname) + '\')">' + esc(m.nickname) + '</span>';
             // v1.1.0：去掉昵称后的「→ 昵称」私信文字标签。
             // 私聊会话页双方已确定；群聊内的 @提及 足以定位发给人，额外标注纯噪音。
             //
@@ -2229,19 +2229,19 @@
             // 判定用 m.dm（服务端下发的私聊标识），不靠 m.type —— v1.2.1 起
             // 私聊里的图片/文件消息 type 分别是 image/file，用 type 会漏判。
             // ⚠️ 悬停时间也一并去掉：meta 行整体不渲染，留个空 div 只会破坏
-            // flex 布局与 .ha-msg-body 的基线对齐。
+            // flex 布局与 .ow-msg-body 的基线对齐。
             var meta = (isSys || m.dm) ? '' :
-                '<div class="ha-msg-meta">' + mainPart + timeHtml + '</div>';
+                '<div class="ow-msg-meta">' + mainPart + timeHtml + '</div>';
 
             return {
                 cls: cls,
                 // v1.1.8：消息头像与昵称一样可点 —— 左击头像即打开该用户资料卡
                 //（原先只有昵称带 onclick，头像是纯展示，两处行为不一致）。
                 // 游客（uid 为 0）传 0，userCard 内部会走 pmHint 提示不可查看。
-                // 加 .ha-msg-av 可点类供 CSS 给 cursor:pointer 与 hover 反馈。
-                html: (isSys ? '' : '<span class="ha-msg-av" onclick="HaChat.userCard(' + (m.uid || 0) + ',\'' + esc(m.nickname) + '\')">'
+                // 加 .ow-msg-av 可点类供 CSS 给 cursor:pointer 与 hover 反馈。
+                html: (isSys ? '' : '<span class="ow-msg-av" onclick="OwChat.userCard(' + (m.uid || 0) + ',\'' + esc(m.nickname) + '\')">'
                     + avatarHtml(m.avatar, m.nickname, false, m.role) + '</span>')
-                    + '<div class="ha-msg-body">' + meta + content + '</div>'
+                    + '<div class="ow-msg-body">' + meta + content + '</div>'
             };
         },
 
@@ -2266,41 +2266,41 @@
             var autoName = ((me0.nickname || '') || '我') + '的群聊';
             this.openModal(
                 '<h3>创建群聊</h3>'
-                + '<div class="ha-form-item"><label>群名称（可选）</label><input class="ha-input" id="haRCName" maxlength="30"'
+                + '<div class="ow-form-item"><label>群名称（可选）</label><input class="ow-input" id="owRCName" maxlength="30"'
                 + ' placeholder="留空默认「' + esc(autoName) + '」"></div>'
-                + '<div class="ha-form-item"><label>类型</label><select class="ha-input" id="haRCType">'
+                + '<div class="ow-form-item"><label>类型</label><select class="ow-input" id="owRCType">'
                 + opts(TYPE, ['public', 'password', 'role'], 'public') + '</select></div>'
-                + '<div class="ha-form-item" id="haRCPassRow" style="display:none"><label>房间密码</label><input class="ha-input" type="password" id="haRCPass" placeholder="密码群必须设置密码"></div>'
-                + '<div class="ha-form-item" id="haRCRoleRow" style="display:none"><label>最低进入角色</label><select class="ha-input" id="haRCRole">'
+                + '<div class="ow-form-item" id="owRCPassRow" style="display:none"><label>房间密码</label><input class="ow-input" type="password" id="owRCPass" placeholder="密码群必须设置密码"></div>'
+                + '<div class="ow-form-item" id="owRCRoleRow" style="display:none"><label>最低进入角色</label><select class="ow-input" id="owRCRole">'
                 + opts(ROLE, ['guest', 'member', 'vip', 'admin'], 'guest') + '</select></div>'
-                + '<div class="ha-form-item"><label>群简介（可选）</label><input class="ha-input" id="haRCDesc" maxlength="200" placeholder="一句话介绍这个群"></div>'
+                + '<div class="ow-form-item"><label>群简介（可选）</label><input class="ow-input" id="owRCDesc" maxlength="200" placeholder="一句话介绍这个群"></div>'
                 // v1.1.11 公开性 State 开关。与上面的「类型」正交：
                 // 类型管「进入方式」（密码/角色门槛），开关管「谁能发现这个群」。
                 // v1.1.14：后台总闸关闭时对当前身份禁用（canPrivate 由服务端按身份算好后下发），
                 // 避免留下「能点、提交必报错」的死开关。
                 // v1.1.16：删掉「开启：显示在群聊列表，游客可进入并发言。关闭：不进公开列表…」，
                 // 同样的理由（读着绕 + 「游客可发言」并非恒成立）。
-                // 「谁能看到这个群」由下方 haRCPubNote 随开关实时说明，不重复写死。
-                + '<div class="ha-form-item ha-form-item-switch">'
+                // 「谁能看到这个群」由下方 owRCPubNote 随开关实时说明，不重复写死。
+                + '<div class="ow-form-item ow-form-item-switch">'
                 // v1.1.18 修正：公开性开关的标签改回「公开群聊」。
                 // v1.1.16 曾把 is_public 也译成「普通」，与同弹窗里 type=public 的
                 // 「普通」撞词 → 两个「普通」并排，用户以为公开性开关消失了。
                 // 定案：**类型**= 普通/密码群/角色限定，**公开性**= 公开/仅邀请。
-                + switchHtml('haRCPublic', '公开群聊', true,
+                + switchHtml('owRCPublic', '公开群聊', true,
                     canPrivate ? ''
                                : '站点已关闭「创建仅邀请群聊」，新群只能公开（管理员不受此限制）。',
                     !canPrivate)
                 + '</div>'
-                + '<div class="ha-form-msg ha-rc-note" id="haRCPubNote"></div>'
-                + '<div class="ha-room-form-tip" id="haRCTip"></div>'
-                + '<div class="ha-form-msg" id="haRCMsg"></div>'
-                + '<div class="ha-modal-actions">'
-                + '<button class="ha-btn ha-btn-ghost" id="haRCCancel">取消</button>'
-                + '<button class="ha-btn ha-btn-primary" id="haRCCreate">创 建</button></div>'
+                + '<div class="ow-form-msg ow-rc-note" id="owRCPubNote"></div>'
+                + '<div class="ow-room-form-tip" id="owRCTip"></div>'
+                + '<div class="ow-form-msg" id="owRCMsg"></div>'
+                + '<div class="ow-modal-actions">'
+                + '<button class="ow-btn ow-btn-ghost" id="owRCCancel">取消</button>'
+                + '<button class="ow-btn ow-btn-primary" id="owRCCreate">创 建</button></div>'
             );
-            bindSwitches($('haModal'));
-            var typeSel = $('haRCType'), tip = $('haRCTip'), msg = $('haRCMsg');
-            var pubBox = $('haRCPublic'), pubNote = $('haRCPubNote');
+            bindSwitches($('owModal'));
+            var typeSel = $('owRCType'), tip = $('owRCTip'), msg = $('owRCMsg');
+            var pubBox = $('owRCPublic'), pubNote = $('owRCPubNote');
             // 公开性提示随开关变化：把「谁能进这个群」讲清楚，避免建完才发现进不去。
             // v1.1.18：措辞改回「公开 / 仅邀请」。v1.1.16 误用「普通」，与类型撞词。
             var refreshPub = function () {
@@ -2309,24 +2309,24 @@
                     return;
                 }
                 pubNote.innerHTML = pubBox.checked
-                    ? '<span style="color:var(--ha-text-sub)">群聊将出现在左侧列表，所有人（含游客）都能看到并进入。</span>'
+                    ? '<span style="color:var(--ow-text-sub)">群聊将出现在左侧列表，所有人（含游客）都能看到并进入。</span>'
                     : '<span style="color:#C41D1F">仅邀请：群聊不会出现在列表里。创建后只有你能进，其他人需要你或群成员在群聊设置里按用户 ID 邀请。</span>';
             };
             pubBox.onchange = refreshPub;
             refreshPub();
             var refreshTip = function () {
                 var t = typeSel.value;
-                $('haRCPassRow').style.display = t === 'password' ? 'block' : 'none';
-                $('haRCRoleRow').style.display = t === 'role' ? 'block' : 'none';
+                $('owRCPassRow').style.display = t === 'password' ? 'block' : 'none';
+                $('owRCRoleRow').style.display = t === 'role' ? 'block' : 'none';
             };
             typeSel.onchange = refreshTip;
             refreshTip();
             // v1.2.44：建群前置提示 —— 名额 / 是否需花积分 / 为什么不能建。
             //   先问服务端再渲染（异步），拿到前保持按钮可用（乐观），
             //   ⚠️ 不能反过来先禁用再放开：请求失败时用户会卡在一个永远点不动的按钮上。
-            tip.innerHTML = '<span style="color:var(--ha-text-sub)">检查创建资格…</span>';
+            tip.innerHTML = '<span style="color:var(--ow-text-sub)">检查创建资格…</span>';
             var gateInfo = null;
-            HaApi.post('room_create_gate', {}, function (rg) {
+            OwApi.post('room_create_gate', {}, function (rg) {
                 gateInfo = (rg && rg.ok) ? rg.gate : null;
                 renderGateTip();
             });
@@ -2339,9 +2339,9 @@
                 var html = '';
                 if (!g.allowed) {
                     html = '<span style="color:#C41D1F">' + esc(g.reason || '当前无法创建群聊') + '</span>';
-                    $('haRCCreate').disabled = true;
-                    $('haRCCreate').style.opacity = '.5';
-                    $('haRCCreate').style.cursor = 'not-allowed';
+                    $('owRCCreate').disabled = true;
+                    $('owRCCreate').style.opacity = '.5';
+                    $('owRCCreate').style.cursor = 'not-allowed';
                 } else if (g.cost > 0) {
                     var why = (typeof g.level === 'number' && g.min_room_level && g.level < g.min_room_level)
                         ? '建群需 <b>' + g.min_room_level + '</b> 级（当前 Lv.' + g.level + '）'
@@ -2351,16 +2351,16 @@
                     if (g.points < g.cost) {
                         html += '<br><span style="color:#C41D1F">积分不足：还需 <b>'
                             + (g.cost - g.points) + '</b> 积分。</span>';
-                        $('haRCCreate').disabled = true;
-                        $('haRCCreate').style.opacity = '.5';
-                        $('haRCCreate').style.cursor = 'not-allowed';
+                        $('owRCCreate').disabled = true;
+                        $('owRCCreate').style.opacity = '.5';
+                        $('owRCCreate').style.cursor = 'not-allowed';
                     }
                 } else if (g.quota > 0) {
-                    html = '<span style="color:var(--ha-text-sub)">免费名额 <b>' + g.used + '</b> / <b>'
+                    html = '<span style="color:var(--ow-text-sub)">免费名额 <b>' + g.used + '</b> / <b>'
                         + g.quota + '</b>（超出后可用积分创建）。</span>';
                 } else if (g.quota === 0 && !g.level) {
                     // gate 字段全为默认值 = 没有任何插件接管（未安装 / 已停用 / 超管）
-                    html = '<span style="color:var(--ha-text-sub)">创建群聊不受等级或名额限制。</span>';
+                    html = '<span style="color:var(--ow-text-sub)">创建群聊不受等级或名额限制。</span>';
                 } else {
                     html = '';
                 }
@@ -2372,7 +2372,7 @@
                         + esc(gateInfo.reason || '当前无法创建群聊') + '</span>';
                     return;
                 }
-                var name = $('haRCName').value.replace(/^\s+|\s+$/g, '');
+                var name = $('owRCName').value.replace(/^\s+|\s+$/g, '');
                 /* v1.2.19：空 = 合法（走默认名）；填了才校验长度。
                    ⚠️ 不能写成 `name.length < 2` —— 那会把「留空」也判成非法，
                    与「可选」的设计直接矛盾。 */
@@ -2382,15 +2382,15 @@
                     return;
                 }
                 var t = typeSel.value;
-                if (t === 'password' && !$('haRCPass').value) {
+                if (t === 'password' && !$('owRCPass').value) {
                     msg.innerHTML = '<span style="color:#C41D1F">密码群必须设置密码</span>'; return;
                 }
                 msg.innerHTML = '创建中…';
-                HaApi.post('room_create', {
-                    name: name, type: t, password: $('haRCPass') ? $('haRCPass').value : '',
-                    min_role: $('haRCRole').value,
+                OwApi.post('room_create', {
+                    name: name, type: t, password: $('owRCPass') ? $('owRCPass').value : '',
+                    min_role: $('owRCRole').value,
                     // v1.1.11：公开性开关。传 '0'/'1' 字符串，服务端按 === '0' 归一
-                    description: $('haRCDesc').value,
+                    description: $('owRCDesc').value,
                     is_public: pubBox.checked ? '1' : '0'
                 }, function (r) {
                     if (!r.ok) { msg.innerHTML = '<span style="color:#C41D1F">' + esc(r.msg) + '</span>'; return; }
@@ -2401,14 +2401,14 @@
                     self.refreshRooms(r.id, r.name);
                 });
             };
-            $('haRCCreate').onclick = submit;
-            $('haRCCancel').onclick = function () { self.closeModal(); };
+            $('owRCCreate').onclick = submit;
+            $('owRCCancel').onclick = function () { self.closeModal(); };
         },
 
         /** 重新拉取房间列表并定位到指定房间 */
         refreshRooms: function (gotoId, gotoName) {
             var self = this;
-            HaApi.post('rooms', {}, function (r) {
+            OwApi.post('rooms', {}, function (r) {
                 if (!r.ok) return;
                 self.cfg.rooms = r.data;
                 self.loadConversations();   // v1.1.0：列表为群聊+私聊聚合，须走 conversations
@@ -2417,7 +2417,7 @@
                 if (found) {
                     self.switchRoom(gotoId, found.name, null);
                 } else if (gotoName) {
-                    $('haRoomName').innerHTML = esc(gotoName);
+                    $('owRoomName').innerHTML = esc(gotoName);
                 }
             });
         },
@@ -2473,7 +2473,7 @@
         /** 生成一个时间戳分隔节点（不进 msgCache，它不是消息） */
         buildTimeDivider: function (ts) {
             var el = document.createElement('div');
-            el.className = 'ha-time-divider';
+            el.className = 'ow-time-divider';
             var span = document.createElement('span');
             span.textContent = this.timeDividerText(ts);
             el.appendChild(span);
@@ -2488,15 +2488,15 @@
          * 那是 addMessage 追加路径才需要的。
          */
         tsOfRef: function (ref) {
-            if (!ref || !ref.id || ref.id.indexOf('haMsg') !== 0) return 0;
-            var c = this.msgCache[parseInt(ref.id.replace('haMsg', ''), 10)];
+            if (!ref || !ref.id || ref.id.indexOf('owMsg') !== 0) return 0;
+            var c = this.msgCache[parseInt(ref.id.replace('owMsg', ''), 10)];
             return c ? (parseInt(c.ts, 10) || 0) : 0;
         },
 
         addMessage: function (m, batch) {
 
-            var box = $('haMessages');
-            var exist = document.getElementById('haMsg' + m.id);
+            var box = $('owMessages');
+            var exist = document.getElementById('owMsg' + m.id);
             if (exist) {
                 // 轮询带回撤回状态时，同步更新已渲染的气泡（否则撤回后界面不变）
                 if (m.recalled) this.markRecalled(m.id);
@@ -2506,39 +2506,39 @@
             var b = this.buildMessage(m);
             var div = document.createElement('div');
             div.className = b.cls;
-            div.id = 'haMsg' + m.id;
+            div.id = 'owMsg' + m.id;
             div.innerHTML = b.html;
 
             // 时间戳：与已渲染的最后一条比时间（末尾追加路径）
-            var lastMsg = null, kids = box.querySelectorAll('.ha-msg'), i;
+            var lastMsg = null, kids = box.querySelectorAll('.ow-msg'), i;
             for (i = kids.length - 1; i >= 0; i--) { lastMsg = kids[i]; break; }
             var prevTs = 0;
             if (lastMsg) {
-                var c = this.msgCache[parseInt(lastMsg.id.replace('haMsg', ''), 10)];
+                var c = this.msgCache[parseInt(lastMsg.id.replace('owMsg', ''), 10)];
                 prevTs = c ? (parseInt(c.ts, 10) || 0) : 0;
             }
             if (this.needTimeDivider(prevTs, m.ts)) box.appendChild(this.buildTimeDivider(m.ts));
             box.appendChild(div);
             // v1.2.18：文件名中间省略必须在**入 DOM 之后**量宽（见 fitFileName 注释），
             // 同一帧内的多次插入由 scheduleFitFileName 合并成一次重排。
-            if (b.html.indexOf('ha-file-name') >= 0) scheduleFitFileName(div);
+            if (b.html.indexOf('ow-file-name') >= 0) scheduleFitFileName(div);
 
             // ⚠️ 裁剪条件必须按**消息条数**算，不能用 children.length ——
             // children 里混着时间戳节点，用它算会让上限被时间戳虚增，
             // 导致实际消息数远未到 500 就开始裁（表现为「消息莫名变少」）。
             if (!batch) {
-                var msgCount = box.getElementsByClassName('ha-msg').length;
+                var msgCount = box.getElementsByClassName('ow-msg').length;
                 while (msgCount > 500) {
                     // 只删「最靠上的那条消息」，并连带它**之后**紧跟的时间戳节点，
                     // 否则会留下一个失去参照的孤儿时间戳在顶部。
-                    var old = box.querySelector('.ha-msg');
+                    var old = box.querySelector('.ow-msg');
                     if (!old) break;
-                    var oid = parseInt((old.id || '').replace('haMsg', ''), 10);
+                    var oid = parseInt((old.id || '').replace('owMsg', ''), 10);
                     if (oid) delete this.msgCache[oid];
                     var after = old.nextSibling;
                     box.removeChild(old);
                     if (after && after.className
-                        && after.className.indexOf('ha-time-divider') >= 0) {
+                        && after.className.indexOf('ow-time-divider') >= 0) {
                         box.removeChild(after);
                     }
                     msgCount--;
@@ -2548,16 +2548,16 @@
 
         /** 把某条消息的气泡更新为「已撤回」状态 */
         markRecalled: function (id) {
-            var el = document.getElementById('haMsg' + id);
+            var el = document.getElementById('owMsg' + id);
             if (!el || el.className.indexOf('recalled') >= 0) return;
             el.className += ' recalled';
-            // v1.2.13：图片 / 文件消息已不再套 .ha-msg-content（去白色底座），
-            // 它们的承载节点是 .ha-msg-plain。两种都要查，否则撤回时
+            // v1.2.13：图片 / 文件消息已不再套 .ow-msg-content（去白色底座），
+            // 它们的承载节点是 .ow-msg-plain。两种都要查，否则撤回时
             // 占位文案不渲染、原图/文件仍留在界面上 —— 表现为「撤回了但内容还在」。
-            // 删除/撤回占位统一回退成 .ha-msg-content，让 .ha-msg.recalled
-            // 与 .ha-msg.deleted 的虚线弱化样式正常生效。
-            var cs = el.querySelector('.ha-msg-content') || el.querySelector('.ha-msg-plain');
-            if (cs) cs.outerHTML = '<span class="ha-msg-content">此消息已撤回</span>';
+            // 删除/撤回占位统一回退成 .ow-msg-content，让 .ow-msg.recalled
+            // 与 .ow-msg.deleted 的虚线弱化样式正常生效。
+            var cs = el.querySelector('.ow-msg-content') || el.querySelector('.ow-msg-plain');
+            if (cs) cs.outerHTML = '<span class="ow-msg-content">此消息已撤回</span>';
             this.msgCache[id] = this.msgCache[id] || {};
             this.msgCache[id].recalled = 1;
         },
@@ -2567,17 +2567,17 @@
             var self = this;
             this.openModal(
                 '<h3>确认操作</h3>'
-                + '<p class="ha-modal-desc">' + esc(text) + '</p>'
-                + '<div class="ha-modal-actions">'
-                + '<button class="ha-btn ha-btn-ghost" id="haCfmNo">取消</button>'
-                + '<button class="ha-btn ha-btn-danger" id="haCfmOk">确定</button></div>'
+                + '<p class="ow-modal-desc">' + esc(text) + '</p>'
+                + '<div class="ow-modal-actions">'
+                + '<button class="ow-btn ow-btn-ghost" id="owCfmNo">取消</button>'
+                + '<button class="ow-btn ow-btn-danger" id="owCfmOk">确定</button></div>'
             );
-            $('haCfmOk').onclick = function () { self.closeModal(); if (onOk) onOk(); };
-            $('haCfmNo').onclick = function () { self.closeModal(); };
+            $('owCfmOk').onclick = function () { self.closeModal(); if (onOk) onOk(); };
+            $('owCfmNo').onclick = function () { self.closeModal(); };
         },
 
         scrollBottom: function () {
-            var box = $('haMessages');
+            var box = $('owMessages');
             box.scrollTop = box.scrollHeight;
         },
 
@@ -2593,17 +2593,17 @@
          * @param {function} done 加载完成回调（成功/失败/已切走都会调）
          */
         loadHistory: function (done) {
-            var self = this, box = $('haMessages');
+            var self = this, box = $('owMessages');
             var finish = function () { if (typeof done === 'function') done(); };
             if (this.historyDone || this.loadingHistory) { finish(); return; }
-            var first = box.querySelector('.ha-msg');
+            var first = box.querySelector('.ow-msg');
             if (!first) { this.historyDone = true; finish(); return; }   // 一条都没有 = 拉完了
-            var before = parseInt(first.id.replace('haMsg', ''), 10);
+            var before = parseInt(first.id.replace('owMsg', ''), 10);
             var isDm = !!this.dm, peer = isDm ? this.dm.peer : '';
             var action = isDm ? 'dm_history' : 'history';
             var payload = isDm ? { peer: peer, before_id: before } : { room_id: this.room, before: before };
             this.loadingHistory = true;
-            HaApi.post(action, payload, function (r) {
+            OwApi.post(action, payload, function (r) {
                 self.loadingHistory = false;
                 // ⚠️ 两边都必须先 !! 归一再比。
                 // 群聊首次进入时 self.dm 从未被赋值，是 undefined；而 isDm 是 !!this.dm
@@ -2636,21 +2636,21 @@
          * 若不自动补，用户会看到上方空白且没有任何提示。
          */
         fillIfShort: function () {
-            var box = $('haMessages');
+            var box = $('owMessages');
             if (!box || this.historyDone || this.loadingHistory) return;
             if (box.scrollHeight > box.clientHeight + 4) return;   // 已填满，不用管
-            if (!box.querySelector('.ha-msg')) return;           // 还没拿到任何消息，等首屏回调
+            if (!box.querySelector('.ow-msg')) return;           // 还没拿到任何消息，等首屏回调
             this.loadHistory();
         },
 
         addMessageBefore: function (m, ref) {
-            var box = $('haMessages');
-            if (document.getElementById('haMsg' + m.id)) return;
+            var box = $('owMessages');
+            if (document.getElementById('owMsg' + m.id)) return;
             this.msgCache[m.id] = m;
             var b = this.buildMessage(m);
             var div = document.createElement('div');
             div.className = b.cls;
-            div.id = 'haMsg' + m.id;
+            div.id = 'owMsg' + m.id;
             div.innerHTML = b.html;
             // 时间戳：与 ref（更晚的那条）比时间，插在**更早这条的上方**。
             // ⚠️ 顺序必须是「先 div 后 divider」：
@@ -2658,7 +2658,7 @@
             //   若先插 divider，就得拿还没入 DOM 的 div 当参照 → 抛 NotFoundError。
             box.insertBefore(div, ref);
             // v1.2.18：同上，插入后才有宽度可量
-            if (b.html.indexOf('ha-file-name') >= 0) scheduleFitFileName(div);
+            if (b.html.indexOf('ow-file-name') >= 0) scheduleFitFileName(div);
             var prevTs = this.tsOfRef(ref);
             if (this.needTimeDivider(prevTs, m.ts)) {
                 box.insertBefore(this.buildTimeDivider(m.ts), div);
@@ -2681,7 +2681,7 @@
         onQuote: function (fn) { if (typeof fn === 'function') this._quoteExt.push(fn); },
         showCtxMenu: function (x, y, m) { this.showUserMenu(x, y, m); },
         hideCtxMenu: function () {
-            var menu = $('haCtxMenu');
+            var menu = $('owCtxMenu');
             if (menu) { menu.style.display = 'none'; menu._from = ''; }
         },
         /* ---------- 消息时间显隐（v1.1.0）----------
@@ -2693,13 +2693,13 @@
         hideMsgTime: function () {
             if (this._timeTimer) { clearTimeout(this._timeTimer); this._timeTimer = null; }
             if (this._timeMsg && this._timeMsg.className) {
-                this._timeMsg.className = this._timeMsg.className.replace(' ha-time-show', '');
+                this._timeMsg.className = this._timeMsg.className.replace(' ow-time-show', '');
             }
             this._timeMsg = null;
         },
         /**
          * 右键「头像」的用户菜单：对该发言人的操作（@ / 私信 / 收藏 / 撤回 / 禁言…）。
-         * 插件通过 HaChat.onMsgCtx 追加的项也进这里（都是针对「人」的能力）。
+         * 插件通过 OwChat.onMsgCtx 追加的项也进这里（都是针对「人」的能力）。
          * @deprecated showCtxMenu 保留为别名，兼容既有插件 / 调用
          */
         showUserMenu: function (x, y, m) {
@@ -2721,7 +2721,7 @@
             if (!items.length) return;
 
             this._ctxItems = items;
-            var menu = $('haCtxMenu');
+            var menu = $('owCtxMenu');
             menu._from = 'msg';
             var html = '', i;
             for (i = 0; i < items.length; i++) {
@@ -2753,7 +2753,7 @@
          */
         send: function (opt) {
             opt = opt || {};
-            var input = $('haInput');
+            var input = $('owInput');
             // v1.2.29：输入区闸门统一在这里拦一道。
             //   'join'   未加入群聊（服务端 send 也有同样校验）
             //   'friend' 停在「联系人」标签 —— 这是**防误发**的关键一环：
@@ -2785,7 +2785,7 @@
                 payload.to_nickname = this.roomName;
             }
             var wasDm = !!this.dm;
-            HaApi.post('send', payload, function (r) {
+            OwApi.post('send', payload, function (r) {
                 if (!r.ok) { toast(r.msg); return; }
                 if (!opt.type || opt.type === 'text') input.value = '';
                 self.clearQuote();   // 发送成功后清掉引用条
@@ -2808,9 +2808,9 @@
             var text = '确定撤回这条消息吗？撤回后所有群成员都不再显示，且不可恢复。'
                 + '（如只想自己不看，请用「删除」）';
             this.confirmModal(text, function () {
-                HaApi.secure('recall', { id: id }, function (r) {
+                OwApi.secure('recall', { id: id }, function (r) {
                     if (!r.ok) { toast(r.msg); return; }
-                    var el = $('haMsg' + id);
+                    var el = $('owMsg' + id);
                     if (el && el.parentNode) el.parentNode.removeChild(el);
                     delete self.msgCache[id];
                     toast(r.msg || '已撤回');
@@ -2821,10 +2821,10 @@
         },
 
         mention: function (nick) {
-            var input = $('haInput');
+            var input = $('owInput');
             input.value += '@' + nick + ' ';
             input.focus();
-            HaChat.autoGrow();
+            OwChat.autoGrow();
         },
 
         /**
@@ -2845,13 +2845,13 @@
         },
 
         collect: function (url) {
-            HaApi.post('sticker_add', { url: url }, function (r) { toast(r.msg); });
+            OwApi.post('sticker_add', { url: url }, function (r) { toast(r.msg); });
         },
 
         viewImg: function (src) {
-            $('haImgViewerImg').src = src;
-            $('haImgViewer').style.display = '-webkit-flex';
-            $('haImgViewer').style.display = 'flex';
+            $('owImgViewerImg').src = src;
+            $('owImgViewer').style.display = '-webkit-flex';
+            $('owImgViewer').style.display = 'flex';
         },
 
         /* ---------- 用户资料卡 ---------- */
@@ -2863,7 +2863,7 @@
          * → avatarUpload），并统一头像尺寸：
          *  - 尺寸：资料卡与设置页都用 'lg'（64px）。v1.1.8 曾统一到 'md'(32px)，
          *    但 32px 在 380px 宽的弹窗里视觉权重太轻，看着仍偏小，故再放大一档。
-         *    尺寸由 CSS 档位锁死（.ha-avatar + overflow:hidden + img 的 max-*），
+         *    尺寸由 CSS 档位锁死（.ow-avatar + overflow:hidden + img 的 max-*），
          *    **与原图实际像素无关**，不会被大图撑破。
          *  - 自己的卡片：头像可点直接换头像（标题提示 + hover 反馈），
          *    与设置页的点击上传走同一条链；上传后两处预览同时回填。
@@ -2874,7 +2874,7 @@
         userCard: function (uid, nick) {
             if (!uid) { this.pmHint(nick); return; }
             var self = this;
-            HaApi.post('user_card', { id: uid }, function (r) {
+            OwApi.post('user_card', { id: uid }, function (r) {
                 if (!r.ok) { toast(r.msg); return; }
                 var u = r.data;
                 var meId = (self.cfg.me && self.cfg.me.id) || 0;
@@ -2884,16 +2884,16 @@
                 // 自己的卡片：头像包一层可点容器，点它=打开隐藏的 file input
                 var avHtml = avatarHtml(u.avatar, u.nickname, 'lg', u.role);
                 if (isMe) {
-                    avHtml = '<span class="ha-set-avatar-btn" id="haCardAvatarPreview" title="点击更换头像"'
-                        + ' onclick="HaChat.pickCardAvatar()">' + avHtml + '</span>'
-                        + '<input type="file" id="haCardAvatarFile" accept="image/*" style="display:none">';
+                    avHtml = '<span class="ow-set-avatar-btn" id="owCardAvatarPreview" title="点击更换头像"'
+                        + ' onclick="OwChat.pickCardAvatar()">' + avHtml + '</span>'
+                        + '<input type="file" id="owCardAvatarFile" accept="image/*" style="display:none">';
                 }
                 var regDate = u.created_at ? new Date(u.created_at * 1000).toLocaleDateString() : '-';
                 var badges = roleTag(u.role, u.title, u.id, true);   // 资料卡=管理场景，显示真实身份
                 // v1.2.23：底部不再放「关闭」—— openModal 自带右上角 ✕（见 openModal），
                 // 两个关闭入口纯冗余。
                 // ⚠️ 连带影响：自己的卡片 canPm=false，删掉「关闭」后**一个按钮都不剩**，
-                // 此时整个 .ha-modal-actions 都不输出（否则卡片底部留一道空边框）。
+                // 此时整个 .ow-modal-actions 都不输出（否则卡片底部留一道空边框）。
                 // 自己的卡片就只能靠 ✕ / 点遮罩 / Esc 关闭 —— 这是有意的。
                 // v1.2.40 按钮改造：
                 //   ① **取消「删除好友」**（用户要求）。删除入口已迁到「私聊右侧栏」，
@@ -2905,45 +2905,45 @@
                 var acts = '';
                 if (canPm) {
                     if (!u.is_friend) {
-                        acts += '<button class="ha-btn ha-btn-ghost" onclick="HaChat.addFriend(' + (u.id) + ')">加好友</button>';
+                        acts += '<button class="ow-btn ow-btn-ghost" onclick="OwChat.addFriend(' + (u.id) + ')">加好友</button>';
                     }
-                    acts += '<button class="ha-btn ha-btn-primary" onclick="HaChat.closeModal();HaChat.openDm(\'user:' + (u.id) + '\',' + JSON.stringify(u.nickname).replace(/"/g, '&quot;') + ')">发私信</button>';
+                    acts += '<button class="ow-btn ow-btn-primary" onclick="OwChat.closeModal();OwChat.openDm(\'user:' + (u.id) + '\',' + JSON.stringify(u.nickname).replace(/"/g, '&quot;') + ')">发私信</button>';
                 } else {
-                    acts += '<button class="ha-btn ha-btn-primary" onclick="HaChat.closeModal();HaChat.openSettings()">编辑资料</button>';
+                    acts += '<button class="ow-btn ow-btn-primary" onclick="OwChat.closeModal();OwChat.openSettings()">编辑资料</button>';
                 }
-                HaChat.openModal(
+                OwChat.openModal(
                     '<h3>用户资料</h3>'
-                    + '<div class="ha-card-head">'
+                    + '<div class="ow-card-head">'
                     + avHtml
-                    + '<div class="ha-card-id">'
+                    + '<div class="ow-card-id">'
                     // v1.2.23：昵称与身份标签**同一行**（标签在昵称右侧）；
                     // 昵称下方显示「ID xxxxx」—— 原「用户 ID」在下方 meta 行里，已上移，不再重复。
                     // ⚠️ badges 为空时不输出该 span：空 flex item 仍会吃掉一个 gap。
-                    + '<div class="ha-card-name-row">'
-                    + '<span class="ha-card-name">' + esc(u.nickname) + '</span>'
-                    + (badges ? '<span class="ha-card-badges ha-card-badges-inline">' + badges + '</span>' : '')
+                    + '<div class="ow-card-name-row">'
+                    + '<span class="ow-card-name">' + esc(u.nickname) + '</span>'
+                    + (badges ? '<span class="ow-card-badges ow-card-badges-inline">' + badges + '</span>' : '')
                     + '</div>'
-                    + '<div class="ha-card-sub">ID ' + esc(fmtUid(u.id)) + '</div>'
+                    + '<div class="ow-card-sub">ID ' + esc(fmtUid(u.id)) + '</div>'
                     + '</div></div>'
                     // v1.2.42：扩展点输出**前置** —— 等级等插件行固定在 meta 最上面，
                     // 排在「积分 / 注册」之前，且不随插件注册顺序漂移。
-                    + '<div class="ha-card-meta">'
+                    + '<div class="ow-card-meta">'
                     + self.cardMetaTopHtml(u)
-                    + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">积分</span>'
-                    + '<span class="ha-card-meta-v">' + esc(u.points || 0) + '</span></div>'
-                    + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">注册</span>'
-                    + '<span class="ha-card-meta-v">' + esc(regDate) + '</span></div>'
+                    + '<div class="ow-card-meta-row"><span class="ow-card-meta-k">积分</span>'
+                    + '<span class="ow-card-meta-v">' + esc(u.points || 0) + '</span></div>'
+                    + '<div class="ow-card-meta-row"><span class="ow-card-meta-k">注册</span>'
+                    + '<span class="ow-card-meta-v">' + esc(regDate) + '</span></div>'
                     + '</div>'
                     // v1.2.23：插件内容锚点（个性签名等）。
                     // 由来：signature 插件原先靠 `modal.querySelector('p')` 定位，
-                    // v1.1.9 资料卡重做布局后 <p> 被 .ha-card-meta 取代 → 拿到 null
+                    // v1.1.9 资料卡重做布局后 <p> 被 .ow-card-meta 取代 → 拿到 null
                     // → 静默 return，签名从此不再显示。给个稳定 id 让插件不再猜结构。
-                    + '<div id="haCardExtras"></div>'
-                    + (acts ? '<div class="ha-modal-actions">' + acts + '</div>' : '')
+                    + '<div id="owCardExtras"></div>'
+                    + (acts ? '<div class="ow-modal-actions">' + acts + '</div>' : '')
                 );
                 // 绑定隐藏 file input：选图后走**与设置页完全相同**的裁剪轮子
                 if (isMe) {
-                    var f = $('haCardAvatarFile');
+                    var f = $('owCardAvatarFile');
                     f.onchange = function () {
                         if (!this.files || !this.files[0]) return;
                         self.avatarCrop(this.files[0]);   // 轮子入口与 openSettings 一致
@@ -2955,7 +2955,7 @@
 
         /** 资料卡里点击自己的头像 → 打开隐藏的 file input（与设置页 pickAvatar 同义） */
         pickCardAvatar: function () {
-            var f = $('haCardAvatarFile');
+            var f = $('owCardAvatarFile');
             if (f) f.click();
         },
 
@@ -2971,16 +2971,16 @@
          * 成员名字对所有人可见（含游客）。
          */
         renderOnline: function (list, canStatus) {
-            var box = $('haOnlineList'), cnt = $('haOnlineCount');
+            var box = $('owOnlineList'), cnt = $('owOnlineCount');
             if (cnt) cnt.innerHTML = list.length;
             if (!box) return;
             var html = '', i;
             for (i = 0; i < list.length; i++) {
                 var o = list[i];
-                html += '<li class="ha-online-item">'
-                      + (canStatus ? '<span class="ha-online-dot"></span>' : '')
+                html += '<li class="ow-online-item">'
+                      + (canStatus ? '<span class="ow-online-dot"></span>' : '')
                       + avatarHtml(o.avatar, o.nickname, true, o.role)
-                      + '<span class="ha-online-name" onclick="HaChat.userCard(' + (o.uid || 0) + ',\'' + esc(o.nickname) + '\')">' + esc(o.nickname) + '</span>'
+                      + '<span class="ow-online-name" onclick="OwChat.userCard(' + (o.uid || 0) + ',\'' + esc(o.nickname) + '\')">' + esc(o.nickname) + '</span>'
                       + roleTag(o.role, '', o.uid) + '</li>';
             }
             box.innerHTML = html;
@@ -2994,14 +2994,14 @@
            游客只出现在公开群（不公开群游客进不来，服务端查询结果自然为空）。
            在线点的显隐仍由服务端 canSeeOnlineStatus 决定，前端不自行判身份。 */
         renderMembers: function (members, guests, canStatus) {
-            var box = $('haOnlineList'), cnt = $('haOnlineCount');
+            var box = $('owOnlineList'), cnt = $('owOnlineCount');
             var ms = members || [], gs = guests || [];
             if (cnt) cnt.innerHTML = ms.length + gs.length;
             if (!box) return;
             var html = '', i;
             for (i = 0; i < ms.length; i++) html += this._memberRow(ms[i], canStatus);
             for (i = 0; i < gs.length; i++) html += this._memberRow(gs[i], canStatus);
-            box.innerHTML = html || '<li class="ha-online-empty">还没有成员</li>';
+            box.innerHTML = html || '<li class="ow-online-empty">还没有成员</li>';
         },
 
         /** 单行成员/游客。游客没有资料卡，名字不可点（点了只会弹「游客无法查看资料卡」） */
@@ -3009,16 +3009,16 @@
             var isGuest = o.kind === 'guest';
             var dot = '';
             if (canStatus && !isGuest) {
-                dot = '<span class="ha-online-dot' + (o.online ? '' : ' is-off') + '"></span>';
+                dot = '<span class="ow-online-dot' + (o.online ? '' : ' is-off') + '"></span>';
             }
-            var nameAttr = isGuest ? '' : ' onclick="HaChat.userCard(' + (o.uid || 0) + ',\'' + esc(o.nickname) + '\')"';
+            var nameAttr = isGuest ? '' : ' onclick="OwChat.userCard(' + (o.uid || 0) + ',\'' + esc(o.nickname) + '\')"';
             var tag = isGuest
-                ? '<span class="ha-tag ha-tag-guest">游客</span>'
+                ? '<span class="ow-tag ow-tag-guest">游客</span>'
                 : roleTag(o.role, '', o.uid);
-            return '<li class="ha-online-item' + (isGuest ? ' is-guest' : '') + '">'
+            return '<li class="ow-online-item' + (isGuest ? ' is-guest' : '') + '">'
                 + dot
                 + avatarHtml(o.avatar, o.nickname, true, o.role)
-                + '<span class="ha-online-name"' + nameAttr + '>' + esc(o.nickname) + '</span>'
+                + '<span class="ow-online-name"' + nameAttr + '>' + esc(o.nickname) + '</span>'
                 + tag + '</li>';
         },
 
@@ -3026,7 +3026,7 @@
         loadMembers: function () {
             var self = this, id = this.room;
             if (!id) return;
-            HaApi.post('room_members', { room_id: id }, function (r) {
+            OwApi.post('room_members', { room_id: id }, function (r) {
                 if (!r.ok || self.room !== id) return;
                 self.renderMembers(r.members, r.guests, r.online_status);
                 self.applyJoinGate(r.is_member, r.is_public);
@@ -3042,7 +3042,7 @@
          *
          * 四件事缺一不可：
          *  ① 停两路轮询（群聊长轮询 + 私聊长轮询），否则在途回调醒来又往
-         *     已清空的 #haMessages 里塞消息（还会把 since 推走）；
+         *     已清空的 #owMessages 里塞消息（还会把 since 推走）；
          *  ② 清空消息区 + 取消列表高亮（视觉上彻底「关掉」）；
          *  ③ 清掉 this.room / this.dm（**不留后路**：否则输入框一解禁就能往刚才那个群发消息）；
          *  ④ 输入区落闸（禁发言 + 提示先选联系人）。
@@ -3056,9 +3056,9 @@
             this.since = 0;
             this.historyDone = true;                     // 已无可加载历史，禁掉上滚懒加载
             this.loadingHistory = false;
-            var box = $('haMessages');
+            var box = $('owMessages');
             if (box) box.innerHTML = '';
-            ChatList.activate('haRoomList', '');         // 取消任何一行的高亮
+            ChatList.activate('owRoomList', '');         // 取消任何一行的高亮
             this.renderRoomPanel();                      // 右侧栏回到「请先选择」空态
             this.applyInputGate('friend');
         },
@@ -3072,13 +3072,13 @@
          *   'conv'    停在「消息」标签但没选中任何会话
          */
         applyInputGate: function (kind) {
-            var box = $('haJoinGate');
-            var input = $('haInput');
+            var box = $('owJoinGate');
+            var input = $('owInput');
             this._inputGate = kind || '';
             if (!input) return;
             // 工具栏一并禁用：选图/选文件会直接走 send 发出消息，
             // 只禁输入框的话，用户还能从工具栏把消息发到「已经关掉的会话」里。
-            var tbIds = ['haBtnEmoji', 'haBtnImage', 'haBtnFile'], i, tb;
+            var tbIds = ['owBtnEmoji', 'owBtnImage', 'owBtnFile'], i, tb;
             for (i = 0; i < tbIds.length; i++) {
                 tb = $(tbIds[i]);
                 if (tb) tb.disabled = !!kind;
@@ -3093,7 +3093,7 @@
             if (kind === 'join') {
                 if (box) {
                     box.innerHTML = '<span>你还没有加入该群聊，加入后即可发言</span>'
-                        + '<button class="ha-btn ha-btn-primary ha-btn-mini" onclick="HaChat.joinCurrentRoom()">加入群聊</button>';
+                        + '<button class="ow-btn ow-btn-primary ow-btn-mini" onclick="OwChat.joinCurrentRoom()">加入群聊</button>';
                     box.style.display = '';
                 }
                 input.placeholder = '加入群聊后即可发言';
@@ -3123,7 +3123,7 @@
         joinCurrentRoom: function () {
             var self = this, id = this.room;
             if (!id) return;
-            HaApi.post('room_join', { room_id: id, join: 1 }, function (r) {
+            OwApi.post('room_join', { room_id: id, join: 1 }, function (r) {
                 if (!r.ok) { toast(r.msg); return; }
                 toast('已加入群聊');
                 // 同步侧栏缓存，否则再点一次该会话还会弹「是否加入」
@@ -3144,15 +3144,15 @@
          *   v1.1.1  改为**常驻侧栏内联表单**（本区块直接渲染可编辑表单）。
          *   v1.1.10 按需求回退到**弹窗**，侧栏只留两行入口：
          *     第 1 行「群聊设置」→ openRoomEdit() 打开模态框
-         *     第 2 行「群公告」  → announcements 插件经 onRoomEdit 钩子填进 #haREExtras
-         *     两行同款样式（.ha-panel-entry），群公告因此位于「所有成员」区块上方，
+         *     第 2 行「群公告」  → announcements 插件经 onRoomEdit 钩子填进 #owREExtras
+         *     两行同款样式（.ow-panel-entry），群公告因此位于「所有成员」区块上方，
          *     **不再与群资料表单耦合**——插件不必关心表单是弹窗还是内联。
          *
          * 钩子契约（onRoomEdit）保持不变：
-         *   fn({ roomId, ownerId, isAdmin, isOwner })，#haREExtras 必定存在。
+         *   fn({ roomId, ownerId, isAdmin, isOwner })，#owREExtras 必定存在。
          */
         renderRoomPanel: function () {
-            var box = $('haRoomPanel');
+            var box = $('owRoomPanel');
             if (!box) return;
             var me = this.cfg.me || {}, isAdmin = this.cfg.actor.role === 'admin';
             var isDm = this.room === 0;                    // 私聊是 room_id=0 的虚拟空间
@@ -3163,8 +3163,8 @@
             // 不属于私聊也不属于群聊，给一个中性空态，别误用私聊那套入口。
             var noTarget = !this.dm && !this.room;
             if (noTarget) {
-                box.innerHTML = '<div class="ha-panel-hint">请先选择一个会话</div>';
-                var memSec0 = document.querySelector('.ha-panel-members');
+                box.innerHTML = '<div class="ow-panel-hint">请先选择一个会话</div>';
+                var memSec0 = document.querySelector('.ow-panel-members');
                 if (memSec0) memSec0.style.display = 'none';
                 return;
             }
@@ -3172,7 +3172,7 @@
             // v1.2.28：私聊**不显示「所有成员」区块** —— 那是群聊概念，
             // 私聊只有两个人，列出来是噪音。用 display 切换而不是移除节点：
             // 切回群聊时无需重建，且 poll 返回的 members 仍有地方可写。
-            var memSec = document.querySelector('.ha-panel-members');
+            var memSec = document.querySelector('.ow-panel-members');
             if (memSec) memSec.style.display = isDm ? 'none' : '';
 
             // v1.2.28：私聊不再是「没有群聊信息」的空洞提示，改渲染四个会话操作入口。
@@ -3181,16 +3181,16 @@
                 return;
             }
             if (!r) {
-                box.innerHTML = '<div class="ha-panel-hint">请先选择一个群聊</div>';
+                box.innerHTML = '<div class="ow-panel-hint">请先选择一个群聊</div>';
                 return;
             }
             var meId = me.id || 0;
             var isOwner = !!meId && meId === (r.owner_id || 0);
 
-            box.innerHTML = entryRow('群聊设置', 'gear', 'HaChat.openRoomEdit()')
-                + '<div class="ha-panel-entry-row" id="haREExtras"></div>';
+            box.innerHTML = entryRow('群聊设置', 'gear', 'OwChat.openRoomEdit()')
+                + '<div class="ow-panel-entry-row" id="owREExtras"></div>';
 
-            // 插件扩展钩子（v0.0.102 起）：群公告等入口往 #haREExtras 追加
+            // 插件扩展钩子（v0.0.102 起）：群公告等入口往 #owREExtras 追加
             var ctx = { roomId: this.room, ownerId: r.owner_id || 0, isAdmin: isAdmin, isOwner: isOwner };
             for (var hi = 0; hi < this._roomEditHooks.length; hi++) {
                 try { this._roomEditHooks[hi](ctx); } catch (e) {}
@@ -3199,13 +3199,13 @@
 
         /**
          * 私聊右侧栏的四个入口（v1.2.28）。样式与群聊的「群聊设置」**完全同款**
-         * （同一个 entryRow + .ha-panel-entry-row）。
+         * （同一个 entryRow + .ow-panel-entry-row）。
          *
-         * ⚠️ 结构不能拍平：分隔线画在 .ha-panel-entry-row 的 border-top 上，
-         * 且宽屏有 `@media (min-width:961px)` 把**首行**撑到 --ha-topbar-h - 1px
+         * ⚠️ 结构不能拍平：分隔线画在 .ow-panel-entry-row 的 border-top 上，
+         * 且宽屏有 `@media (min-width:961px)` 把**首行**撑到 --ow-topbar-h - 1px
          * 来让这条线与顶栏（聊天名称下方那条）落在同一像素行。
-         * 所以第一个入口必须是 .ha-panel-room-body 的**直接子元素**，
-         * 其余三个放进紧随其后的 .ha-panel-entry-row —— 拍平成同级会同时丢掉：
+         * 所以第一个入口必须是 .ow-panel-room-body 的**直接子元素**，
+         * 其余三个放进紧随其后的 .ow-panel-entry-row —— 拍平成同级会同时丢掉：
          *   ① 顶部分隔线（第一条横线会消失/错位）
          *   ② 与顶栏横线的平行关系
          */
@@ -3220,19 +3220,19 @@
             var first = isGuest || !peerKey
                 ? entryRow('私聊会话', 'gear', '')       // 游客/异常态：静态行，只作占位保住首行结构
                 : entryRow(d.pinned ? '取消置顶' : '设为置顶', d.pinned ? 'pinOff' : 'pin',
-                    'HaChat.toggleDmPin()');
+                    'OwChat.toggleDmPin()');
 
-            var rest = entryRow('删除聊天记录', 'trash', 'HaChat.clearDmHistory()');
+            var rest = entryRow('删除聊天记录', 'trash', 'OwChat.clearDmHistory()');
             // 「删除好友」只在对方确实是好友时给：否则点了必然报错（服务端会拒）
             if (!isGuest && uid && this.dm && this.dm.is_friend) {
-                rest += entryRow('删除好友', 'userX', 'HaChat.removeDmFriend()');
+                rest += entryRow('删除好友', 'userX', 'OwChat.removeDmFriend()');
             }
             // 「举报」来自 content-report 插件，插件未启用/未加载时**不渲染这一行**，
             // 不能给一个点了没反应的入口（插件不提供任何核心兜底）。
-            if (!isGuest && uid && w.HaCR && typeof w.HaCR.openReport === 'function') {
-                rest += entryRow('举报', 'flag', 'HaChat.reportDmPeer()');
+            if (!isGuest && uid && w.OwCR && typeof w.OwCR.openReport === 'function') {
+                rest += entryRow('举报', 'flag', 'OwChat.reportDmPeer()');
             }
-            return first + '<div class="ha-panel-entry-row">' + rest + '</div>';
+            return first + '<div class="ow-panel-entry-row">' + rest + '</div>';
         },
 
         /** 置顶 / 取消置顶当前私聊（仅影响自己的会话列表顺序） */
@@ -3240,7 +3240,7 @@
             var self = this;
             var peerKey = (this.dm && this.dm.peer) ? ('dm:' + this.dm.peer) : '';
             if (!peerKey) { toast('私聊对象不合法'); return; }
-            HaApi.post('dm_pin', { peer_key: peerKey }, function (r) {
+            OwApi.post('dm_pin', { peer_key: peerKey }, function (r) {
                 if (!r.ok) { toast(r.msg); return; }
                 if (self.dm) self.dm.pinned = !!r.pinned;
                 toast(r.msg);
@@ -3260,11 +3260,11 @@
             if (!peer) { toast('私聊对象不合法'); return; }
             this.confirm('确定清空与「' + (this.roomName || '对方') + '」的聊天记录？\n'
                 + '仅清空你自己这边的视图，对方仍能看到全部消息。', function () {
-                HaApi.post('dm_clear', { peer: peer }, function (r) {
+                OwApi.post('dm_clear', { peer: peer }, function (r) {
                     if (!r.ok) { toast(r.msg); return; }
                     toast(r.msg || '已清空聊天记录');
                     if (self.dm && self.dm.peer === peer) {
-                        $('haMessages').innerHTML = '';
+                        $('owMessages').innerHTML = '';
                         self.since = 0;
                         self.historyDone = true;    // 已无可加载的历史，避免上滚又拉回来
                     }
@@ -3286,8 +3286,8 @@
         /** 举报当前私聊对方（入口来自 content-report 插件） */
         reportDmPeer: function () {
             var d = this.dm || {};
-            if (!d.id || !w.HaCR) { toast('举报功能不可用'); return; }
-            w.HaCR.openReport(d.id, this.roomName || '', 0, 0, 0);
+            if (!d.id || !w.OwCR) { toast('举报功能不可用'); return; }
+            w.OwCR.openReport(d.id, this.roomName || '', 0, 0, 0);
         },
 
         /**
@@ -3325,24 +3325,24 @@
 
             this.openModal(
                 '<h3>群聊设置</h3>'
-                + '<div class="ha-card-head">'
-                + '<span class="ha-set-avatar-btn" id="haRoomAvatarPreview"'
-                + (canEdit ? ' title="点击更换群头像" onclick="HaChat.roomAvatarPick()"' : '') + '>'
+                + '<div class="ow-card-head">'
+                + '<span class="ow-set-avatar-btn" id="owRoomAvatarPreview"'
+                + (canEdit ? ' title="点击更换群头像" onclick="OwChat.roomAvatarPick()"' : '') + '>'
                 // v1.1.19：群头像改走 roomAvatarHtml —— 无自定义头像时显示默认剪影图，
                 // 不再是「群名首字 + 随机色块」（那个 role 传 'member' 走的是色盘分支）。
                 + roomAvatarHtml(this._roomAvatar, 'lg') + '</span>'
-                + '<input type="file" id="haRoomAvatarFile" accept="image/*" style="display:none">'
-                + '<div class="ha-card-id">'
-                + '<div class="ha-card-name">' + esc(r.name) + '</div>'
-                + '<div class="ha-card-badges"><span class="ha-tag ha-tag-green">' + typeName + '</span>'
+                + '<input type="file" id="owRoomAvatarFile" accept="image/*" style="display:none">'
+                + '<div class="ow-card-id">'
+                + '<div class="ow-card-name">' + esc(r.name) + '</div>'
+                + '<div class="ow-card-badges"><span class="ow-tag ow-tag-green">' + typeName + '</span>'
                 // v1.1.18：公开性徽章改回「公开」。v1.1.16 写成「普通」会与左边
                 // type=public 的「普通」并排出现两个同词标签，等于把公开性信息抹掉了。
-                + '<span class="ha-tag ha-tag-member">' + (isPublic ? '公开' : '仅邀请') + '</span></div>'
+                + '<span class="ow-tag ow-tag-member">' + (isPublic ? '公开' : '仅邀请') + '</span></div>'
                 + '</div></div>'
                 + (canEdit
-                    ? '<div class="ha-card-meta">'
-                      + '<div class="ha-form-item"><label>群名称</label><input class="ha-input" id="haRoomEditName" value="' + esc(r.name) + '" maxlength="30"></div>'
-                      + '<div class="ha-form-item" style="margin-top:10px"><label>群简介</label><input class="ha-input" id="haRoomEditDesc" value="' + esc(r.description || '') + '" maxlength="200" placeholder="一句话介绍这个群（可选）"></div>'
+                    ? '<div class="ow-card-meta">'
+                      + '<div class="ow-form-item"><label>群名称</label><input class="ow-input" id="owRoomEditName" value="' + esc(r.name) + '" maxlength="30"></div>'
+                      + '<div class="ow-form-item" style="margin-top:10px"><label>群简介</label><input class="ow-input" id="owRoomEditDesc" value="' + esc(r.description || '') + '" maxlength="200" placeholder="一句话介绍这个群（可选）"></div>'
                       // v1.1.11 公开性开关：与「类型」正交，只控制谁能发现这个群。
                       // v1.1.14：总闸关闭且本群当前是公开时禁用，避免「保存必报错」。
                       // v1.1.16：删掉「开启：显示在群聊列表，游客可进入并发言。关闭：只有群主
@@ -3350,38 +3350,38 @@
                       // 且「游客可进入并发言」并非所有群都成立（受类型与角色门槛影响）。
                       // v1.1.18：公开性开关标签改回「公开群聊」（v1.1.16 误写「普通群聊」，
                       // 与上方类型徽章「普通」撞词，看起来像开关消失了）。
-                      + '<div class="ha-form-item ha-form-item-switch">'
-                      + switchHtml('haRoomPublic', '公开群聊', isPublic,
+                      + '<div class="ow-form-item ow-form-item-switch">'
+                      + switchHtml('owRoomPublic', '公开群聊', isPublic,
                           canTogglePublic ? ''
                                           : '站点已关闭「创建仅邀请群聊」，本群只能保持公开。',
                           !canTogglePublic)
                       + '</div>'
                       + '</div>'
-                      + '<div class="ha-modal-actions ha-modal-actions-split">'
-                      + (canInvite ? '<button class="ha-btn ha-btn-ghost" onclick="HaChat.roomMembers(' + r.id + ')">成员管理</button>' : '')
-                      + '<span class="ha-modal-actions-sp"></span>'
-                      + '<button class="ha-btn ha-btn-ghost" onclick="HaChat.closeModal()">取消</button>'
-                      + '<button class="ha-btn ha-btn-primary" onclick="HaChat.roomEditSave(' + r.id + ')">保存</button></div>'
+                      + '<div class="ow-modal-actions ow-modal-actions-split">'
+                      + (canInvite ? '<button class="ow-btn ow-btn-ghost" onclick="OwChat.roomMembers(' + r.id + ')">成员管理</button>' : '')
+                      + '<span class="ow-modal-actions-sp"></span>'
+                      + '<button class="ow-btn ow-btn-ghost" onclick="OwChat.closeModal()">取消</button>'
+                      + '<button class="ow-btn ow-btn-primary" onclick="OwChat.roomEditSave(' + r.id + ')">保存</button></div>'
                     // 只读：非群主会员也能看到群名称 / 简介 / 群主，信息不设限，仅不可改
-                    : '<div class="ha-card-meta">'
+                    : '<div class="ow-card-meta">'
                       + (r.description
-                          ? '<div class="ha-card-meta-row"><span class="ha-card-meta-k">简介</span><span class="ha-card-meta-v">' + esc(r.description) + '</span></div>'
-                          : '<div class="ha-card-meta-row"><span class="ha-card-meta-v ha-panel-empty">群主还没有写简介</span></div>')
-                      + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">群主</span><span class="ha-card-meta-v">' + esc(fmtUid(r.owner_id)) + '</span></div>'
-                      + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">可见性</span><span class="ha-card-meta-v">' + (isPublic ? '公开（所有人可见）' : '仅邀请（仅群主与成员）') + '</span></div>'
-                      + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">修改</span><span class="ha-card-meta-v">仅群主与超级管理员可修改</span></div>'
+                          ? '<div class="ow-card-meta-row"><span class="ow-card-meta-k">简介</span><span class="ow-card-meta-v">' + esc(r.description) + '</span></div>'
+                          : '<div class="ow-card-meta-row"><span class="ow-card-meta-v ow-panel-empty">群主还没有写简介</span></div>')
+                      + '<div class="ow-card-meta-row"><span class="ow-card-meta-k">群主</span><span class="ow-card-meta-v">' + esc(fmtUid(r.owner_id)) + '</span></div>'
+                      + '<div class="ow-card-meta-row"><span class="ow-card-meta-k">可见性</span><span class="ow-card-meta-v">' + (isPublic ? '公开（所有人可见）' : '仅邀请（仅群主与成员）') + '</span></div>'
+                      + '<div class="ow-card-meta-row"><span class="ow-card-meta-k">修改</span><span class="ow-card-meta-v">仅群主与超级管理员可修改</span></div>'
                       + '</div>'
-                      + '<div class="ha-modal-actions ha-modal-actions-split">'
-                      + (canInvite ? '<button class="ha-btn ha-btn-ghost" onclick="HaChat.roomMembers(' + r.id + ')">成员管理</button>' : '')
-                      + '<span class="ha-modal-actions-sp"></span>'
-                      + '<button class="ha-btn ha-btn-ghost ha-btn-block" onclick="HaChat.closeModal()">关闭</button></div>')
+                      + '<div class="ow-modal-actions ow-modal-actions-split">'
+                      + (canInvite ? '<button class="ow-btn ow-btn-ghost" onclick="OwChat.roomMembers(' + r.id + ')">成员管理</button>' : '')
+                      + '<span class="ow-modal-actions-sp"></span>'
+                      + '<button class="ow-btn ow-btn-ghost ow-btn-block" onclick="OwChat.closeModal()">关闭</button></div>')
             );
-            bindSwitches($('haModal'));
+            bindSwitches($('owModal'));
 
-            var f = $('haRoomAvatarFile');
+            var f = $('owRoomAvatarFile');
             if (f) f.onchange = function () {
                 if (!this.files || !this.files[0]) return;
-                var self2 = HaChat;
+                var self2 = OwChat;
                 self2.roomAvatarCrop(this.files[0]);   // 裁剪浮层独立，弹窗主体保持完好
                 this.value = '';
             };
@@ -3397,26 +3397,26 @@
          */
         roomMembers: function (roomId) {
             var self = this;
-            HaApi.post('room_members', { room_id: roomId }, function (r) {
+            OwApi.post('room_members', { room_id: roomId }, function (r) {
                 if (!r.ok) { toast(r.msg); return; }
                 var list = r.data || [], canInvite = !!r.can_invite;
                 var isOwnerOrAdmin = (self.cfg.actor.role === 'admin')
                     || ((self.cfg.me || {}).id === r.owner_id);
                 var meId = (self.cfg.me || {}).id || 0;
                 var cards = '';
-                if (!list.length) cards = '<div class="ha-mem-empty">还没有其他成员，可按用户 ID 邀请</div>';
+                if (!list.length) cards = '<div class="ow-mem-empty">还没有其他成员，可按用户 ID 邀请</div>';
                 for (var i = 0; i < list.length; i++) {
                     var m = list[i];
                     // v1.2.40：成员管理是**管理场景**，超管要显示「超级管理员」
                     //（判断谁能管这个群靠的就是这个标签，隐藏身份会让人做错决定）
                     var mTag = roleTag(m.role, '', 0, true);
-                    cards += '<div class="ha-mem-row">'
+                    cards += '<div class="ow-mem-row">'
                         + avatarHtml(m.avatar, m.nickname, 'sm', m.role)
-                        + '<span class="ha-mem-name">' + esc(m.nickname || 'ID' + m.user_id) + '</span>'
-                        + (mTag ? '<span class="ha-mem-role">' + mTag + '</span>' : '')
-                        + '<span class="ha-mem-id">ID ' + esc(fmtUid(m.user_id)) + '</span>'
+                        + '<span class="ow-mem-name">' + esc(m.nickname || 'ID' + m.user_id) + '</span>'
+                        + (mTag ? '<span class="ow-mem-role">' + mTag + '</span>' : '')
+                        + '<span class="ow-mem-id">ID ' + esc(fmtUid(m.user_id)) + '</span>'
                         + (isOwnerOrAdmin
-                            ? '<button class="ha-btn ha-btn-ghost ha-btn-mini ha-mem-del" data-id="' + m.user_id + '">移出</button>'
+                            ? '<button class="ow-btn ow-btn-ghost ow-btn-mini ow-mem-del" data-id="' + m.user_id + '">移出</button>'
                             : '')
                         + '</div>';
                 }
@@ -3424,38 +3424,38 @@
                 var codeRow = '';
                 if (r.invite_code) {
                     var link = self.cfg.site_url + '/?room_invite=' + esc(r.invite_code);
-                    codeRow = '<div class="ha-card-meta">'
-                        + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">邀请码</span>'
-                        + '<span class="ha-card-meta-v">' + esc(r.invite_code) + '</span></div>'
-                        + '<div class="ha-card-meta-row"><span class="ha-card-meta-k">邀请链接</span>'
-                        + '<span class="ha-card-meta-v ha-mem-link">'
+                    codeRow = '<div class="ow-card-meta">'
+                        + '<div class="ow-card-meta-row"><span class="ow-card-meta-k">邀请码</span>'
+                        + '<span class="ow-card-meta-v">' + esc(r.invite_code) + '</span></div>'
+                        + '<div class="ow-card-meta-row"><span class="ow-card-meta-k">邀请链接</span>'
+                        + '<span class="ow-card-meta-v ow-mem-link">'
                         + '<a href="' + esc(link) + '" target="_blank" rel="noopener">' + esc(link) + '</a></span></div>'
                         + '</div>';
                 }
                 self.openModal(
                     '<h3>群成员</h3>'
-                    + '<div class="ha-mem-head">共 ' + (list.length + 1) + ' 人（含群主）</div>'
-                    + '<div class="ha-mem-list">' + cards + '</div>'
+                    + '<div class="ow-mem-head">共 ' + (list.length + 1) + ' 人（含群主）</div>'
+                    + '<div class="ow-mem-list">' + cards + '</div>'
                     + (canInvite
-                        ? '<div class="ha-mem-invite">'
-                          + '<div class="ha-form-item"><label>邀请用户</label>'
-                          + '<input class="ha-input" id="haMemInviteId" placeholder="对方用户 ID（数字）" inputmode="numeric"></div>'
-                          + '<button class="ha-btn ha-btn-primary ha-btn-block" id="haMemInviteBtn">邀请加入</button>'
+                        ? '<div class="ow-mem-invite">'
+                          + '<div class="ow-form-item"><label>邀请用户</label>'
+                          + '<input class="ow-input" id="owMemInviteId" placeholder="对方用户 ID（数字）" inputmode="numeric"></div>'
+                          + '<button class="ow-btn ow-btn-primary ow-btn-block" id="owMemInviteBtn">邀请加入</button>'
                           + '</div>'
                         : '')
                     + codeRow
-                    + '<div class="ha-modal-actions">'
+                    + '<div class="ow-modal-actions">'
                     + (isOwnerOrAdmin && r.invite_code
-                        ? '<button class="ha-btn ha-btn-ghost" onclick="HaChat.roomInviteReset(' + roomId + ')">重置邀请码</button>' : '')
-                    + '<button class="ha-btn ha-btn-ghost ha-btn-block" onclick="HaChat.closeModal()">关闭</button></div>'
+                        ? '<button class="ow-btn ow-btn-ghost" onclick="OwChat.roomInviteReset(' + roomId + ')">重置邀请码</button>' : '')
+                    + '<button class="ow-btn ow-btn-ghost ow-btn-block" onclick="OwChat.closeModal()">关闭</button></div>'
                 );
                 // 邀请
-                var ib = $('haMemInviteBtn');
+                var ib = $('owMemInviteBtn');
                 if (ib) ib.onclick = function () {
-                    var uid = ($('haMemInviteId').value || '').replace(/[^0-9]/g, '');
+                    var uid = ($('owMemInviteId').value || '').replace(/[^0-9]/g, '');
                     if (!uid) { toast('请输入对方的用户 ID（数字）'); return; }
                     ib.disabled = true; ib.textContent = '邀请中…';
-                    HaApi.secure('room_invite', { room_id: roomId, user_id: uid }, function (res) {
+                    OwApi.secure('room_invite', { room_id: roomId, user_id: uid }, function (res) {
                         toast(res.msg);
                         if (!res.ok) { ib.disabled = false; ib.textContent = '邀请加入'; return; }
                         self.closeModal();
@@ -3463,13 +3463,13 @@
                     });
                 };
                 // 移出（敏感操作：票据一次性）
-                var delBtns = document.querySelectorAll('#haModal .ha-mem-del');
+                var delBtns = document.querySelectorAll('#owModal .ow-mem-del');
                 for (var k = 0; k < delBtns.length; k++) {
                     (function (el) {
                         el.onclick = function () {
                             var uid = el.getAttribute('data-id');
                             self.confirm('确定把该成员移出本群？他将无法再进入仅邀请群。', function () {
-                                HaApi.secure('room_remove_member', { room_id: roomId, user_id: uid }, function (res) {
+                                OwApi.secure('room_remove_member', { room_id: roomId, user_id: uid }, function (res) {
                                     toast(res.msg);
                                     if (res.ok) { self.closeModal(); self.roomMembers(roomId); }
                                 });
@@ -3477,7 +3477,7 @@
                         };
                     })(delBtns[k]);
                 }
-                var rb = $('haModal').querySelector('[onclick*="roomInviteReset"]');
+                var rb = $('owModal').querySelector('[onclick*="roomInviteReset"]');
                 if (rb) rb.onclick = function () { self.roomInviteReset(roomId); };
             });
         },
@@ -3486,7 +3486,7 @@
         roomInviteReset: function (roomId) {
             var self = this;
             this.confirm('重置后，旧邀请链接与邀请码立即失效。确定继续？', function () {
-                HaApi.secure('room_invite_code_reset', { room_id: roomId }, function (r) {
+                OwApi.secure('room_invite_code_reset', { room_id: roomId }, function (r) {
                     toast(r.msg);
                     if (r.ok) { self.closeModal(); self.roomMembers(roomId); }
                 });
@@ -3498,17 +3498,17 @@
 
         /* ---------- 表情面板 ---------- */
         buildEmojiPanel: function () {
-            var self = this, html = '<div class="ha-emoji-tabs">'
-                + '<button class="ha-emoji-tab active" data-tab="emoji">Emoji</button>'
-                + '<button class="ha-emoji-tab" data-tab="sticker">我的贴纸</button></div>'
-                + '<div class="ha-emoji-grid" id="haEmojiGrid"></div>';
-            $('haEmojiPanel').innerHTML = html;
-            var tabs = $('haEmojiPanel').querySelectorAll('.ha-emoji-tab'), i;
+            var self = this, html = '<div class="ow-emoji-tabs">'
+                + '<button class="ow-emoji-tab active" data-tab="emoji">Emoji</button>'
+                + '<button class="ow-emoji-tab" data-tab="sticker">我的贴纸</button></div>'
+                + '<div class="ow-emoji-grid" id="owEmojiGrid"></div>';
+            $('owEmojiPanel').innerHTML = html;
+            var tabs = $('owEmojiPanel').querySelectorAll('.ow-emoji-tab'), i;
             for (i = 0; i < tabs.length; i++) {
                 tabs[i].onclick = function () {
-                    var t = $('haEmojiPanel').querySelectorAll('.ha-emoji-tab'), j;
-                    for (j = 0; j < t.length; j++) t[j].className = 'ha-emoji-tab';
-                    this.className = 'ha-emoji-tab active';
+                    var t = $('owEmojiPanel').querySelectorAll('.ow-emoji-tab'), j;
+                    for (j = 0; j < t.length; j++) t[j].className = 'ow-emoji-tab';
+                    this.className = 'ow-emoji-tab active';
                     self.renderEmojiGrid(this.getAttribute('data-tab'));
                 };
             }
@@ -3516,27 +3516,27 @@
         },
 
         renderEmojiGrid: function (tab) {
-            var grid = $('haEmojiGrid'), self = this, html = '', i;
+            var grid = $('owEmojiGrid'), self = this, html = '', i;
             if (tab === 'emoji') {
-                for (i = 0; i < this.emojis.length; i++) html += '<span class="ha-emoji-item">' + this.emojis[i] + '</span>';
+                for (i = 0; i < this.emojis.length; i++) html += '<span class="ow-emoji-item">' + this.emojis[i] + '</span>';
                 grid.innerHTML = html;
                 var items = grid.getElementsByTagName('span');
                 for (i = 0; i < items.length; i++) {
                     items[i].onclick = function () {
-                        $('haInput').value += this.innerHTML;
-                        $('haInput').focus();
+                        $('owInput').value += this.innerHTML;
+                        $('owInput').focus();
                     };
                 }
             } else {
-                HaApi.post('stickers', {}, function (r) {
+                OwApi.post('stickers', {}, function (r) {
                     if (!r.ok || !r.data.length) { grid.innerHTML = '<p style="padding:20px;color:#5C5C5C;font-size:12px">暂无贴纸：把鼠标悬停在图片消息上点击「收藏贴纸」即可添加</p>'; return; }
-                    for (i = 0; i < r.data.length; i++) html += '<img class="ha-sticker-item" src="' + esc(r.data[i].url) + '">';
+                    for (i = 0; i < r.data.length; i++) html += '<img class="ow-sticker-item" src="' + esc(r.data[i].url) + '">';
                     grid.innerHTML = html;
                     var imgs = grid.getElementsByTagName('img');
                     for (i = 0; i < imgs.length; i++) {
                         imgs[i].onclick = function () {
                             self.send({ type: 'image', content: this.src });
-                            $('haEmojiPanel').style.display = 'none';
+                            $('owEmojiPanel').style.display = 'none';
                         };
                     }
                 });
@@ -3545,16 +3545,16 @@
 
         /* ---------- 我的面板 / 设置 ---------- */
         renderMe: function () {
-            var self = this, me = this.cfg.me, el = $('haMe');
+            var self = this, me = this.cfg.me, el = $('owMe');
             if (!el) return;
             if (me) {
                 // 昵称与身份标签同行；整块可点击 → 弹出操作菜单（创建群聊/设置/管理后台/退出）
                 // v1.0.93：侧栏不展示任何身份标签（群主/会员只在消息区、在线成员列表、资料卡显示）
-                el.className = 'ha-me ha-me-click';
+                el.className = 'ow-me ow-me-click';
                 el.innerHTML = avatarHtml(me.avatar, me.nickname, false, me.role)
-                    + '<div class="ha-me-info">'
-                    + '<div class="ha-me-line"><span class="ha-me-name">' + esc(me.nickname) + '</span>' + (me.title ? '<span class="ha-tag ha-tag-title">' + esc(me.title) + '</span>' : '') + '</div>'
-                    + '<div style="font-size:11px;color:var(--ha-text-sub)">ID ' + esc(fmtUid(me.id || 0)) + ' · 积分 ' + esc(me.points || 0) + '</div></div>';
+                    + '<div class="ow-me-info">'
+                    + '<div class="ow-me-line"><span class="ow-me-name">' + esc(me.nickname) + '</span>' + (me.title ? '<span class="ow-tag ow-tag-title">' + esc(me.title) + '</span>' : '') + '</div>'
+                    + '<div style="font-size:11px;color:var(--ow-text-sub)">ID ' + esc(fmtUid(me.id || 0)) + ' · 积分 ' + esc(me.points || 0) + '</div></div>';
                 el.onclick = function (e) {
                     // 阻止冒泡：否则 document 级「点击菜单外关闭」会立刻把刚打开的菜单关掉
                     e = e || w.event;
@@ -3562,10 +3562,10 @@
                     self.toggleMeMenu();
                 };
             } else {
-                el.className = 'ha-me';
+                el.className = 'ow-me';
                 el.onclick = null;
                 el.innerHTML = avatarHtml('', this.cfg.actor.nickname, false, 'guest')
-                    + '<div><div class="ha-me-name">' + esc(this.cfg.actor.nickname) + '</div></div>';
+                    + '<div><div class="ow-me-name">' + esc(this.cfg.actor.nickname) + '</div></div>';
             }
         },
 
@@ -3574,7 +3574,7 @@
            v1.2.31 之前这里是 onBrandMenu 扩展点 + toggleBrandMenu（头像+昵称/联系人/插件项）。
            用户要求删除并改成搜索：**默认搜「当前聊天」**，下方可切换搜索范围。
            ⚠️ onBrandMenu 扩展点一并删除（全项目零引用，plugins/ 下无任何调用）；
-              打开自己资料卡仍有入口 —— 侧栏底部资料区 #haMe（toggleMeMenu）。 */
+              打开自己资料卡仍有入口 —— 侧栏底部资料区 #owMe（toggleMeMenu）。 */
 
         /**
          * 搜索范围（v1.2.32 调整顺序：找人/群 挪到最后）。
@@ -3599,7 +3599,7 @@
          *   - 给 {id, label, run(self, keyword)} → 点击该标签时由插件自己搜、自己渲染，
          *     核心只负责把输入框的值传过去（适合要调自己接口、或结果结构不同的插件）
          * @example
-         * HaChat.onSearchScopes(function (defs) {
+         * OwChat.onSearchScopes(function (defs) {
          *     defs.push({ id: 'files', label: '文件', run: function (self, kw) { /* 自搜 *\/ } });
          * });
          */
@@ -3634,17 +3634,17 @@
             var defs = this.searchScopes(), i;
             var scopeHtml = '';
             for (i = 0; i < defs.length; i++) {
-                scopeHtml += '<button class="ha-tab' + (defs[i].id === this._srScope ? ' is-active' : '')
+                scopeHtml += '<button class="ow-tab' + (defs[i].id === this._srScope ? ' is-active' : '')
                     + '" data-scope="' + esc(defs[i].id) + '" type="button">' + esc(defs[i].label) + '</button>';
             }
             this.openModal(
                 '<h3>搜索</h3>'
-                + '<div class="ha-tabs ha-sr-scope" id="haSrScope">' + scopeHtml + '</div>'
+                + '<div class="ow-tabs ow-sr-scope" id="owSrScope">' + scopeHtml + '</div>'
                 // v1.2.32：maxlength=50（与服务端 cleanSearchKey 一致）
-                + '<input class="ha-input" id="haSrQ" maxlength="50" placeholder="' + esc(hint) + '" autocomplete="off">'
-                + '<div class="ha-sr-list" id="haSrList"></div>'
+                + '<input class="ow-input" id="owSrQ" maxlength="50" placeholder="' + esc(hint) + '" autocomplete="off">'
+                + '<div class="ow-sr-list" id="owSrList"></div>'
             , 460);
-            var q = $('haSrQ');
+            var q = $('owSrQ');
             this.renderSearchResults([]);
             if (!q) return;
             // 防抖 300ms（输入过程），回车立即搜一次
@@ -3656,7 +3656,7 @@
                 e = e || w.event;
                 if (e.keyCode === 13) { if (self._srTimer) clearTimeout(self._srTimer); self.doSearch(q.value); }
             };
-            var bar = $('haSrScope');
+            var bar = $('owSrScope');
             if (bar) bar.onclick = function (e) {
                 var t = e.target || e.srcElement;
                 while (t && t !== bar && !(t.getAttribute && t.getAttribute('data-scope'))) t = t.parentNode;
@@ -3664,7 +3664,7 @@
                 var sc = t.getAttribute('data-scope');
                 if (!sc || sc === self._srScope) return;
                 self._srScope = sc;
-                var bs = bar.getElementsByClassName('ha-tab'), i2;
+                var bs = bar.getElementsByClassName('ow-tab'), i2;
                 for (i2 = 0; i2 < bs.length; i2++) {
                     if (bs[i2].getAttribute('data-scope') === sc) bs[i2].className += ' is-active';
                     else bs[i2].className = bs[i2].className.replace(' is-active', '');
@@ -3675,14 +3675,14 @@
                     if (defs2[j].id === sc && typeof defs2[j].run === 'function') {
                         self._srData = [];
                         self.renderSearchResults([]);
-                        try { defs2[j].run(self, ($('haSrQ') || {}).value || ''); } catch (err) {}
+                        try { defs2[j].run(self, ($('owSrQ') || {}).value || ''); } catch (err) {}
                         return;
                     }
                 }
                 // v1.2.32：「在「群名」里搜索」这种**带上下文的提示只属于「当前聊天」**，
                 // 切到其它范围必须换回普通提示（否则「在『综合闲聊』里搜索」下面
                 // 列出全站消息，自相矛盾还误导用户）；切回来也要**恢复**上下文提示。
-                var qi = $('haSrQ');
+                var qi = $('owSrQ');
                 if (qi) {
                     if (sc === 'current') {
                         var c2 = self.searchContext();
@@ -3733,10 +3733,10 @@
                 var wait = Math.ceil((self._srCoolUntil - new Date().getTime()) / 1000);
                 if (wait <= 0) {
                     if (self._srCoolTimer) { clearInterval(self._srCoolTimer); self._srCoolTimer = null; }
-                    if (list) list.innerHTML = '<div class="ha-sr-empty">可以搜索了，回车或继续输入关键词</div>';
+                    if (list) list.innerHTML = '<div class="ow-sr-empty">可以搜索了，回车或继续输入关键词</div>';
                     return;
                 }
-                if (list) list.innerHTML = '<div class="ha-sr-empty">搜索太频繁，' + wait + ' 秒后可再次搜索</div>';
+                if (list) list.innerHTML = '<div class="ow-sr-empty">搜索太频繁，' + wait + ' 秒后可再次搜索</div>';
             };
             tick();
             this._srCoolTimer = setInterval(tick, 1000);
@@ -3749,11 +3749,11 @@
                 .replace(/\s+/g, ' ')
                 .replace(/^\s+|\s+$/g, '');
             if (kw.length > 50) kw = kw.slice(0, 50);
-            var list = $('haSrList');
+            var list = $('owSrList');
             if (!kw) { this.renderSearchResults([]); return; }
             if (this._srScope === 'current' && !this.searchContext()) {
                 // 中间是空白的（切到「联系人」标签后就是这状态）→ 明确告诉用户，别让人干等
-                if (list) list.innerHTML = '<div class="ha-sr-empty">当前没有打开的聊天，请先点开一个会话，或切换上面的搜索范围</div>';
+                if (list) list.innerHTML = '<div class="ow-sr-empty">当前没有打开的聊天，请先点开一个会话，或切换上面的搜索范围</div>';
                 return;
             }
             // ① 递增退避冷却
@@ -3765,13 +3765,13 @@
 
             var ctx = this.searchContext() || { roomId: 0, peer: '' };
             var mySeq = ++this._srSeq;
-            if (list) list.innerHTML = '<div class="ha-sr-empty">搜索中…</div>';
-            HaApi.post('search', {
+            if (list) list.innerHTML = '<div class="ow-sr-empty">搜索中…</div>';
+            OwApi.post('search', {
                 scope: this._srScope, q: kw,
                 room_id: ctx.roomId || 0, peer: ctx.peer || ''
             }, function (r) {
                 if (mySeq !== self._srSeq) return;
-                if (!r.ok) { if (list) list.innerHTML = '<div class="ha-sr-empty">' + esc(r.msg || '搜索失败') + '</div>'; return; }
+                if (!r.ok) { if (list) list.innerHTML = '<div class="ow-sr-empty">' + esc(r.msg || '搜索失败') + '</div>'; return; }
                 self._srData = r.data || [];
                 self._srTruncated = !!r.truncated;
                 self._srLimit = r.limit || 0;
@@ -3799,11 +3799,11 @@
         },
 
         renderSearchResults: function (list) {
-            var self = this, box = $('haSrList');
+            var self = this, box = $('owSrList');
             if (!box) return;
             if (!list.length) {
-                var kw = ($('haSrQ') || {}).value || '';
-                box.innerHTML = '<div class="ha-sr-empty">' + (kw ? '没有找到相关内容' : '输入关键词开始搜索') + '</div>';
+                var kw = ($('owSrQ') || {}).value || '';
+                box.innerHTML = '<div class="ow-sr-empty">' + (kw ? '没有找到相关内容' : '输入关键词开始搜索') + '</div>';
                 return;
             }
             this._srRendered = 0;
@@ -3812,7 +3812,7 @@
             //  ① 用 onscroll 赋值而不是 addEventListener —— 每次搜索都会重跑这个函数，
             //     addEventListener 会不断叠加监听器，回调里重复追加。
             //  ② 判断条件里的 scrollTop/clientHeight/scrollHeight 必须取 **box**（列表元素），
-            //     不是 self（HaChat 对象）。写成 self.scrollTop 恒为 undefined，
+            //     不是 self（OwChat 对象）。写成 self.scrollTop 恒为 undefined，
             //     比较恒为 false → 永远不触发追加，列表就停在首批 20 条。
             box.onscroll = function () {
                 if (box.scrollTop + box.clientHeight >= box.scrollHeight - 48) self.appendSrBatch();
@@ -3822,7 +3822,7 @@
 
         /** 追加一批（默认 20 条）；已全部渲染完则收尾加分隔线说明 */
         appendSrBatch: function () {
-            var self = this, box = $('haSrList');
+            var self = this, box = $('owSrList');
             if (!box || !this._srData) return;
             var total = this._srData.length;
             var from = this._srRendered;
@@ -3834,33 +3834,33 @@
                 if (d.type === 'msg') {
                     // v1.2.37：用发送者的真实头像（后端按 user_id 批量带出）；
                     // 游客消息没有用户身份 → 退回字母头像
-                    html += '<div class="ha-sr-item is-msg" data-i="' + i + '">'
+                    html += '<div class="ow-sr-item is-msg" data-i="' + i + '">'
                         + this.srAvatar(d.avatar || '', d.from, true, d.user_id ? 'user' : 'guest')
-                        + '<span class="ha-sr-main">'
-                        + '<span class="ha-sr-title">' + esc(d.from) + '<span class="ha-sr-tag">' + (d.room_id ? '群聊' : '私聊') + '</span></span>'
-                        + '<span class="ha-sr-sub">' + esc(d.text) + '</span>'
+                        + '<span class="ow-sr-main">'
+                        + '<span class="ow-sr-title">' + esc(d.from) + '<span class="ow-sr-tag">' + (d.room_id ? '群聊' : '私聊') + '</span></span>'
+                        + '<span class="ow-sr-sub">' + esc(d.text) + '</span>'
                         + '</span></div>';
                 } else if (d.type === 'room') {
                     // v1.2.32：群也显示 ID（可按 ID 直接搜到群）
-                    html += '<div class="ha-sr-item" data-i="' + i + '">'
-                        + roomAvatarHtml(d.avatar, true, 'ha-cl-icon')
-                        + '<span class="ha-sr-main">'
-                        + '<span class="ha-sr-title">' + esc(d.name)
-                        + '<span class="ha-sr-tag">ID ' + esc(fmtUid(d.room_id)) + '</span>'
-                        + (d.need_password ? '<span class="ha-sr-tag">密码房</span>' : '')
+                    html += '<div class="ow-sr-item" data-i="' + i + '">'
+                        + roomAvatarHtml(d.avatar, true, 'ow-cl-icon')
+                        + '<span class="ow-sr-main">'
+                        + '<span class="ow-sr-title">' + esc(d.name)
+                        + '<span class="ow-sr-tag">ID ' + esc(fmtUid(d.room_id)) + '</span>'
+                        + (d.need_password ? '<span class="ow-sr-tag">密码房</span>' : '')
                         + '</span>'
-                        + '<span class="ha-sr-sub">' + (d.need_password ? '需要密码才能进入' : '点击进入群聊') + '</span>'
+                        + '<span class="ow-sr-sub">' + (d.need_password ? '需要密码才能进入' : '点击进入群聊') + '</span>'
                         + '</span></div>';
                 } else {
                     // v1.2.32：ID 提到**标题行**做标签
-                    html += '<div class="ha-sr-item" data-i="' + i + '">'
+                    html += '<div class="ow-sr-item" data-i="' + i + '">'
                         + this.srAvatar(d.avatar, d.nickname, true, d.role)
-                        + '<span class="ha-sr-main">'
-                        + '<span class="ha-sr-title">' + esc(d.nickname)
-                        + '<span class="ha-sr-tag">ID ' + esc(fmtUid(d.user_id)) + '</span>'
-                        + (d.is_friend ? '<span class="ha-sr-tag">好友</span>' : '')
+                        + '<span class="ow-sr-main">'
+                        + '<span class="ow-sr-title">' + esc(d.nickname)
+                        + '<span class="ow-sr-tag">ID ' + esc(fmtUid(d.user_id)) + '</span>'
+                        + (d.is_friend ? '<span class="ow-sr-tag">好友</span>' : '')
                         + '</span>'
-                        + '<span class="ha-sr-sub">' + esc(d.signature || ('用户 ID ' + fmtUid(d.user_id))) + '</span>'
+                        + '<span class="ow-sr-sub">' + esc(d.signature || ('用户 ID ' + fmtUid(d.user_id))) + '</span>'
                         + '</span></div>';
                 }
             }
@@ -3870,7 +3870,7 @@
             // 最后一批之后才补截断说明
             if (to >= total && this._srTruncated && this._srLimit) {
                 box.insertAdjacentHTML('beforeend',
-                    '<div class="ha-sr-tip">结果较多，仅显示前 ' + this._srLimit + ' 条，试试更精确的关键词</div>');
+                    '<div class="ow-sr-tip">结果较多，仅显示前 ' + this._srLimit + ' 条，试试更精确的关键词</div>');
             }
             // 内容不足一屏（结果少或窗口很高）时继续补，否则用户永远滚不到底、
             // 后面的批次就永远加载不出来。
@@ -3928,9 +3928,9 @@
 
         /* ---------- 消息定位轮子（v1.2.36） ----------
            统一「跳到某条消息」的唯一入口。此前有**两套**并行实现：
-             · jumpToQuote（引用跳转）：scrollIntoView(smooth) + .ha-msg-jump 动画
+             · jumpToQuote（引用跳转）：scrollIntoView(smooth) + .ow-msg-jump 动画
                                       + 递归 loadHistory（最多 10 页）
-             · 搜索结果跳转：手动算 scrollTop + .ha-msg-hit 高亮 + 弹操作菜单
+             · 搜索结果跳转：手动算 scrollTop + .ow-msg-hit 高亮 + 弹操作菜单
                                       + 自己的按页回溯（15 页）
            两套的高亮样式、回溯方式、页数上限都不一样，看起来像两个功能。
            现在合并成一个轮子 `locateMsg(msgId, opt)`，样式与行为完全一致。
@@ -3949,19 +3949,19 @@
         },
 
         _locateStep: function (msgId, page, opt) {
-            var self = this, box = $('haMessages');
+            var self = this, box = $('owMessages');
             if (!box) return;
-            var node = $('haMsg' + msgId);
+            var node = $('owMsg' + msgId);
             if (node) { this._locateFocus(node, opt); return; }
             var fail = function () { toast(opt.tip || '未能定位到该消息'); };
             if (page >= this._srLocateMax || this.historyDone) { fail(); return; }
-            var first = box.querySelector('.ha-msg');
+            var first = box.querySelector('.ow-msg');
             if (!first) { fail(); return; }
-            var firstId = parseInt(first.id.replace('haMsg', ''), 10);
+            var firstId = parseInt(first.id.replace('owMsg', ''), 10);
             if (firstId <= msgId) { fail(); return; }     // 已到顶，这条不存在
             var isDm = !!this.dm;
             var peer = isDm ? this.dm.peer : '';
-            HaApi.post(isDm ? 'dm_history' : 'history',
+            OwApi.post(isDm ? 'dm_history' : 'history',
                 isDm ? { peer: peer, before_id: firstId } : { room_id: this.room, before: firstId },
                 function (r) {
                     // 已切走 / 已切私聊 → 丢弃，别把别处的消息插进当前视图
@@ -3977,20 +3977,20 @@
 
         /** 滚动居中 + 高亮 +（可选）弹操作菜单 */
         _locateFocus: function (node, opt) {
-            var self = this, box = $('haMessages');
+            var self = this, box = $('owMessages');
             var r = node.getBoundingClientRect(), br = box.getBoundingClientRect();
             box.scrollTop += (r.top - br.top) - (box.clientHeight / 2) + (r.height / 2);
             setTimeout(function () {
                 var rr = node.getBoundingClientRect();
-                node.className += ' ha-msg-hit';
+                node.className += ' ow-msg-hit';
                 setTimeout(function () {
-                    node.className = node.className.replace(' ha-msg-hit', '');
+                    node.className = node.className.replace(' ow-msg-hit', '');
                 }, 2400);
                 if (!opt.menu) return;
                 // ⚠️ 必须在此闭包外抓 self：setTimeout 回调里的 this 是 undefined
                 //（本文件是严格模式），写 this.msgCache 会抛
                 // 「Cannot read properties of undefined」并中断后面的菜单弹出。
-                var m = self.msgCache[parseInt(node.id.replace('haMsg', ''), 10)];
+                var m = self.msgCache[parseInt(node.id.replace('owMsg', ''), 10)];
                 if (m) self.showContentMenu(Math.round(rr.left + Math.min(rr.width, 360)), Math.round(rr.top + 8), m);
             }, 60);
         },
@@ -4001,10 +4001,10 @@
         },
 
         /**
-         * 个人资料区操作菜单：复用消息右键菜单（haCtxMenu）的展示 / 委托点击 /
+         * 个人资料区操作菜单：复用消息右键菜单（owCtxMenu）的展示 / 委托点击 /
          * 点击外部与 Esc 关闭，向上弹出（资料区位于侧栏底部）。
          */        toggleMeMenu: function () {
-            var self = this, me = this.cfg.me, menu = $('haCtxMenu');
+            var self = this, me = this.cfg.me, menu = $('owCtxMenu');
             if (!me || !menu) return;
             // 再次点击资料区 = 收起
             if (menu.style.display !== 'none' && menu._from === 'me') { this.hideCtxMenu(); return; }
@@ -4015,7 +4015,7 @@
             if (this.cfg.actor.role === 'admin') items.push({ t: '管理后台', run: function () { location.href = '?page=admin'; } });
             items.push({ t: '退出登录', run: function () {
                 self.confirmModal('确定退出登录吗？', function () {
-                    HaApi.secure('logout', {}, function () { location.href = '?page=login'; });
+                    OwApi.secure('logout', {}, function () { location.href = '?page=login'; });
                 });
             } });
             this._ctxItems = items;
@@ -4025,7 +4025,7 @@
             menu.innerHTML = html;
             menu.style.display = 'block';
             // 定位：贴着资料区上缘，左边对齐侧栏
-            var r = $('haMe').getBoundingClientRect();
+            var r = $('owMe').getBoundingClientRect();
             var mh = menu.offsetHeight || items.length * 34;
             menu.style.left = Math.max(4, r.left) + 'px';
             menu.style.top = Math.max(4, r.top - mh - 8) + 'px';
@@ -4037,24 +4037,24 @@
             this.openModal(
                 '<h3>个人设置</h3>'
                 // 头像置顶：点击当前头像即触发上传（不另设上传按钮）
-                + '<div class="ha-set-avatar">'
-                + '<span id="haSetAvatarPreview" class="ha-set-avatar-btn" title="点击更换头像" onclick="document.getElementById(\'haSetAvatarFile\').click()">'
+                + '<div class="ow-set-avatar">'
+                + '<span id="owSetAvatarPreview" class="ow-set-avatar-btn" title="点击更换头像" onclick="document.getElementById(\'owSetAvatarFile\').click()">'
                 + avatarHtml(me.avatar, me.nickname, 'lg', me.role) + '</span>'
-                + '<input type="file" id="haSetAvatarFile" accept="image/*" style="display:none">'
+                + '<input type="file" id="owSetAvatarFile" accept="image/*" style="display:none">'
                 + '</div>'
-                + '<div class="ha-form-item"><label>昵称</label><input class="ha-input" id="haSetNick" value="' + esc(me.nickname) + '">'
+                + '<div class="ow-form-item"><label>昵称</label><input class="ow-input" id="owSetNick" value="' + esc(me.nickname) + '">'
                 + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">2-20 个字符，支持中英文、数字、下划线与短横线，不含空格或 @；允许重名。</p></div>'
                 // v1.2.37：第三方应用授权已剥离为插件 oauth-core，**按需加载**。
-                // 入口按钮按 window.HaOauth 是否存在来渲染 —— 插件停用时它的 chat.js
+                // 入口按钮按 window.OwOauth 是否存在来渲染 —— 插件停用时它的 chat.js
                 // 不加载，这里自然什么都不显示，核心不需要任何开关判断。
-                + ((w.HaOauth) ? '<div class="ha-form-item"><label>第三方授权</label>'
-                    + '<button class="ha-btn ha-btn-ghost ha-btn-block" onclick="HaOauth.open()">管理应用授权</button>'
+                + ((w.OwOauth) ? '<div class="ow-form-item"><label>第三方授权</label>'
+                    + '<button class="ow-btn ow-btn-ghost ow-btn-block" onclick="OwOauth.open()">管理应用授权</button>'
                     + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">'
                     + '把资料、聊天记录等权限授予你安装的插件应用；随时可在此取消。</p></div>' : '')
-                + '<button class="ha-btn ha-btn-primary ha-btn-block" onclick="HaChat.saveSettings()">保存</button>'
+                + '<button class="ow-btn ow-btn-primary ow-btn-block" onclick="OwChat.saveSettings()">保存</button>'
             );
             var self = this;
-            $('haSetAvatarFile').onchange = function () {
+            $('owSetAvatarFile').onchange = function () {
                 if (!this.files || !this.files[0]) return;
                 // 选完图不直接上传：先进入裁剪弹窗，由滑块手动缩放后再导出
                 self.avatarCrop(this.files[0]);
@@ -4072,22 +4072,22 @@
          * @param File file 用户选择的原始图片
          */
         /**
-         * 独立裁剪浮层（参考论坛 dialog 方案）：不复用 haModal——
+         * 独立裁剪浮层（参考论坛 dialog 方案）：不复用 owModal——
          * 裁剪时编辑弹窗 / 后台表单保持完好，裁剪完直接回填预览。
          */
         openCropOverlay: function (html) {
             this.closeCropOverlay();
             var mask = document.createElement('div');
-            mask.className = 'ha-modal-mask';
-            mask.id = 'haCropMask';
+            mask.className = 'ow-modal-mask';
+            mask.id = 'owCropMask';
             mask.style.zIndex = '110';   // 盖在普通弹窗（z100）之上
-            mask.innerHTML = '<div class="ha-modal" id="haCropModal">'
-                + '<button class="ha-modal-close" onclick="HaChat.closeCropOverlay()">✕</button>' + html + '</div>';
+            mask.innerHTML = '<div class="ow-modal" id="owCropModal">'
+                + '<button class="ow-modal-close" onclick="OwChat.closeCropOverlay()">✕</button>' + html + '</div>';
             document.body.appendChild(mask);
         },
 
         closeCropOverlay: function () {
-            var m = $('haCropMask');
+            var m = $('owCropMask');
             if (m && m.parentNode) m.parentNode.removeChild(m);
         },
 
@@ -4115,16 +4115,16 @@
             reader.onload = function (ev) {
                 self.openCropOverlay(
                     '<h3>调整头像</h3>'
-                    + '<div class="ha-crop-wrap"><canvas id="haCropCanvas" width="200" height="200"></canvas></div>'
-                    + '<div class="ha-crop-ctrl">'
-                    + '<input type="range" id="haCropZoom" min="1" max="3" step="0.01" value="1">'
-                    + '<span class="ha-crop-val" id="haCropVal">100%</span>'
+                    + '<div class="ow-crop-wrap"><canvas id="owCropCanvas" width="200" height="200"></canvas></div>'
+                    + '<div class="ow-crop-ctrl">'
+                    + '<input type="range" id="owCropZoom" min="1" max="3" step="0.01" value="1">'
+                    + '<span class="ow-crop-val" id="owCropVal">100%</span>'
                     + '</div>'
-                    + '<div class="ha-modal-actions">'
-                    + '<button class="ha-btn ha-btn-ghost" onclick="HaChat.avatarCropCancel()">取消</button>'
-                    + '<button class="ha-btn ha-btn-primary" onclick="HaChat.avatarCropSave()">确定</button></div>'
+                    + '<div class="ow-modal-actions">'
+                    + '<button class="ow-btn ow-btn-ghost" onclick="OwChat.avatarCropCancel()">取消</button>'
+                    + '<button class="ow-btn ow-btn-primary" onclick="OwChat.avatarCropSave()">确定</button></div>'
                 );
-                var canvas = $('haCropCanvas'), zoom = $('haCropZoom'), val = $('haCropVal');
+                var canvas = $('owCropCanvas'), zoom = $('owCropZoom'), val = $('owCropVal');
                 var ctx = canvas.getContext('2d');
                 var SIZE = canvas.width;                 // 200：取景框即 canvas 本身
                 var img = new Image();
@@ -4167,7 +4167,7 @@
 
         /**
          * 右键「消息内容」的菜单：复制 / 引用 / 撤回 / 删除。
-         * 插件可通过 HaChat.onMsgContent 追加项（如翻译、举报、复制原文…）。
+         * 插件可通过 OwChat.onMsgContent 追加项（如翻译、举报、复制原文…）。
          *
          * v1.2.4 语义彻底对调（勿回退）：
          *   - **撤回** = 真正的删除，**全局生效**（所有人都不再看到），需满足撤回条件
@@ -4199,7 +4199,7 @@
             }
             this._ctxItems = items;
             if (!items.length) return;
-            var menu = $('haCtxMenu'), html = '', i2;
+            var menu = $('owCtxMenu'), html = '', i2;
             menu._from = 'msg';
             for (i2 = 0; i2 < items.length; i2++) html += '<a href="javascript:;" data-i="' + i2 + '">' + esc(items[i2].t) + '</a>';
             menu.innerHTML = html;
@@ -4244,27 +4244,27 @@
             }
             this.quote = { nick: String(q.nick || '').slice(0, 40), text: String(q.text || '').slice(0, 120), id: q.id || 0 };
             this.renderQuote();
-            var input = $('haInput');
+            var input = $('owInput');
             if (input) input.focus();
         },
 
         /** 渲染 / 清除输入框上方的引用条 */
         renderQuote: function () {
-            var box = $('haQuoteBar');
+            var box = $('owQuoteBar');
             if (!box) return;
             var q = this.quote;
-            var input = $('haInput');
+            var input = $('owInput');
             // 有引用时输入框顶部留白，让引用条独占输入框内第一行
             if (input) {
-                if (q && (q.nick || q.text)) input.className = 'ha-input ha-has-quote';
-                else input.className = 'ha-input';
+                if (q && (q.nick || q.text)) input.className = 'ow-input ow-has-quote';
+                else input.className = 'ow-input';
                 this.autoGrow();   // padding 变化后重算高度
             }
             if (!q || (!q.nick && !q.text)) { this.quote = null; box.style.display = 'none'; box.innerHTML = ''; return; }
             box.style.display = 'block';
-            box.innerHTML = '<div class="ha-quote-inner"><span class="ha-quote-nick">' + esc(q.nick) + '：</span>'
-                + '<span class="ha-quote-text">' + esc(q.text) + '</span>'
-                + '<button class="ha-quote-del" type="button" title="取消引用" onclick="HaChat.clearQuote()">✕</button></div>';
+            box.innerHTML = '<div class="ow-quote-inner"><span class="ow-quote-nick">' + esc(q.nick) + '：</span>'
+                + '<span class="ow-quote-text">' + esc(q.text) + '</span>'
+                + '<button class="ow-quote-del" type="button" title="取消引用" onclick="OwChat.clearQuote()">✕</button></div>';
         },
 
         /** 取消引用 */
@@ -4273,7 +4273,7 @@
         /**
          * 触发群头像文件选择（群聊设置弹窗内的隐藏 input，v1.1.10）
          */
-        roomAvatarPick: function () { var f = $('haRoomAvatarFile'); if (f) f.click(); },
+        roomAvatarPick: function () { var f = $('owRoomAvatarFile'); if (f) f.click(); },
 
         /**
          * 保存群聊设置（群聊设置弹窗内的表单，v1.1.10）
@@ -4283,15 +4283,15 @@
          */
         roomEditSave: function (id) {
             var self = this;
-            var nameEl = $('haRoomEditName'), descEl = $('haRoomEditDesc');
+            var nameEl = $('owRoomEditName'), descEl = $('owRoomEditDesc');
             if (!nameEl || !descEl) { toast('请先打开群聊设置弹窗'); return; }
-            HaApi.post('room_update', {
+            OwApi.post('room_update', {
                 id: id,
                 name: nameEl.value,
                 description: descEl.value,
                 avatar: this._roomAvatar || '',
                 // v1.1.11 公开性：只在有开关时提交，避免别处复用本函数时误改
-                is_public: $('haRoomPublic') ? ($('haRoomPublic').checked ? '1' : '0') : null
+                is_public: $('owRoomPublic') ? ($('owRoomPublic').checked ? '1' : '0') : null
             }, function (r) {
                 if (!r.ok) { toast(r.msg); return; }
                 toast('群聊信息已更新');
@@ -4303,7 +4303,7 @@
         /** 重新拉取群聊列表并重渲染 */
         reloadRooms: function () {
             var self = this;
-            HaApi.post('rooms', {}, function (r) {
+            OwApi.post('rooms', {}, function (r) {
                 if (!r.ok) return;
                 self.cfg.rooms = r.data;
                 // v1.1.0：列表已改为「群聊+私聊」聚合，走 conversations 重新拉取，
@@ -4341,9 +4341,9 @@
             var self = this;
             var text = '确定删除这条消息吗？删除后仅本机不再看到，其他人不受影响。';
             this.confirmModal(text, function () {
-                HaApi.secure('msg_delete', { id: id }, function (r) {
+                OwApi.secure('msg_delete', { id: id }, function (r) {
                     if (!r.ok) { toast(r.msg); return; }
-                    var el = $('haMsg' + id);
+                    var el = $('owMsg' + id);
                     if (el && el.parentNode) el.parentNode.removeChild(el);
                     delete self.msgCache[id];
                     // 本机隐藏只影响消息区，不影响会话摘要，无需重拉
@@ -4359,7 +4359,7 @@
 
         /** 按当前缩放导出正方形头像并上传（上传后仍需点「保存」写入资料） */
         avatarCropSave: function () {
-            var self = this, canvas = $('haCropCanvas');
+            var self = this, canvas = $('owCropCanvas');
             if (!canvas) { toast('裁剪弹窗已关闭'); return; }
             var done = function (blob) {
                 self.closeCropOverlay();
@@ -4385,7 +4385,7 @@
          */
         uploadAvatarBlob: function (file, filename, onOk) {
             var fd = new FormData();
-            var s = HaApi.sign('upload');
+            var s = OwApi.sign('upload');
             fd.append('ts', s.ts);
             fd.append('sign', s.sign);
             fd.append('kind', 'avatar');
@@ -4408,7 +4408,7 @@
          * 上传个人头像（file 可为 File 或 canvas 导出的 Blob），成功后刷新全部预览。
          *
          * v1.1.8：改为**回填所有可能出现头像预览的容器** —— 个人设置弹窗
-         * （#haSetAvatarPreview）与自己的资料卡（#haCardAvatarPreview）。
+         * （#owSetAvatarPreview）与自己的资料卡（#owCardAvatarPreview）。
          * 原先只回填前者，于是从资料卡上传后，卡片里的头像还是旧图
          * （必须关掉再打开才刷新），而资料卡恰恰是最新的入口。
          * 裁剪 → 导出 → 上传 → 回填这一整条链路由 cropForTarget / avatarCropSave
@@ -4420,10 +4420,10 @@
                 self.uploadAvatarBlob(file, filename, function (url) {
                     self.cfg.me.avatar = url;
                     // 设置弹窗预览
-                    var pv = $('haSetAvatarPreview');
+                    var pv = $('owSetAvatarPreview');
                     if (pv) pv.innerHTML = avatarHtml(url, self.cfg.me.nickname, 'lg', self.cfg.me.role);
                     // 自己的资料卡预览
-                    var cv = $('haCardAvatarPreview');
+                    var cv = $('owCardAvatarPreview');
                     if (cv) cv.innerHTML = avatarHtml(url, self.cfg.me.nickname, 'lg', self.cfg.me.role);
                     self.renderMe();
                     toast('头像已上传，点击保存生效');
@@ -4438,12 +4438,12 @@
             var self = this;
             self.uploadAvatarBlob(file, filename, function (url) {
                 self._roomAvatar = url;
-                var pv = $('haRoomAvatarPreview');
+                var pv = $('owRoomAvatarPreview');
                 if (pv) {
                     // 侧栏用头像组件，后台表单用图片预览（裁剪浮层独立，两者都完好）
                     // v1.1.19：群头像统一走 roomAvatarHtml（此处必有 url，行为与原来一致，
                     // 只是组件口径统一，将来加默认图时不会漏掉这一处）。
-                    if (pv.getAttribute('class').indexOf('ha-set-avatar-btn') >= 0)
+                    if (pv.getAttribute('class').indexOf('ow-set-avatar-btn') >= 0)
                         pv.innerHTML = roomAvatarHtml(url, false);
                     else
                         pv.innerHTML = '<img src="' + esc(url) + '" alt="">';
@@ -4454,51 +4454,51 @@
 
         saveSettings: function () {
             var self = this;
-            HaApi.post('profile_save', {
-                nickname: $('haSetNick').value,
+            OwApi.post('profile_save', {
+                nickname: $('owSetNick').value,
                 avatar: this.cfg.me.avatar || ''
             }, function (r) {
                 toast(r.msg);
-                if (r.ok) { self.cfg.me.nickname = $('haSetNick').value; self.renderMe(); self.closeModal(); }
+                if (r.ok) { self.cfg.me.nickname = $('owSetNick').value; self.renderMe(); self.closeModal(); }
             });
         },
 
         /* ---------- 弹层 ---------- */
         /** 打开弹窗；width 可选（px），供内容较宽的弹窗（如群公告页面）覆盖默认 380px */
         openModal: function (html, width) {
-            // 后台页（HaAdmin）没有静态浮层：动态补建（closeModal 同样兼容）
-            if (!$('haModalMask') || !$('haModal')) {
+            // 后台页（OwAdmin）没有静态浮层：动态补建（closeModal 同样兼容）
+            if (!$('owModalMask') || !$('owModal')) {
                 var mask = document.createElement('div');
-                mask.className = 'ha-modal-mask';
-                mask.id = 'haModalMask';
+                mask.className = 'ow-modal-mask';
+                mask.id = 'owModalMask';
                 mask.style.display = 'none';
-                mask.innerHTML = '<div class="ha-modal" id="haModal"></div>';
+                mask.innerHTML = '<div class="ow-modal" id="owModal"></div>';
                 document.body.appendChild(mask);
             }
-            $('haModal').style.maxWidth = width ? (parseInt(width, 10) + 'px') : '';
-            $('haModal').innerHTML = '<button class="ha-modal-close" onclick="HaChat.closeModal()">✕</button>' + html;
-            $('haModalMask').style.display = '-webkit-flex';
-            $('haModalMask').style.display = 'flex';
+            $('owModal').style.maxWidth = width ? (parseInt(width, 10) + 'px') : '';
+            $('owModal').innerHTML = '<button class="ow-modal-close" onclick="OwChat.closeModal()">✕</button>' + html;
+            $('owModalMask').style.display = '-webkit-flex';
+            $('owModalMask').style.display = 'flex';
         },
-        closeModal: function () { $('haModalMask').style.display = 'none'; },
+        closeModal: function () { $('owModalMask').style.display = 'none'; },
 
         /** 自研确认弹窗（v1.0.112 前台版）：替代原生 confirm——全站禁止浏览器原生弹窗 */
         confirm: function (text, onOk) {
             var mask = document.createElement('div');
-            mask.className = 'ha-modal-mask';
+            mask.className = 'ow-modal-mask';
             mask.style.display = 'flex';
             mask.style.zIndex = 200;   // 叠在普通弹窗（z-index 100）之上
-            mask.innerHTML = '<div class="ha-modal" style="width:340px;max-width:92%">'
-                + '<button class="ha-modal-close">✕</button>'
+            mask.innerHTML = '<div class="ow-modal" style="width:340px;max-width:92%">'
+                + '<button class="ow-modal-close">✕</button>'
                 + '<h3>确认操作</h3>'
-                + '<p class="ha-modal-desc">' + esc(text).replace(/\n/g, '<br>') + '</p>'
-                + '<div class="ha-modal-actions">'
-                + '<button class="ha-btn ha-btn-ghost">取消</button>'
-                + '<button class="ha-btn ha-btn-danger">确定</button></div></div>';
+                + '<p class="ow-modal-desc">' + esc(text).replace(/\n/g, '<br>') + '</p>'
+                + '<div class="ow-modal-actions">'
+                + '<button class="ow-btn ow-btn-ghost">取消</button>'
+                + '<button class="ow-btn ow-btn-danger">确定</button></div></div>';
             document.body.appendChild(mask);
             var close = function () { if (mask.parentNode) document.body.removeChild(mask); };
-            mask.querySelector('.ha-modal-close').onclick = close;
-            var bs = mask.querySelectorAll('.ha-modal-actions .ha-btn');
+            mask.querySelector('.ow-modal-close').onclick = close;
+            var bs = mask.querySelectorAll('.ow-modal-actions .ow-btn');
             bs[0].onclick = close;
             bs[1].onclick = function () { close(); if (onOk) onOk(); };
             mask.onclick = function (e) { if (e.target === mask) close(); };
@@ -4506,9 +4506,9 @@
     };
 
     /* ==========================================================================
-       HaAdmin：管理后台
+       OwAdmin：管理后台
        ========================================================================== */
-    var HaAdmin = {
+    var OwAdmin = {
         /**
          * 通用确认弹窗（与前台 confirmModal 同一样式，v1.0.50）。
          * 所有删除 / 卸载 / 禁用等危险操作统一调用，不再使用原生 confirm。
@@ -4524,28 +4524,28 @@
             if (!el) return;
             var pages = Math.max(1, Math.ceil(total / size));
             if (pages <= 1) {
-                el.innerHTML = '<span style="font-size:12px;color:var(--ha-text-sub)">共 ' + total + ' 条</span>';
+                el.innerHTML = '<span style="font-size:12px;color:var(--ow-text-sub)">共 ' + total + ' 条</span>';
                 return;
             }
-            var h = '<div class="ha-pager">';
-            if (page > 1) h += '<button type="button" class="ha-btn ha-btn-ghost" data-pg="' + (page - 1) + '">上一页</button>';
+            var h = '<div class="ow-pager">';
+            if (page > 1) h += '<button type="button" class="ow-btn ow-btn-ghost" data-pg="' + (page - 1) + '">上一页</button>';
             // 数字页码：当前页前后各 2 页，首末页与区间之间用省略号
             var start = Math.max(1, page - 2), end = Math.min(pages, page + 2);
             if (start > 1) {
-                h += '<button type="button" class="ha-btn ha-btn-ghost" data-pg="1">1</button>';
-                if (start > 2) h += '<span class="ha-pager-dots">…</span>';
+                h += '<button type="button" class="ow-btn ow-btn-ghost" data-pg="1">1</button>';
+                if (start > 2) h += '<span class="ow-pager-dots">…</span>';
             }
             for (var i = start; i <= end; i++) {
-                h += '<button type="button" class="ha-btn ' + (i === page ? 'ha-btn-primary' : 'ha-btn-ghost') + '"' + (i === page ? ' disabled' : '') + ' data-pg="' + i + '">' + i + '</button>';
+                h += '<button type="button" class="ow-btn ' + (i === page ? 'ow-btn-primary' : 'ow-btn-ghost') + '"' + (i === page ? ' disabled' : '') + ' data-pg="' + i + '">' + i + '</button>';
             }
             if (end < pages) {
-                if (end < pages - 1) h += '<span class="ha-pager-dots">…</span>';
-                h += '<button type="button" class="ha-btn ha-btn-ghost" data-pg="' + pages + '">' + pages + '</button>';
+                if (end < pages - 1) h += '<span class="ow-pager-dots">…</span>';
+                h += '<button type="button" class="ow-btn ow-btn-ghost" data-pg="' + pages + '">' + pages + '</button>';
             }
-            if (page < pages) h += '<button type="button" class="ha-btn ha-btn-ghost" data-pg="' + (page + 1) + '">下一页</button>';
+            if (page < pages) h += '<button type="button" class="ow-btn ow-btn-ghost" data-pg="' + (page + 1) + '">下一页</button>';
             // 页码跳转：输入页码回车直接跳
-            h += '<span class="ha-pager-jump">跳至<input type="number" class="ha-pager-jump-input" min="1" max="' + pages + '" value="' + page + '">页</span>';
-            h += '<span class="ha-pager-info">共 ' + total + ' 条</span>';
+            h += '<span class="ow-pager-jump">跳至<input type="number" class="ow-pager-jump-input" min="1" max="' + pages + '" value="' + page + '">页</span>';
+            h += '<span class="ow-pager-info">共 ' + total + ' 条</span>';
             h += '</div>';
             el.innerHTML = h;
             var btns = el.getElementsByTagName('button');
@@ -4555,7 +4555,7 @@
                     if (pg >= 1 && pg <= pages && pg !== page) go(pg);
                 };
             }
-            var jump = el.querySelector('.ha-pager-jump-input');
+            var jump = el.querySelector('.ow-pager-jump-input');
             if (jump) {
                 var doJump = function () {
                     var v = parseInt(jump.value, 10);
@@ -4581,11 +4581,86 @@
             return n;
         },
 
+        /**
+         * 批量操作「下拉轮子」（v1.2.60）：把多个批量动作收进一个 select + 一个执行按钮。
+         *
+         * 为什么改：原先每个动作平铺一个按钮（群聊审核摊了 4 个），动作一多就撑爆一行、
+         * 挤掉「已选 N 条」提示位，窄屏还会折成两行。而真正会被用的往往只有一个动作。
+         * 下拉首项是占位提示，强迫用户先明确「要做哪个」，比一排等权按钮少误点。
+         *
+         * @param {Object} opt
+         *   - id      容器元素 id
+         *   - chkCls  行复选框 class
+         *   - actions [{key, label, danger?}]，danger=true 的动作项标红
+         *   - statBase 未选中时的统计文案（如「共 120 条」）
+         *   - onExec  function(actionKey, ids)，由页面自己弹确认框并调接口
+         */
+        uiBatchBar: function (opt) {
+            var box = $(opt.id);
+            if (!box) return;
+            var acts = opt.actions || [], h = '', i;
+            h = '<div class="ow-admin-batch">'
+               + '<select class="ow-input ow-batch-select" id="' + opt.id + '_sel">'
+               + '<option value="">请选择批量操作</option>';
+            for (i = 0; i < acts.length; i++) {
+                h += '<option value="' + esc(acts[i].key) + '"' + (acts[i].danger ? ' class="ow-batch-danger"' : '') + '>'
+                   + esc(acts[i].label) + '</option>';
+            }
+            h += '</select>'
+               + '<button type="button" class="ow-btn ow-btn-primary" id="' + opt.id + '_go" disabled>执行</button>'
+               + '<span id="' + opt.id + '_stat" style="color:var(--ow-text-sub);font-size:12px"></span>'
+               + '</div>';
+            box.innerHTML = h;
+
+            var btn = $(opt.id + '_go');
+            if (btn) {
+                btn.onclick = function () {
+                    var sel = $(opt.id + '_sel');
+                    var key = sel ? sel.value : '';
+                    if (!key) { toast('请先选择批量操作'); return; }
+                    var ids = OwAdmin.batchIds(opt.chkCls);
+                    if (!ids.length) { toast('请先勾选要操作的项目'); return; }
+                    opt.onExec(key, ids);   // 确认框与接口调用交给页面（各动作危险程度不同）
+                };
+            }
+            var sel2 = $(opt.id + '_sel');
+            if (sel2) {
+                sel2.onchange = function () {
+                    // 选中危险动作时执行按钮转红，给一道额外的视觉刹车
+                    var a = null;
+                    for (var j = 0; j < acts.length; j++) if (acts[j].key === sel2.value) a = acts[j];
+                    if (btn) btn.className = 'ow-btn ' + (a && a.danger ? 'ow-btn-danger' : 'ow-btn-primary');
+                };
+            }
+            OwAdmin.batchSync(opt.chkCls, opt.id, opt.statBase);
+        },
+
+        /** 取当前勾选的 id 列表（所有批量调用方共用这一份取值逻辑） */
+        batchIds: function (chkCls) {
+            var boxes = document.getElementsByClassName(chkCls), ids = [];
+            for (var i = 0; i < boxes.length; i++) if (boxes[i].checked) ids.push(boxes[i].value);
+            return ids;
+        },
+
+        /**
+         * 批量计数同步（下拉轮子版）：未选中时禁用执行按钮，并把「已选 N 条」写进统计位。
+         * @return number 已选数量
+         */
+        batchSync: function (chkCls, barId, base) {
+            var ids = OwAdmin.batchIds(chkCls);
+            var go = $(barId + '_go'), st = $(barId + '_stat');
+            if (go) go.disabled = ids.length === 0;
+            if (st) st.textContent = ids.length
+                ? (base ? base + '，已选 ' + ids.length + ' 条' : '已选 ' + ids.length + ' 条')
+                : (base || '');
+            return ids.length;
+        },
+
         /* ---------- 安全日志：动作/字段中文表 + 详情解析 + 筛选加载（v1.2.51） ----------
            原来一次拉 200 条裸行：action 是英文 slug、data 是原始 JSON，基本看不懂。
            现在服务端分页 + 按动作筛选，动作/字段都翻成中文，data 拼成一句人话。
-           ⚠️ 这些方法必须在 HaAdmin **顶层**：筛选下拉的 onchange 直接引用
-           HaAdmin.logAct / HaAdmin.logLoad；pages 表里的 logs 只是渲染壳。
+           ⚠️ 这些方法必须在 OwAdmin **顶层**：筛选下拉的 onchange 直接引用
+           OwAdmin.logAct / OwAdmin.logLoad；pages 表里的 logs 只是渲染壳。
            动作表覆盖核心与全部内置插件；新动作没进表也不出错 —— 回退显示英文 slug。 */
         _logActs: {
             login: '登录成功', login_fail: '登录失败', login_locked: '账号锁定',
@@ -4595,7 +4670,7 @@
             admin_ban: '后台封禁', ban_quick: '快捷封禁',
             admin_user_set: '后台设置用户', admin_user_lock: '后台锁定用户',
             admin_user_points: '调整积分', admin_user_level: '调整等级',
-            cron_toggle: '计划任务启停', cron_run: '手动执行任务', cron_token: '重置任务令牌', cron_error: '任务执行异常',
+            cron_toggle: '维护任务启停', cron_run: '手动执行任务', cron_token: '重置任务令牌', cron_error: '任务执行异常',
             room_create: '创建群聊', room_update: '更新群资料', room_review: '群聊处置', room_undo: '撤销处置',
             room_invite: '邀请入群', room_member_del: '移出成员', room_invite_code: '生成邀请链接', room_pass_fail: '房间密码错误',
             msg_recall: '撤回消息', msg_hide: '隐藏消息', msg_expire: '保留期清理',
@@ -4651,80 +4726,151 @@
             return parts.length ? parts.join('，') : '—';
         },
         logAct: function (a) {
-            HaAdmin._logAct = a || '';
-            HaAdmin.logLoad(1);
+            OwAdmin._logAct = a || '';
+            OwAdmin.logLoad(1);
         },
         logLoad: function (page) {
-            HaAdmin._logPage = Math.max(1, page || 1);
-            HaApi.post('admin_logs', { page: HaAdmin._logPage, psize: 30, action: HaAdmin._logAct }, function (r) {
-                var main = $('haAdminMain');
-                if (!r.ok) { main.innerHTML = '<div class="ha-card">' + esc(r.msg || '加载失败') + '</div>'; return; }
+            OwAdmin._logPage = Math.max(1, page || 1);
+            OwApi.post('admin_logs', { page: OwAdmin._logPage, psize: 30, action: OwAdmin._logAct }, function (r) {
+                var main = $('owAdminMain');
+                if (!r.ok) { main.innerHTML = '<div class="ow-card">' + esc(r.msg || '加载失败') + '</div>'; return; }
 
                 // 筛选下拉：全部 + 各动作（带计数）。每次重绘以保住计数最新，
                 // 选中态跟随 _logAct，翻页不丢筛选。
-                var sel = $('haLogAct');
+                var sel = $('owLogAct');
                 if (sel) {
                     var oh = '<option value="">全部动作（' + r.total + '）</option>';
                     for (var a = 0; a < r.actions.length; a++) {
                         var it = r.actions[a];
-                        oh += '<option value="' + esc(it.action) + '"' + (it.action === HaAdmin._logAct ? ' selected' : '') + '>'
-                            + esc(HaAdmin._logActName(it.action)) + '（' + it.n + '）</option>';
+                        oh += '<option value="' + esc(it.action) + '"' + (it.action === OwAdmin._logAct ? ' selected' : '') + '>'
+                            + esc(OwAdmin._logActName(it.action)) + '（' + it.n + '）</option>';
                     }
                     sel.innerHTML = oh;
                 }
-                var stat = $('haLogStat');
+                var stat = $('owLogStat');
                 if (stat) stat.textContent = '共 ' + r.total + ' 条';
+                OwAdmin._logTotal = r.total;
 
-                var h = '<tr><th>时间</th><th>动作</th><th>操作者</th><th>IP</th><th>详情</th></tr>';
+                var h = '<tr><th style="width:32px"><input type="checkbox" id="owLogCheckAll" onchange="OwAdmin.logToggleAll(this)"></th>'
+                      + '<th>时间</th><th>动作</th><th>操作者</th><th>IP</th><th>详情</th></tr>';
                 if (!r.data.length) {
-                    h += '<tr><td colspan="5" style="color:#5C5C5C">当前筛选下暂无日志。</td></tr>';
+                    h += '<tr><td colspan="6" style="color:#5C5C5C">当前筛选下暂无日志。</td></tr>';
                 }
                 for (var i = 0; i < r.data.length; i++) {
                     var x = r.data[i];
-                    h += '<tr><td style="white-space:nowrap">' + esc(HaAdmin._logTs(x.created_at)) + '</td>'
-                       + '<td><b>' + esc(HaAdmin._logActName(x.action)) + '</b>'
+                    h += '<tr><td><input type="checkbox" class="owLogChk" value="' + x.id + '" onchange="OwAdmin.logSyncBatch()"></td>'
+                       + '<td style="white-space:nowrap">' + esc(OwAdmin._logTs(x.created_at)) + '</td>'
+                       + '<td><b>' + esc(OwAdmin._logActName(x.action)) + '</b>'
                        + '<div style="color:#8A8A8A;font-size:11px">' + esc(x.action) + '</div></td>'
                        + '<td>' + esc(x.actor || '—') + '</td>'
                        + '<td>' + esc(x.ip || '—') + '</td>'
-                       + '<td style="max-width:420px">' + HaAdmin._logDetail(x) + '</td></tr>';
+                       + '<td style="max-width:420px">' + OwAdmin._logDetail(x) + '</td></tr>';
                 }
-                var tb = $('haLogTable');
+                var tb = $('owLogTable');
                 if (tb) tb.innerHTML = h;
-                HaAdmin.uiPager('haLogPager', r.page, r.total, r.psize || 30, function (pg) { HaAdmin.logLoad(pg); });
+                var all = $('owLogCheckAll');
+                if (all) all.checked = false;
+                OwAdmin.batchSync('owLogChk', 'owLogBatch', '共 ' + r.total + ' 条');
+                OwAdmin.uiPager('owLogPager', r.page, r.total, r.psize || 30, function (pg) { OwAdmin.logLoad(pg); });
+            });
+        },
+
+        /** 全选 / 取消全选（安全日志） */
+        logToggleAll: function (cb) {
+            var boxes = document.getElementsByClassName('owLogChk');
+            for (var i = 0; i < boxes.length; i++) boxes[i].checked = cb.checked;
+            OwAdmin.logSyncBatch();
+        },
+
+        logSyncBatch: function () {
+            OwAdmin.batchSync('owLogChk', 'owLogBatch', '共 ' + (OwAdmin._logTotal || 0) + ' 条');
+        },
+
+        /** CSV 导出：走 GET 直出（服务端在签名门禁前放行，仅校验管理员会话） */
+        logExport: function () {
+            window.location.href = '?action=admin_logs_export';
+        },
+
+        /** 打开某个日志文件（系统日志页的 tab 切换） */
+        syslogOpen: function (file) {
+            OwAdmin._sysFile = file;
+            var tabs = $('owSysTabs');
+            if (tabs) {
+                var bs = tabs.getElementsByTagName('button');
+                for (var i = 0; i < bs.length; i++) {
+                    var on = bs[i].getAttribute('data-file') === file;
+                    bs[i].className = bs[i].className.replace(/\s*active/g, '') + (on ? ' active' : '');
+                }
+            }
+            var btn = $('owSysClear');
+            if (btn) btn.disabled = false;
+            var body = $('owSysBody');
+            if (body) body.innerHTML = '加载中…';
+            OwApi.post('admin_syslog_read', { file: file }, function (r) {
+                if (!body) return;
+                if (!r.ok) { body.innerHTML = '<div class="ow-syslog-line">' + esc(r.msg) + '</div>'; return; }
+                // 用 textContent 而非 innerHTML：日志内容含任意字符，拼 HTML 会被当成标签解析
+                body.textContent = r.content || '（文件为空）';
+            });
+        },
+
+        syslogClear: function () {
+            var file = OwAdmin._sysFile;
+            if (!file) return;
+            OwAdmin.confirm('确定清空 ' + file + ' 的全部内容？该文件的现有记录将不可恢复。', function () {
+                OwApi.secure('admin_syslog_clear', { file: file }, function (r) {
+                    toast(r.msg);
+                    if (r.ok) OwAdmin.syslogOpen(file);
+                });
+            });
+        },
+
+        /**
+         * 手动清理 OPcache（v1.2.60）：刷新已编译脚本缓存，适合代码更新后手动触发。
+         * 只清缓存、不改任何数据，故走普通 post 而非票据。
+         */
+        opcacheReset: function () {
+            var btn = $('owOpcacheBtn'), st = $('owOpcacheStat');
+            if (btn) btn.disabled = true;
+            if (st) st.textContent = '正在清理…';
+            OwApi.post('admin_opcache_reset', {}, function (r) {
+                if (btn) btn.disabled = false;
+                if (st) st.textContent = r.ok ? '（' + (r.msg || '已完成') + '）' : '';
+                toast(r.msg);
             });
         },
 
         confirm: function (text, onOk) {
             var mask = document.createElement('div');
-            mask.className = 'ha-modal-mask';
+            mask.className = 'ow-modal-mask';
             mask.style.display = 'flex';
-            mask.innerHTML = '<div class="ha-modal" style="width:340px;max-width:92%">'
-                + '<button class="ha-modal-close">✕</button>'
+            mask.innerHTML = '<div class="ow-modal" style="width:340px;max-width:92%">'
+                + '<button class="ow-modal-close">✕</button>'
                 + '<h3>确认操作</h3>'
-                + '<p class="ha-modal-desc">' + esc(text).replace(/\n/g, '<br>') + '</p>'
-                + '<div class="ha-modal-actions">'
-                + '<button class="ha-btn ha-btn-ghost">取消</button>'
-                + '<button class="ha-btn ha-btn-danger">确定</button></div></div>';
+                + '<p class="ow-modal-desc">' + esc(text).replace(/\n/g, '<br>') + '</p>'
+                + '<div class="ow-modal-actions">'
+                + '<button class="ow-btn ow-btn-ghost">取消</button>'
+                + '<button class="ow-btn ow-btn-danger">确定</button></div></div>';
             document.body.appendChild(mask);
             var close = function () { if (mask.parentNode) document.body.removeChild(mask); };
-            mask.querySelector('.ha-modal-close').onclick = close;
-            var bs = mask.querySelectorAll('.ha-modal-actions .ha-btn');
+            mask.querySelector('.ow-modal-close').onclick = close;
+            var bs = mask.querySelectorAll('.ow-modal-actions .ow-btn');
             bs[0].onclick = close;
             bs[1].onclick = function () { close(); if (onOk) onOk(); };
             mask.onclick = function (e) { if (e.target === mask) close(); };
         },
         init: function (opt) {
-            HaApi.key = opt.key;
-            HaApi.setServerTime(opt.ts);
-            var menu = $('haAdminMenu'), self = this;
+            OwApi.key = opt.key;
+            OwApi.setServerTime(opt.ts);
+            var menu = $('owAdminMenu'), self = this;
             // 移动端抽屉：顶栏汉堡开合 + 遮罩点击收起 + 回到桌面宽度自动复位
-            var side = $('haAdminSide'), mask = $('haAdminMask');
+            var side = $('owAdminSide'), mask = $('owAdminMask');
             var setSide = function (open) {
                 if (!side) return;
-                side.className = 'ha-admin-side' + (open ? ' open' : '');
+                side.className = 'ow-admin-side' + (open ? ' open' : '');
                 if (mask) mask.style.display = open ? 'block' : 'none';
             };
-            if ($('haAdminToggle')) $('haAdminToggle').onclick = function () { setSide(side.className.indexOf('open') < 0); };
+            if ($('owAdminToggle')) $('owAdminToggle').onclick = function () { setSide(side.className.indexOf('open') < 0); };
             if (mask) mask.onclick = function () { setSide(false); };
             window.onresize = function () {
                 if ((document.documentElement.clientWidth || window.innerWidth || 1024) > 720) setSide(false);
@@ -4732,7 +4878,7 @@
             var items = menu.getElementsByTagName('li'), i;
             // 记忆当前页面：启停插件等操作刷新后停留在原页面，而不是跳回默认页
             var remember = function (ap) {
-                try { sessionStorage.setItem('haAdminPage', ap); } catch (e) {}
+                try { sessionStorage.setItem('owAdminPage', ap); } catch (e) {}
             };
             for (i = 0; i < items.length; i++) {
                 items[i].onclick = function () {
@@ -4753,8 +4899,8 @@
             }
             /* 恢复上次所在页面（启停插件刷新后不跳回默认页）；无记录时进群聊管理 */
             var lastPage = 'rooms';
-            try { lastPage = sessionStorage.getItem('haAdminPage') || 'rooms'; } catch (e) {}
-            try { if (sessionStorage.getItem('haAdminPluginsOpen') === '1') self.togglePluginSub(true); } catch (e) {}
+            try { lastPage = sessionStorage.getItem('owAdminPage') || 'rooms'; } catch (e) {}
+            try { if (sessionStorage.getItem('owAdminPluginsOpen') === '1') self.togglePluginSub(true); } catch (e) {}
             // 摘掉服务端预置的默认选中态（rooms），避免双高亮
             var all0 = menu.getElementsByTagName('li'), k0;
             for (k0 = 0; k0 < all0.length; k0++) {
@@ -4775,42 +4921,42 @@
          * @param {boolean} forceOpen true=强制展开（点击插件子页面时用），false=切换
          */
         togglePluginSub: function (forceOpen) {
-            var menu = $('haAdminMenu'), all = menu.getElementsByTagName('li'), i, el, group = null;
+            var menu = $('owAdminMenu'), all = menu.getElementsByTagName('li'), i, el, group = null;
             for (i = 0; i < all.length; i++) {
-                if (all[i].className.indexOf('ha-admin-group') >= 0) { group = all[i]; break; }
+                if (all[i].className.indexOf('ow-admin-group') >= 0) { group = all[i]; break; }
             }
             if (!group) return;   // 没有任何插件声明后台页面 → 插件管理是普通菜单项
-            var willOpen = forceOpen ? true : group.className.indexOf('ha-group-open') < 0;
+            var willOpen = forceOpen ? true : group.className.indexOf('ow-group-open') < 0;
             // ⚠️ 正则里的类名必须与上面 if 判断、以及 CSS 里的**完全一致**：
-            //   写错一个字母（曾写成 \bow-group-open，实际是 ha-group-open）会导致
+            //   写错一个字母（曾写成 \bow-group-open，实际是 ow-group-open）会导致
             //   类名只增不减 → 点标题收起无效、越点越开，且不报任何错。
             group.className = trimCls((group.className.replace(/\bha-group-open\b/g, ''))
-                + (willOpen ? ' ha-group-open' : ''));
+                + (willOpen ? ' ow-group-open' : ''));
             for (i = 0; i < all.length; i++) {
                 el = all[i];
-                if (el.className.indexOf('ha-admin-sub') < 0) continue;
+                if (el.className.indexOf('ow-admin-sub') < 0) continue;
                 el.className = trimCls((el.className.replace(/\bha-sub-open\b/g, ''))
-                    + (willOpen ? ' ha-sub-open' : ''));
+                    + (willOpen ? ' ow-sub-open' : ''));
             }
             // 记录展开状态：刷新后恢复
             try {
-                if (willOpen) sessionStorage.setItem('haAdminPluginsOpen', '1');
-                else sessionStorage.removeItem('haAdminPluginsOpen');
+                if (willOpen) sessionStorage.setItem('owAdminPluginsOpen', '1');
+                else sessionStorage.removeItem('owAdminPluginsOpen');
             } catch (e) {}
         },
 
         page: function (name) {
-            var main = $('haAdminMain');
-            var M = HaAdmin.pages[name];
+            var main = $('owAdminMain');
+            var M = OwAdmin.pages[name];
             // 移动端适配：主区内任何表格自动套横滚容器（含异步渲染与插件页）
             if (!main._tableObserver) {
                 main._tableObserver = new MutationObserver(function () {
-                    var tables = main.querySelectorAll('table.ha-table');
+                    var tables = main.querySelectorAll('table.ow-table');
                     for (var i = 0; i < tables.length; i++) {
                         var t = tables[i];
-                        if (t.parentNode.className !== 'ha-table-wrap') {
+                        if (t.parentNode.className !== 'ow-table-wrap') {
                             var w = document.createElement('div');
-                            w.className = 'ha-table-wrap';
+                            w.className = 'ow-table-wrap';
                             t.parentNode.insertBefore(w, t);
                             w.appendChild(t);
                         }
@@ -4819,8 +4965,8 @@
                 main._tableObserver.observe(main, { childList: true, subtree: true });
             }
             if (name.indexOf('plugin:') === 0) {
-                HaApi.post('admin_plugin_page', { slug: name.substr(7) }, function (r) {
-                    main.innerHTML = r.ok ? r.html : '<div class="ha-card">' + esc(r.msg) + '</div>';
+                OwApi.post('admin_plugin_page', { slug: name.substr(7) }, function (r) {
+                    main.innerHTML = r.ok ? r.html : '<div class="ow-card">' + esc(r.msg) + '</div>';
                 });
                 return;
             }
@@ -4831,15 +4977,15 @@
             /* 用户管理（v1.0.44）、禁言管理（v1.0.52）、系统公告（v1.0.102）、
                敏感词过滤（v1.0.104）已剥离为插件，见 plugins/ 对应目录 */
             plugins: function (main) {
-                HaApi.post('admin_plugins', {}, function (r) {
-                    var h = '<h2>插件管理</h2><p class="ha-admin-desc">安装（上传 zip）、启用 / 停用、下载与卸载插件。插件存放于 plugins/ 目录。</p>'
-                        + '<div class="ha-card ha-upload-row">'
-                        + '<input type="file" id="haPluginZip" accept=".zip" style="display:none">'
-                        + '<button type="button" class="ha-btn ha-btn-ghost" onclick="document.getElementById(\'haPluginZip\').click()">选择文件</button>'
-                        + '<span class="ha-upload-name" id="haPluginZipName">未选择文件</span>'
-                        + '<button type="button" class="ha-btn ha-btn-primary" style="margin-left:auto" onclick="HaAdmin.pluginInstall()">上传安装</button>'
+                OwApi.post('admin_plugins', {}, function (r) {
+                    var h = '<h2>插件管理</h2><p class="ow-admin-desc">安装（上传 zip）、启用 / 停用、下载与卸载插件。插件存放于 plugins/ 目录。</p>'
+                        + '<div class="ow-card ow-upload-row">'
+                        + '<input type="file" id="owPluginZip" accept=".zip" style="display:none">'
+                        + '<button type="button" class="ow-btn ow-btn-ghost" onclick="document.getElementById(\'owPluginZip\').click()">选择文件</button>'
+                        + '<span class="ow-upload-name" id="owPluginZipName">未选择文件</span>'
+                        + '<button type="button" class="ow-btn ow-btn-primary" style="margin-left:auto" onclick="OwAdmin.pluginInstall()">上传安装</button>'
                         + '</div>'
-                        + '<div class="ha-plugin-list">';
+                        + '<div class="ow-plugin-list">';
                     // v1.2.57：点标题直达该插件的后台页。
                     // 条件：已启用 **且** slug 在服务端下发的 admin_pages 清单里
                     // ——没后台页的插件（如 signature）保持普通文字，不给「点了没反应」的假链接。
@@ -4847,101 +4993,186 @@
                     for (var i = 0; i < r.data.length; i++) {
                         var d = r.data[i];
                         var canOpen = d.enabled && slugs.indexOf(d.id) >= 0;
-                        h += '<div class="ha-plugin-card">'
-                           + '<div class="ha-plugin-head">'
+                        h += '<div class="ow-plugin-card">'
+                           + '<div class="ow-plugin-head">'
                            + (canOpen
-                               ? '<b class="ha-plugin-title-link" title="打开「' + esc(d.name) + '」设置页"'
-                                 + ' onclick="HaAdmin.pluginOpen(\'' + esc(d.id) + '\')">' + esc(d.name) + '</b>'
+                               ? '<b class="ow-plugin-title-link" title="打开「' + esc(d.name) + '」设置页"'
+                                 + ' onclick="OwAdmin.pluginOpen(\'' + esc(d.id) + '\')">' + esc(d.name) + '</b>'
                                : '<b>' + esc(d.name) + '</b>')
-                           + (d.enabled ? '<span class="ha-tag ha-tag-green">启用</span>' : '<span class="ha-tag ha-tag-guest">未启用</span>') + '</div>'
-                           + '<div class="ha-plugin-meta">' + esc(d.id) + ' · v' + esc(d.version) + ' · ' + esc(d.source || '本地')
-                           // 计划任务数放在最前：它是「这个插件会自己在后台动什么」的规模指标，
+                           + (d.enabled ? '<span class="ow-tag ow-tag-green">启用</span>' : '<span class="ow-tag ow-tag-guest">未启用</span>') + '</div>'
+                           + '<div class="ow-plugin-meta">' + esc(d.id) + ' · v' + esc(d.version) + ' · ' + esc(d.source || '本地')
+                           // 维护任务数放在最前：它是「这个插件会自己在后台动什么」的规模指标，
                            // 比「注册了几个函数」更值得管理员先看到（v1.1.13）
-                           + ' · 计划任务 ' + (d.crons || 0)
+                           + ' · 维护任务 ' + (d.crons || 0)
                            + ' · 钩子 ' + (d.hooks || 0) + ' · 路由 ' + (d.routes || 0) + ' · 后台页 ' + (d.pages || 0) + '</div>'
-                           + '<div class="ha-plugin-desc">' + esc(d.description || '') + '</div>'
-                           + '<div class="ha-plugin-actions">'
-                           + '<button class="ha-btn ha-btn-primary" onclick="HaAdmin.pluginToggle(\'' + esc(d.id) + '\',1)"' + (d.enabled ? ' disabled' : '') + '>启用</button>'
-                           + '<button class="ha-btn ha-btn-ghost" onclick="HaAdmin.pluginToggle(\'' + esc(d.id) + '\',0)"' + (d.enabled ? '' : ' disabled') + '>停用</button>'
-                           + '<a class="ha-btn ha-btn-ghost" href="?action=admin_plugin_download&name=' + esc(d.id) + '">下载</a>'
-                           + '<button class="ha-btn ha-btn-ghost" onclick="HaAdmin.pluginUninstall(\'' + esc(d.id) + '\')">卸载</button>'
+                           + '<div class="ow-plugin-desc">' + esc(d.description || '') + '</div>'
+                           + '<div class="ow-plugin-actions">'
+                           + '<button class="ow-btn ow-btn-primary" onclick="OwAdmin.pluginToggle(\'' + esc(d.id) + '\',1)"' + (d.enabled ? ' disabled' : '') + '>启用</button>'
+                           + '<button class="ow-btn ow-btn-ghost" onclick="OwAdmin.pluginToggle(\'' + esc(d.id) + '\',0)"' + (d.enabled ? '' : ' disabled') + '>停用</button>'
+                           + '<a class="ow-btn ow-btn-ghost" href="?action=admin_plugin_download&name=' + esc(d.id) + '">下载</a>'
+                           + '<button class="ow-btn ow-btn-ghost" onclick="OwAdmin.pluginUninstall(\'' + esc(d.id) + '\')">卸载</button>'
                            + '</div></div>';
                     }
-                    if (!r.data.length) h += '<div class="ha-card" style="color:#5C5C5C">暂无插件</div>';
+                    if (!r.data.length) h += '<div class="ow-card" style="color:#5C5C5C">暂无插件</div>';
                     main.innerHTML = h + '</div>';
                     /* 自研上传控件：隐藏原生 file input，选择后回显文件名 */
-                    var zip = $('haPluginZip');
+                    var zip = $('owPluginZip');
                     if (zip) zip.onchange = function () {
-                        var name = $('haPluginZipName');
+                        var name = $('owPluginZipName');
                         if (this.files && this.files[0]) {
                             name.textContent = this.files[0].name;
-                            name.className = 'ha-upload-name ha-has-file';
+                            name.className = 'ow-upload-name ow-has-file';
                         } else {
                             name.textContent = '未选择文件';
-                            name.className = 'ha-upload-name';
+                            name.className = 'ow-upload-name';
                         }
                     };
                 });
             },
             rooms: function (main) {
                 // 群聊审核（v1.0.84）：服务端分页 + 搜索 + 多选批量 + 回收站可撤销
-                HaAdmin._roomPage = 1;
-                HaAdmin._roomTrashPage = 1;
-                main.innerHTML = '<h2>群聊审核</h2><p class="ha-admin-desc">对群聊做合规处置：名称 / 头像不合法可重置，违规群聊可封禁或删除。所有处置均可在回收站撤销。</p>'
-                    + '<div class="ha-card"><div class="ha-form-row">'
-                    + '<div class="ha-form-item" style="min-width:120px"><label>房主用户ID</label>'
-                    + '<input class="ha-input" id="haRVRoomOwner" type="number" min="0" placeholder="0=全部" value="0" onkeydown="if(event.key===\'Enter\')HaAdmin.roomLoad(1)"></div>'
-                    + '<div class="ha-form-item" style="min-width:120px"><label>群聊ID</label>'
-                    + '<input class="ha-input" id="haRVRoomId" type="number" min="0" placeholder="0=全部" value="0" onkeydown="if(event.key===\'Enter\')HaAdmin.roomLoad(1)"></div>'
-                    + '<button class="ha-btn ha-btn-primary" onclick="HaAdmin.roomLoad(1)">搜索</button>'
-                    + '<button class="ha-btn ha-btn-ghost" onclick="HaAdmin.roomResetFilter()">重置</button>'
+                OwAdmin._roomPage = 1;
+                OwAdmin._roomTrashPage = 1;
+                main.innerHTML = '<h2>群聊审核</h2><p class="ow-admin-desc">对群聊做合规处置：名称 / 头像不合法可重置，违规群聊可封禁或删除。所有处置均可在回收站撤销。</p>'
+                    + '<div class="ow-card"><div class="ow-form-row">'
+                    + '<div class="ow-form-item" style="min-width:120px"><label>房主用户ID</label>'
+                    + '<input class="ow-input" id="owRVRoomOwner" type="number" min="0" placeholder="0=全部" value="0" onkeydown="if(event.key===\'Enter\')OwAdmin.roomLoad(1)"></div>'
+                    + '<div class="ow-form-item" style="min-width:120px"><label>群聊ID</label>'
+                    + '<input class="ow-input" id="owRVRoomId" type="number" min="0" placeholder="0=全部" value="0" onkeydown="if(event.key===\'Enter\')OwAdmin.roomLoad(1)"></div>'
+                    + '<button class="ow-btn ow-btn-primary" onclick="OwAdmin.roomLoad(1)">搜索</button>'
+                    + '<button class="ow-btn ow-btn-ghost" onclick="OwAdmin.roomResetFilter()">重置</button>'
                     + '</div></div>'
-                    + '<div class="ha-card">'
-                    + '<div class="ha-admin-batch">'
-                    + '<button class="ha-btn ha-btn-ghost" id="haRVBatchName" onclick="HaAdmin.roomBatch(\'reset_name\')" disabled>批量重置名称</button>'
-                    + '<button class="ha-btn ha-btn-ghost" id="haRVBatchAvatar" onclick="HaAdmin.roomBatch(\'reset_avatar\')" disabled>批量重置头像</button>'
-                    + '<button class="ha-btn ha-btn-ghost" id="haRVBatchBan" onclick="HaAdmin.roomBatch(\'toggle_status\')" disabled>批量封禁</button>'
-                    + '<button class="ha-btn ha-btn-danger" id="haRVBatchDel" onclick="HaAdmin.roomBatch(\'delete\')" disabled>批量删除</button>'
-                    + '<span id="haRVStat" style="color:var(--ha-text-sub);font-size:12px"></span>'
-                    + '</div>'
-                    + '<div class="ha-table-wrap"><table class="ha-table" id="haRVTable"></table></div>'
-                    + '<div id="haRVPager" style="margin-top:10px"></div></div>'
-                    + '<div class="ha-card"><h3 style="margin:0 0 10px;font-size:14px">审核回收站</h3>'
-                    + '<div class="ha-table-wrap"><table class="ha-table" id="haRoomTrash"></table></div>'
-                    + '<div id="haTrashPager" style="margin-top:10px"></div>'
+                    + '<div class="ow-card">'
+                    + '<div id="owRVBatch"></div>'
+                    + '<div class="ow-table-wrap"><table class="ow-table" id="owRVTable"></table></div>'
+                    + '<div id="owRVPager" style="margin-top:10px"></div></div>'
+                    + '<div class="ow-card"><h3 style="margin:0 0 10px;font-size:14px">审核回收站</h3>'
+                    + '<div class="ow-table-wrap"><table class="ow-table" id="owRoomTrash"></table></div>'
+                    + '<div id="owTrashPager" style="margin-top:10px"></div>'
                     + '<p style="font-size:12px;color:#5C5C5C;margin:8px 0 0">撤销有顺序依赖：群聊被删除后，需先撤销「删除」才能恢复其之前的名称 / 头像 / 封禁状态。</p></div>';
-                HaAdmin.roomLoad(1);
-                HaAdmin.roomTrashLoad(1);
+                // 批量操作改下拉（v1.2.60）：原先平铺 4 个按钮，窄屏会折成两行并挤掉统计位
+                OwAdmin.uiBatchBar({
+                    id: 'owRVBatch',
+                    chkCls: 'owRVChk',
+                    statBase: '共 0 条',
+                    actions: [
+                        { key: 'reset_name',    label: '批量重置名称' },
+                        { key: 'reset_avatar',  label: '批量重置头像' },
+                        { key: 'toggle_status', label: '批量封禁 / 解封' },
+                        { key: 'delete',        label: '批量删除', danger: true }
+                    ],
+                    onExec: function (act, ids) { OwAdmin.roomBatch(act, ids); }
+                });
+                OwAdmin.roomLoad(1);
+                OwAdmin.roomTrashLoad(1);
             },
-        /* ⚠️ 动作/字段中文表与详情解析挂在 HaAdmin **顶层**（_logActs 等），不在这里 ——
+        /* ⚠️ 动作/字段中文表与详情解析挂在 OwAdmin **顶层**（_logActs 等），不在这里 ——
            pages 表成员只能被 page(ap) 分发调用，而筛选下拉的 onchange 直接引用
-           HaAdmin.logAct / HaAdmin.logLoad，必须放顶层才可达。 */
+           OwAdmin.logAct / OwAdmin.logLoad，必须放顶层才可达。 */
         logs: function (main) {
-            HaAdmin._logPage = 1;
-            HaAdmin._logAct = '';
-            main.innerHTML = '<h2>安全日志</h2>'
-                + '<p class="ha-admin-desc">记录登录、封禁、群聊处置、插件安装等关键安全事件（IP 与数据已脱敏）。'
-                + '「详情」列是事件的可读说明；动作多时用顶部下拉筛选定位。</p>'
-                + '<div class="ha-card"><div class="ha-form-row" style="align-items:center">'
-                + '<div class="ha-form-item" style="min-width:240px"><label>按动作筛选</label>'
-                + '<select class="ha-input" id="haLogAct" onchange="HaAdmin.logAct(this.value)"></select></div>'
-                + '<span id="haLogStat" style="margin-left:auto;color:var(--ha-text-sub);font-size:12px"></span>'
+            OwAdmin._logPage = 1;
+            OwAdmin._logAct = '';
+            OwAdmin._logTotal = 0;
+            main.innerHTML = '<div class="ow-admin-head">'
+                + '<h2>安全日志</h2>'
+                // 系统日志是独立的文件日志页（PHP 报错落盘），与本页的数据库审计流水是两套东西，
+                // 故用按钮跳页而不是塞进同一张表
+                + '<div class="ow-admin-head-act">'
+                + '<button type="button" class="ow-btn ow-btn-ghost" onclick="OwAdmin.page(\'syslog\')">系统日志</button>'
+                + '<button type="button" class="ow-btn ow-btn-ghost" onclick="OwAdmin.logExport()">导出 CSV</button>'
                 + '</div></div>'
-                + '<div class="ha-card"><div class="ha-table-wrap"><table class="ha-table" id="haLogTable"></table></div>'
-                + '<div id="haLogPager" style="margin-top:10px"></div></div>';
-            HaAdmin.logLoad(1);
+                + '<p class="ow-admin-desc">记录登录、封禁、群聊处置、插件安装等关键安全事件（IP 与数据已脱敏）。'
+                + '「详情」列是事件的可读说明；动作多时用顶部下拉筛选定位。</p>'
+                + '<div class="ow-card"><div class="ow-form-row" style="align-items:center">'
+                + '<div class="ow-form-item" style="min-width:240px"><label>按动作筛选</label>'
+                + '<select class="ow-input" id="owLogAct" onchange="OwAdmin.logAct(this.value)"></select></div>'
+                + '<span id="owLogStat" style="margin-left:auto;color:var(--ow-text-sub);font-size:12px"></span>'
+                + '</div></div>'
+                + '<div class="ow-card">'
+                + '<div id="owLogBatch"></div>'
+                + '<div class="ow-table-wrap"><table class="ow-table" id="owLogTable"></table></div>'
+                + '<div id="owLogPager" style="margin-top:10px"></div></div>';
+            // 批量轮子：当前仅「批量删除」；导出走顶部独立按钮（导出全量而非所选）
+            OwAdmin.uiBatchBar({
+                id: 'owLogBatch',
+                chkCls: 'owLogChk',
+                statBase: '共 0 条',
+                actions: [{ key: 'del', label: '批量删除所选日志', danger: true }],
+                onExec: function (act, ids) {
+                    OwAdmin.confirm('确定删除选中的 ' + ids.length + ' 条安全日志？该操作不可恢复。', function () {
+                        OwApi.secure('admin_logs_batch', { ids: ids.join(',') }, function (r) {
+                            toast(r.msg);
+                            if (r.ok) OwAdmin.logLoad(OwAdmin._logPage || 1);
+                        });
+                    });
+                }
+            });
+            OwAdmin.logLoad(1);
         },
-            /* 计划任务（v1.1.13）：插件通过 Plugin::cron() 声明式注册的任务。
+        /* ---------- 系统日志（PHP 报错文件日志，v1.2.60） ---------- */
+        syslog: function (main) {
+            OwAdmin._sysFile = '';
+            main.innerHTML = '<div class="ow-admin-head">'
+                + '<h2>系统日志</h2>'
+                + '<div class="ow-admin-head-act">'
+                + '<button type="button" class="ow-btn ow-btn-ghost" onclick="OwAdmin.page(\'logs\')">返回操作日志</button>'
+                + '<button type="button" class="ow-btn ow-btn-ghost" id="owSysClear" onclick="OwAdmin.syslogClear()" disabled>清空当前文件</button>'
+                + '</div></div>'
+                + '<div id="owSysTip"></div>'
+                + '<div class="ow-card"><div class="ow-syslog-tabs" id="owSysTabs"></div>'
+                + '<div class="ow-syslog-body" id="owSysBody">加载中…</div></div>';
+            OwApi.post('admin_syslog', {}, function (r) {
+                var tip = $('owSysTip'), tabs = $('owSysTabs'), body = $('owSysBody');
+                if (!tip || !tabs || !body) return;
+                if (!r.ok) { body.innerHTML = '<div class="ow-syslog-line">加载失败：' + esc(r.msg) + '</div>'; return; }
+                var files = r.files || [], h = '', i;
+                // 调试模式关闭时的说明条：这是「日志页空着」最常见的疑问来源，
+                // 直接讲清楚开关在哪、为什么没日志，而不是让人以为功能坏了
+                tip.innerHTML = r.debug ? ''
+                    : '<div class="ow-notice ow-notice-warn">'
+                    + '<b>当前「调试模式」为关闭</b>（后台「系统设置 → 系统与维护 → 调试模式」）。'
+                    + '这种状态下不会记录任何 debug 级日志，所以这里看不到内容是正常的。'
+                    + '需要排查细节时，把该开关打开再复现一次即可，用完请及时关闭。'
+                    + '<br>另外请放心：<b>安全日志</b>（登录、封禁、群聊处置等审计流水）与调试模式无关，'
+                    + '无论开关与否都会照常记录。'
+                    + '</div>';
+                if (!files.length) {
+                    tabs.innerHTML = '';
+                    body.innerHTML = '<div class="ow-syslog-line">暂无日志文件。开启调试模式后，PHP 报错会自动记录到 '
+                        + '<code>data/logs/debug.log</code>。</div>';
+                    return;
+                }
+                for (i = 0; i < files.length; i++) {
+                    var f = files[i];
+                    // data-file + 事件委托而非内联 onclick：避免把文件名拼进 JS 字符串
+                    h += '<button type="button" class="ow-syslog-tab" data-file="' + esc(f.name) + '">'
+                       + '<b>' + esc(f.name) + '</b>'
+                       + '<span>' + (f.size >= 1024 ? (f.size / 1024).toFixed(1) + ' KB' : f.size + ' B')
+                       + ' · ' + esc(new Date(f.mtime * 1000).toLocaleString()) + '</span></button>';
+                }
+                tabs.innerHTML = h;
+                // 事件委托：只在容器上挂一个监听，切换文件时无需重复绑定
+                tabs.onclick = function (e) {
+                    var b = e.target;
+                    while (b && b !== this && b.tagName !== 'BUTTON') b = b.parentNode;
+                    if (b && b.tagName === 'BUTTON' && b.getAttribute('data-file')) {
+                        OwAdmin.syslogOpen(b.getAttribute('data-file'));
+                    }
+                };
+                OwAdmin.syslogOpen(files[0].name);
+            });
+        },
+            /* 维护任务（v1.1.13 引入时称「计划任务」）：插件通过 Plugin::cron() 声明式注册的任务。
                与旧的 cron.minute 钩子不同——那些任务在这里不可见、不可控。
                任务表只显示「已注册」的：插件停用后其任务仍在表里但每次都会被跳过，
                服务端用 plugin_active 标记，前端据此隐藏启停开关（避免给一个必然被跳过的
                任务提供「启用」按钮）。 */
             cron: function (main) {
-                HaAdmin._cronPage = 1;
-                HaAdmin.cronLoad(main);
+                OwAdmin._cronPage = 1;
+                OwAdmin.cronLoad(main);
             },
             settings: function (main) {
-                HaApi.post('admin_settings_get', {}, function (r) {
+                OwApi.post('admin_settings_get', {}, function (r) {
                     var d = r.data;
                     /* v1.2.52：布尔类设置全部改用通用开关轮子（原来是一排下拉）。
                        d[k] 是 DB setting 的字符串 '1'/'0'；缺键时用与 core/db.php
@@ -4951,34 +5182,34 @@
                        缺键时浏览器会选中第一项 → 显示「开启」但实际是关的。 */
                     function sw(k, label, def) {
                         var v = (d[k] === undefined || d[k] === null || d[k] === '') ? def : d[k];
-                        // v1.2.53：开关**不要包 .ha-form-item** —— 包了会被 .ha-form-row 的
+                        // v1.2.53：开关**不要包 .ow-form-item** —— 包了会被 .ow-form-row 的
                         // min-width 卡成窄列，轨道被推到列最右侧，与文字隔一大片空白
                         //（用户报的「样式错乱」）。开关行自带 flex 布局，直接平铺即可。
-                        return switchHtml('haS_' + k, label, v === '1');
+                        return switchHtml('owS_' + k, label, v === '1');
                     }
                     /* 输入框（文本 / 数值） */
                     function fld(k, label, def, placeholder) {
-                        return '<div class="ha-form-item"><label>' + esc(label) + '</label>'
-                            + '<input class="ha-input" id="haS_' + k + '" value="'
+                        return '<div class="ow-form-item"><label>' + esc(label) + '</label>'
+                            + '<input class="ow-input" id="owS_' + k + '" value="'
                             + esc((d[k] === undefined || d[k] === null || d[k] === '') ? def : d[k]) + '"'
                             + (placeholder ? ' placeholder="' + esc(placeholder) + '"' : '') + '></div>';
                     }
-                    function row(items) { return '<div class="ha-form-row">' + items + '</div>'; }
+                    function row(items) { return '<div class="ow-form-row">' + items + '</div>'; }
                     function note(html) {
                         return '<p style="font-size:12px;color:#5C5C5C;margin:4px 0 12px">' + html + '</p>';
                     }
-                    /* v1.2.53 折叠分组（.ha-fold，样式见 halou.css）——与插件后台的分组同一思路，
+                    /* v1.2.53 折叠分组（.ow-fold，样式见 owlsgo.css）——与插件后台的分组同一思路，
                        点标题展开 / 收起。
                        v1.2.54：**默认全部收起**（用户定版）——先给分组目录，点哪个看哪个，
                        不用在一长条表单里找。收起时输入框仍在 DOM 里，settingsSave 照常提交
                        **全部分组**的值，不存在「收起就没保存」。 */
                     function sec(title, body) {
-                        return '<div class="ha-fold">'
-                            + '<div class="ha-fold-hd" onclick="HaAdmin.foldToggle(this)">' + esc(title)
-                            + '<span class="ha-fold-arrow">&#9656;</span></div>'
-                            + '<div class="ha-fold-bd">' + body + '</div></div>';
+                        return '<div class="ow-fold">'
+                            + '<div class="ow-fold-hd" onclick="OwAdmin.foldToggle(this)">' + esc(title)
+                            + '<span class="ow-fold-arrow">&#9656;</span></div>'
+                            + '<div class="ow-fold-bd">' + body + '</div></div>';
                     }
-                    main.innerHTML = '<h2>系统设置</h2><p class="ha-admin-desc">站点、注册控制、游客与发言限制、存储方式。点分组标题展开对应设置。</p>'
+                    main.innerHTML = '<h2>系统设置</h2><p class="ow-admin-desc">站点、注册控制、游客与发言限制、存储方式。点分组标题展开对应设置。</p>'
 
                         /* ---------- ① 基本信息 ---------- */
                         + sec('基本信息',
@@ -5039,29 +5270,45 @@
                             + sw('debug_mode', '调试模式', '0')
                             + '<p style="font-size:12px;color:#B06000;background:#FFF6E5;border:1px solid #FFE1B0;border-radius:4px;padding:8px 10px;margin:4px 0 12px">'
                             + '开启后记录 debug 级日志、出错页显示详细报错。仅用于排错，用完请及时关闭 —— 报错细节可能暴露路径、SQL 与配置信息。<br>'
-                            + '日志文件：data/logs/debug.log（页面报错实时显示；接口请求只落日志、不回显，避免破坏前端数据）。</p>')
+                            + '日志文件：data/logs/debug.log（页面报错实时显示；接口请求只落日志、不回显，避免破坏前端数据）。'
+                            + '也可在「安全日志 → 系统日志」查看与清空。</p>'
+                            // v1.2.60 运行缓存：放在「系统与维护」分组内，说明文字走 ow-tip
+                            // （oneItem 会把 .ow-form-item 里的提示元素转成 label 上的 ⓘ 气泡）。
+                            // 它是一次性动作而非设置项，所以不随「保存设置」提交，按钮走独立接口。
+                            + '<div class="ow-form-item">'
+                            + '<label>运行缓存</label>'
+                            + '<button type="button" class="ow-btn ow-btn-ghost" id="owOpcacheBtn" onclick="OwAdmin.opcacheReset()">清理 OPcache</button>'
+                            + '<span id="owOpcacheStat" style="font-size:12px;color:#5C5C5C;margin-left:10px"></span>'
+                            // 必须是<p> 且字号 ≤12.5px——OwTip.isHint() 就是按这两条认提示元素的，
+                            // 写成 <span> 或 class 写错都不会被转成 ⓘ 气泡
+                            + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">刷新已编译脚本缓存，适合代码更新后手动触发。'
+                            + 'PHP 会把源码编译成字节码缓存在内存里（OPcache），更新文件后若仍跑旧代码'
+                            + '（尤其是关闭了时间戳校验时），清一次缓存即可立即生效。开启调试模式时会写 '
+                            + 'data/logs/debug.log，本操作不影响它。</p>'
+                            + '</div>')
 
-                        + '<button class="ha-btn ha-btn-primary" onclick="HaAdmin.settingsSave()">保存设置</button>';
+                        + '<button class="ow-btn ow-btn-primary" onclick="OwAdmin.settingsSave()">保存设置</button>';
+
                     // 开关视觉同步（is-on 类）：新增 DOM 后必须调，轨道才有开/关配色
                     bindSwitches(main);
-                    if (w.HaTip && typeof w.HaTip.scan === 'function') w.HaTip.scan(main);
+                    if (w.OwTip && typeof w.OwTip.scan === 'function') w.OwTip.scan(main);
                 });
             },
             /* 禁言管理自 v1.0.52 起剥离为插件 ban-manager，页面与交互见 plugins/ban-manager/ */
         },
 
-        /* ---------- 用户管理动作已随 v1.0.44 剥离为插件（HaUM，plugins/user-manager/） ---------- */
+        /* ---------- 用户管理动作已随 v1.0.44 剥离为插件（OwUM，plugins/user-manager/） ---------- */
 
         /* ---------- 房间动作 ---------- */
         /** 群聊审核动作：重置名称 / 恢复默认头像 / 封禁解封 */
         /** 审核回收站：列出最近处置，可撤销 */
         roomTrash: function () {
-            HaApi.post('admin_room_trash_list', {}, function (r) {
-                var el = document.getElementById('haRoomTrash');
+            OwApi.post('admin_room_trash_list', {}, function (r) {
+                var el = document.getElementById('owRoomTrash');
                 if (!el) return;
                 var ACT = { reset_name: '重置名称', reset_avatar: '重置头像', toggle_status: '封禁/解封', delete: '删除' };
                 if (!r.data.length) { el.innerHTML = '<span style="font-size:13px;color:#5C5C5C">暂无审核记录</span>'; return; }
-                var h = '<table class="ha-table"><tr><th>时间</th><th>群聊</th><th>操作</th><th>操作前</th><th>状态</th><th></th></tr>';
+                var h = '<table class="ow-table"><tr><th>时间</th><th>群聊</th><th>操作</th><th>操作前</th><th>状态</th><th></th></tr>';
                 for (var i = 0; i < r.data.length; i++) {
                     var d = r.data[i];
                     var before = d.before_data && d.before_data.row ? '（整条群聊记录）'
@@ -5071,17 +5318,17 @@
                        + '<td>' + esc(ACT[d.action] || d.action) + '</td>'
                        + '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + before + '</td>'
                        + '<td>' + (d.undone == 1 ? '<span style="color:#5C5C5C">已撤销</span>' : '-') + '</td>'
-                       + '<td>' + (d.undone == 1 ? '' : '<a href="javascript:;" onclick="HaAdmin.roomTrashUndo(' + d.id + ')">撤销</a>') + '</td></tr>';
+                       + '<td>' + (d.undone == 1 ? '' : '<a href="javascript:;" onclick="OwAdmin.roomTrashUndo(' + d.id + ')">撤销</a>') + '</td></tr>';
                 }
                 el.innerHTML = h + '</table>'
                     + '<p style="font-size:12px;color:#5C5C5C;margin:8px 0 0">撤销有顺序依赖：群聊被删除后，需先撤销「删除」才能恢复其之前的名称 / 头像 / 封禁状态。</p>';
             });
         },
         roomTrashUndo: function (id) {
-            HaAdmin.confirm('确定撤销该审核操作？', function () {
-                HaApi.secure('admin_room_trash_undo', { id: id }, function (r) {
+            OwAdmin.confirm('确定撤销该审核操作？', function () {
+                OwApi.secure('admin_room_trash_undo', { id: id }, function (r) {
                     toast(r.msg);
-                    if (r.ok) { HaAdmin.roomTrashLoad(HaAdmin._roomTrashPage || 1); HaAdmin.roomLoad(HaAdmin._roomPage || 1); }
+                    if (r.ok) { OwAdmin.roomTrashLoad(OwAdmin._roomTrashPage || 1); OwAdmin.roomLoad(OwAdmin._roomPage || 1); }
                 });
             });
         },
@@ -5091,10 +5338,10 @@
         roomLoad: function (page) {
             this._roomPage = page || this._roomPage || 1;
             var self = this;
-            HaApi.post('admin_rooms', {
+            OwApi.post('admin_rooms', {
                 page: this._roomPage, size: 20,
-                owner: ($('haRVRoomOwner') || {}).value || 0,
-                rid: ($('haRVRoomId') || {}).value || 0
+                owner: ($('owRVRoomOwner') || {}).value || 0,
+                rid: ($('owRVRoomId') || {}).value || 0
             }, function (r) {
                 if (!r.ok) { toast(r.msg); return; }
                 var d = r.data;
@@ -5104,50 +5351,52 @@
                     var d2 = d.list[i];
                     var av = d2.avatar
                         ? '<img src="' + esc(d2.avatar) + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;display:block">'
-                        : '<span style="display:block;width:28px;height:28px;border-radius:50%;background:var(--ha-bg-sub);color:var(--ha-text-sub);font-size:12px;line-height:28px;text-align:center">' + esc(d2.name.charAt(0)) + '</span>';
-                    h += '<tr><td><input type="checkbox" class="haRVChk" value="' + d2.id + '" onchange="HaAdmin.roomSyncBatch()"></td>'
+                        : '<span style="display:block;width:28px;height:28px;border-radius:50%;background:var(--ow-bg-sub);color:var(--ow-text-sub);font-size:12px;line-height:28px;text-align:center">' + esc(d2.name.charAt(0)) + '</span>';
+                    h += '<tr><td><input type="checkbox" class="owRVChk" value="' + d2.id + '" onchange="OwAdmin.roomSyncBatch()"></td>'
                        + '<td>' + esc(fmtUid(d2.id)) + '</td><td>' + av + '</td><td>' + esc(d2.name) + '</td>'
                        + '<td>' + (d2.owner_id ? esc(fmtUid(d2.owner_id)) : '-') + '</td>'
                        + '<td>' + (d2.status == 1 ? '正常' : '<span style="color:#C41D1F">已封禁</span>') + '</td>'
                        + '<td style="white-space:nowrap">'
-                       + '<a href="javascript:;" onclick="HaAdmin.roomReview(' + d2.id + ',\'reset_name\')">名称不合法</a> '
-                       + '<a href="javascript:;" onclick="HaAdmin.roomReview(' + d2.id + ',\'reset_avatar\')">头像不合法</a> '
-                       + '<a href="javascript:;" onclick="HaAdmin.roomReview(' + d2.id + ',\'toggle_status\')">' + (d2.status == 1 ? '封禁' : '解封') + '</a> '
-                       + '<a href="javascript:;" onclick="HaAdmin.roomDel(' + d2.id + ')">删除</a></td></tr>';
+                       + '<a href="javascript:;" onclick="OwAdmin.roomReview(' + d2.id + ',\'reset_name\')">名称不合法</a> '
+                       + '<a href="javascript:;" onclick="OwAdmin.roomReview(' + d2.id + ',\'reset_avatar\')">头像不合法</a> '
+                       + '<a href="javascript:;" onclick="OwAdmin.roomReview(' + d2.id + ',\'toggle_status\')">' + (d2.status == 1 ? '封禁' : '解封') + '</a> '
+                       + '<a href="javascript:;" onclick="OwAdmin.roomDel(' + d2.id + ')">删除</a></td></tr>';
                 }
-                $('haRVTable').innerHTML = '<tr><th style="width:32px"><input type="checkbox" id="haRVCheckAll" onchange="HaAdmin.roomToggleAll(this)"></th>'
+                $('owRVTable').innerHTML = '<tr><th style="width:32px"><input type="checkbox" id="owRVCheckAll" onchange="OwAdmin.roomToggleAll(this)"></th>'
                     + '<th>ID</th><th>头像</th><th>名称</th><th>房主ID</th><th>状态</th><th>操作</th></tr>'
-                    + (h || '<tr><td colspan="7" style="color:var(--ha-text-sub)">无匹配的群聊</td></tr>');
-                self.uiPager('haRVPager', d.page, d.total, d.size, function (pg) { self.roomLoad(pg); });
+                    + (h || '<tr><td colspan="7" style="color:var(--ow-text-sub)">无匹配的群聊</td></tr>');
+                self.uiPager('owRVPager', d.page, d.total, d.size, function (pg) { self.roomLoad(pg); });
                 self.roomSyncBatch();
             });
         },
 
         roomResetFilter: function () {
-            $('haRVRoomOwner').value = '0';
-            $('haRVRoomId').value = '0';
+            $('owRVRoomOwner').value = '0';
+            $('owRVRoomId').value = '0';
             this.roomLoad(1);
         },
 
         roomToggleAll: function (cb) {
-            var boxes = document.getElementsByClassName('haRVChk');
+            var boxes = document.getElementsByClassName('owRVChk');
             for (var i = 0; i < boxes.length; i++) boxes[i].checked = cb.checked;
             this.roomSyncBatch();
         },
 
         roomSyncBatch: function () {
-            this.uiBatchSync('haRVChk', ['haRVBatchName', 'haRVBatchAvatar', 'haRVBatchBan', 'haRVBatchDel'], 'haRVStat', '共 ' + ((this._roomAll || []).length) + ' 条');
+            this.batchSync('owRVChk', 'owRVBatch', '共 ' + ((this._roomAll || []).length) + ' 条');
         },
 
-        /** 批量审核（v1.0.83 补实现 v1.0.91）：act = reset_name / reset_avatar / toggle_status / delete */
-        roomBatch: function (act) {
-            var boxes = document.getElementsByClassName('haRVChk'), ids = [];
-            for (var i = 0; i < boxes.length; i++) if (boxes[i].checked) ids.push(parseInt(boxes[i].value, 10) || 0);
-            if (!ids.length) { toast('未选择群聊'); return; }
+        /**
+         * 批量审核（v1.0.83 补实现 v1.0.91，v1.2.60 接下拉轮子）：
+         * act = reset_name / reset_avatar / toggle_status / delete。
+         * ids 由 uiBatchBar 统一收集后传入，这里不再自己遍历复选框。
+         */
+        roomBatch: function (act, ids) {
+            if (!ids || !ids.length) { toast('未选择群聊'); return; }
             var ACT = { reset_name: '批量重置名称', reset_avatar: '批量重置头像', toggle_status: '批量封禁/解封', delete: '批量删除' };
             var self = this;
             this.confirm('确定对已选 ' + ids.length + ' 个群聊执行「' + (ACT[act] || act) + '」？', function () {
-                HaApi.secure('admin_room_batch', { act: act, ids: ids.join(',') }, function (r) {
+                OwApi.secure('admin_room_batch', { act: act, ids: ids.join(',') }, function (r) {
                     toast(r.msg);
                     if (r.ok) {
                         self.roomLoad(self._roomPage || 1);
@@ -5161,12 +5410,12 @@
         roomTrashLoad: function (page) {
             this._roomTrashPage = page || this._roomTrashPage || 1;
             var self = this;
-            HaApi.post('admin_room_trash_list', { page: this._roomTrashPage, size: 20 }, function (r) {
-                var el = document.getElementById('haRoomTrash');
+            OwApi.post('admin_room_trash_list', { page: this._roomTrashPage, size: 20 }, function (r) {
+                var el = document.getElementById('owRoomTrash');
                 if (!el || !r.ok) return;
                 var d = r.data;
                 var ACT = { reset_name: '重置名称', reset_avatar: '重置头像', toggle_status: '封禁/解封', delete: '删除' };
-                if (!d.list.length) { el.innerHTML = '<tr><td colspan="6" style="color:var(--ha-text-sub)">暂无审核记录</td></tr>'; }
+                if (!d.list.length) { el.innerHTML = '<tr><td colspan="6" style="color:var(--ow-text-sub)">暂无审核记录</td></tr>'; }
                 else {
                     var h = '';
                     for (var i = 0; i < d.list.length; i++) {
@@ -5178,11 +5427,11 @@
                            + '<td>' + esc(ACT[t.action] || t.action) + '</td>'
                            + '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + before + '</td>'
                            + '<td>' + (t.undone == 1 ? '<span style="color:#5C5C5C">已撤销</span>' : '-') + '</td>'
-                           + '<td>' + (t.undone == 1 ? '' : '<a href="javascript:;" onclick="HaAdmin.roomTrashUndo(' + t.id + ')">撤销</a>') + '</td></tr>';
+                           + '<td>' + (t.undone == 1 ? '' : '<a href="javascript:;" onclick="OwAdmin.roomTrashUndo(' + t.id + ')">撤销</a>') + '</td></tr>';
                     }
                     el.innerHTML = h;
                 }
-                self.uiPager('haTrashPager', d.page, d.total, d.size, function (pg) { self.roomTrashLoad(pg); });
+                self.uiPager('owTrashPager', d.page, d.total, d.size, function (pg) { self.roomTrashLoad(pg); });
             });
         },
 
@@ -5193,30 +5442,30 @@
                 toggle_status: ''
             };
             var run = function () {
-                HaApi.post('admin_room_review', { id: id, act: act }, function (r) {
+                OwApi.post('admin_room_review', { id: id, act: act }, function (r) {
                     toast(r.msg);
-                    if (r.ok) { HaAdmin.roomTrashLoad(HaAdmin._roomTrashPage || 1); HaAdmin.roomLoad(HaAdmin._roomPage || 1); }
+                    if (r.ok) { OwAdmin.roomTrashLoad(OwAdmin._roomTrashPage || 1); OwAdmin.roomLoad(OwAdmin._roomPage || 1); }
                 });
             };
-            if (tips[act]) HaAdmin.confirm(tips[act], run);
+            if (tips[act]) OwAdmin.confirm(tips[act], run);
             else run();
         },
         roomDel: function (id) {
-            HaAdmin.confirm('确定删除该群聊？删除后可在「审核回收站」撤销恢复。', function () {
-                HaApi.secure('admin_room_del', { id: id }, function (r) { toast(r.msg); HaAdmin.page('rooms'); });
+            OwAdmin.confirm('确定删除该群聊？删除后可在「审核回收站」撤销恢复。', function () {
+                OwApi.secure('admin_room_del', { id: id }, function (r) { toast(r.msg); OwAdmin.page('rooms'); });
             });
         },
 
-        /* ---------- 计划任务（v1.1.13） ---------- */
+        /* ---------- 维护任务（v1.1.13 引入时称「计划任务」，v1.2.60 更名） ---------- */
 
         /* 状态徽标：ok 成功 / error 失败 / skip 跳过（插件未启用）。
-           ⚠️ 只用 CSS 里真实存在的 ha-tag-*：green / owner / vip / member / guest / title。
-           没有 ha-tag-red、没有 ha-tag-gray —— 别臆造，会静默退化成无背景的裸文字。
+           ⚠️ 只用 CSS 里真实存在的 ow-tag-*：green / owner / vip / member / guest / title。
+           没有 ow-tag-red、没有 ow-tag-gray —— 别臆造，会静默退化成无背景的裸文字。
            失败借用 owner（橙红，视觉上最接近警示），跳过用 member（灰）。 */
         _cronStatusTag: function (s) {
             var map = { ok: 'green', error: 'owner', skip: 'member' };
             var cn = { ok: '成功', error: '失败', skip: '跳过' };
-            return '<span class="ha-tag ha-tag-' + (map[s] || 'guest') + '">' + esc(cn[s] || s || '—') + '</span>';
+            return '<span class="ow-tag ow-tag-' + (map[s] || 'guest') + '">' + esc(cn[s] || s || '—') + '</span>';
         },
 
         /* 把相对时间说人话：刚刚 / N 分钟前 / N 小时前 / 具体日期 */
@@ -5232,51 +5481,51 @@
         },
 
         cronLoad: function (main) {
-            var page = HaAdmin._cronPage || 1;
-            main = main || $('haAdminMain');
-            HaApi.post('admin_cron_list', { page: page, psize: 30 }, function (r) {
-                if (!r.ok) { main.innerHTML = '<div class="ha-card">' + esc(r.msg) + '</div>'; return; }
+            var page = OwAdmin._cronPage || 1;
+            main = main || $('owAdminMain');
+            OwApi.post('admin_cron_list', { page: page, psize: 30 }, function (r) {
+                if (!r.ok) { main.innerHTML = '<div class="ow-card">' + esc(r.msg) + '</div>'; return; }
 
-                var lastRun = r.last_run ? HaAdmin._cronAgo(r.last_run) : '从未执行';
-                var h = '<h2>计划任务</h2>'
-                  + '<p class="ha-admin-desc">插件通过 <code>Plugin::cron()</code> 声明式注册的任务。'
+                var lastRun = r.last_run ? OwAdmin._cronAgo(r.last_run) : '从未执行';
+                var h = '<h2>维护任务</h2>'
+                  + '<p class="ow-admin-desc">插件通过 <code>Plugin::cron()</code> 声明式注册的维护任务。'
                   + '由长轮询每分钟驱动一次（多进程下有排他锁，不会重复执行），也可挂系统计划任务访问触发地址。'
                   + '「立即执行」会忽略到期时间强制跑一遍，便于验证任务是否正常。</p>'
-                  + '<div class="ha-card" style="margin-bottom:12px">'
-                  + '<div class="ha-form-row" style="align-items:center;gap:10px">'
-                  + '<button type="button" class="ha-btn ha-btn-primary" onclick="HaAdmin.cronRun()">立即执行全部</button>'
-                  + '<button type="button" class="ha-btn ha-btn-ghost" onclick="HaAdmin.cronToken()">重置触发令牌</button>'
-                  + '<button type="button" class="ha-btn ha-btn-ghost" onclick="HaAdmin.cronClearLogs()">清理 30 天前日志</button>'
+                  + '<div class="ow-card" style="margin-bottom:12px">'
+                  + '<div class="ow-form-row" style="align-items:center;gap:10px">'
+                  + '<button type="button" class="ow-btn ow-btn-primary" onclick="OwAdmin.cronRun()">立即执行全部</button>'
+                  + '<button type="button" class="ow-btn ow-btn-ghost" onclick="OwAdmin.cronToken()">重置触发令牌</button>'
+                  + '<button type="button" class="ow-btn ow-btn-ghost" onclick="OwAdmin.cronClearLogs()">清理 30 天前日志</button>'
                   + '<span style="margin-left:auto;color:#5C5C5C;font-size:12px">最近一次执行：' + esc(lastRun) + '</span>'
                   + '</div>'
-                  + '<div class="ha-form-row" style="margin-top:10px">'
+                  + '<div class="ow-form-row" style="margin-top:10px">'
                   + '<div style="flex:1;min-width:0">'
                   + '<label style="display:block;font-size:12px;color:#5C5C5C;margin-bottom:4px">外部触发地址（系统计划任务用，间隔建议 1 分钟）</label>'
-                  + '<input class="ha-input" readonly value="' + esc(HaAdmin._cronUrl(r.token)) + '" onclick="this.select()">'
+                  + '<input class="ow-input" readonly value="' + esc(OwAdmin._cronUrl(r.token)) + '" onclick="this.select()">'
                   + '</div></div></div>';
 
                 /* ---- 任务表 ---- */
-                h += '<div class="ha-card"><table class="ha-table"><tr>'
+                h += '<div class="ow-card"><table class="ow-table"><tr>'
                   + '<th>任务</th><th>说明</th><th>间隔</th><th>下次执行</th><th>最近执行</th><th>状态</th><th>操作</th></tr>';
                 if (!r.tasks.length) {
-                    h += '<tr><td colspan="7" style="color:#5C5C5C">暂无计划任务。插件在 main.php 顶层调用 Plugin::cron() 注册后，刷新本页即会出现。</td></tr>';
+                    h += '<tr><td colspan="7" style="color:#5C5C5C">暂无维护任务。插件在 main.php 顶层调用 Plugin::cron() 注册后，刷新本页即会出现。</td></tr>';
                 }
                 for (var i = 0; i < r.tasks.length; i++) {
                     var t = r.tasks[i];
                     h += '<tr>'
                        + '<td><b>' + esc(t.plugin ? t.plugin + '::' + t.name : t.name) + '</b>'
-                       +   (t.due ? ' <span class="ha-tag ha-tag-owner">待执行</span>' : '')
+                       +   (t.due ? ' <span class="ow-tag ow-tag-owner">待执行</span>' : '')
                        +   '<div style="color:#8A8A8A;font-size:12px">已运行 ' + (parseInt(t.run_count, 10) || 0) + ' 次</div></td>'
                        + '<td>' + esc(t.description || '—') + '</td>'
                        + '<td>' + esc(t.interval_text) + '</td>'
                        + '<td>' + esc(t.next_run_text) + '</td>'
-                       + '<td>' + esc(t.last_run_text) + (t.last_status ? ' ' + HaAdmin._cronStatusTag(t.last_status) : '') + '</td>'
-                       + '<td>' + (t.enabled ? '<span class="ha-tag ha-tag-green">启用</span>' : '<span class="ha-tag ha-tag-guest">停用</span>')
+                       + '<td>' + esc(t.last_run_text) + (t.last_status ? ' ' + OwAdmin._cronStatusTag(t.last_status) : '') + '</td>'
+                       + '<td>' + (t.enabled ? '<span class="ow-tag ow-tag-green">启用</span>' : '<span class="ow-tag ow-tag-guest">停用</span>')
                        +   (t.plugin_active ? '' : '<div style="color:#F4995D;font-size:12px">插件未启用</div>') + '</td>'
                        + '<td>';
                     if (t.plugin_active) {
-                        h += '<button class="ha-btn ha-btn-mini ' + (t.enabled ? 'ha-btn-ghost' : 'ha-btn-primary') + '"'
-                           + ' onclick="HaAdmin.cronToggle(' + (parseInt(t.id, 10) || 0) + ')">'
+                        h += '<button class="ow-btn ow-btn-mini ' + (t.enabled ? 'ow-btn-ghost' : 'ow-btn-primary') + '"'
+                           + ' onclick="OwAdmin.cronToggle(' + (parseInt(t.id, 10) || 0) + ')">'
                            + (t.enabled ? '停用' : '启用') + '</button>';
                     }
                     h += '</td></tr>';
@@ -5284,7 +5533,7 @@
                 h += '</table></div>';
 
                 /* ---- 执行日志 ---- */
-                h += '<h2 style="margin-top:20px">执行日志</h2><div class="ha-card"><table class="ha-table"><tr>'
+                h += '<h2 style="margin-top:20px">执行日志</h2><div class="ow-card"><table class="ow-table"><tr>'
                   + '<th>任务</th><th>结果</th><th>耗时</th><th>信息</th><th>时间</th></tr>';
                 if (!r.logs.length) {
                     h += '<tr><td colspan="5" style="color:#5C5C5C">暂无执行记录</td></tr>';
@@ -5292,7 +5541,7 @@
                 for (var j = 0; j < r.logs.length; j++) {
                     var g = r.logs[j];
                     h += '<tr><td>' + esc(g.name) + '</td>'
-                       + '<td>' + HaAdmin._cronStatusTag(g.status) + '</td>'
+                       + '<td>' + OwAdmin._cronStatusTag(g.status) + '</td>'
                        + '<td>' + (parseInt(g.duration, 10) || 0) + ' ms</td>'
                        + '<td>' + esc(g.message || '—') + '</td>'
                        + '<td>' + esc(new Date(parseInt(g.created_at, 10) * 1000).toISOString().slice(0, 19).replace('T', ' ')) + '</td></tr>';
@@ -5300,10 +5549,10 @@
                 h += '</table>';
                 // v1.2.51：执行日志换通用分页轮子 uiPager（原来只有「上一页/下一页」，
                 // 与群聊审核等页的数字页码+跳页不一致，也没法直接跳页）
-                h += '<div id="haCronLogPager" style="margin-top:10px"></div></div>';
+                h += '<div id="owCronLogPager" style="margin-top:10px"></div></div>';
 
                 main.innerHTML = h;
-                HaAdmin.uiPager('haCronLogPager', page, r.log_total, 30, function (pg) { HaAdmin.cronPage(pg); });
+                OwAdmin.uiPager('owCronLogPager', page, r.log_total, 30, function (pg) { OwAdmin.cronPage(pg); });
             });
         },
 
@@ -5312,19 +5561,19 @@
             return token ? base + '&token=' + encodeURIComponent(token) : base;
         },
         cronPage: function (p) {
-            HaAdmin._cronPage = Math.max(1, p);
-            HaAdmin.cronLoad();
+            OwAdmin._cronPage = Math.max(1, p);
+            OwAdmin.cronLoad();
         },
-        /* 启停：敏感操作，走一次性票据（HaApi.secure），不能用普通 post */
+        /* 启停：敏感操作，走一次性票据（OwApi.secure），不能用普通 post */
         cronToggle: function (id) {
-            HaApi.secure('admin_cron_toggle', { id: id }, function (r) {
+            OwApi.secure('admin_cron_toggle', { id: id }, function (r) {
                 toast(r.msg);
-                if (r.ok) HaAdmin.cronLoad();
+                if (r.ok) OwAdmin.cronLoad();
             });
         },
         cronRun: function () {
-            HaAdmin.confirm('立即执行全部已启用的计划任务？\n忽略到期时间，任务可能包含清理类操作。', function () {
-                HaApi.secure('admin_cron_run', {}, function (r) {
+            OwAdmin.confirm('立即执行全部已启用的维护任务？\n忽略到期时间，任务可能包含清理类操作。', function () {
+                OwApi.secure('admin_cron_run', {}, function (r) {
                     toast(r.msg);
                     if (r.ok) {
                         // 失败详情单独提示，否则「执行 3 个，失败 1 个」看不出是哪个挂了
@@ -5333,24 +5582,24 @@
                             if (r.results[i].status !== 'ok') bad.push(r.results[i].name + '：' + (r.results[i].message || r.results[i].status));
                         }
                         if (bad.length) toast(bad.join('；'), 'err');
-                        HaAdmin.cronLoad();
+                        OwAdmin.cronLoad();
                     }
                 });
             });
         },
         cronToken: function () {
-            HaAdmin.confirm('重置外部触发令牌？\n旧地址立即失效，已配置的系統计划任务需要更新为新地址。', function () {
-                HaApi.secure('admin_cron_token', {}, function (r) {
+            OwAdmin.confirm('重置外部触发令牌？\n旧地址立即失效，已配置的系统计划任务需要更新为新地址。', function () {
+                OwApi.secure('admin_cron_token', {}, function (r) {
                     toast(r.msg);
-                    if (r.ok) HaAdmin.cronLoad();
+                    if (r.ok) OwAdmin.cronLoad();
                 });
             });
         },
         cronClearLogs: function () {
-            HaAdmin.confirm('清理 30 天前的执行日志？该操作不可恢复。', function () {
-                HaApi.secure('admin_cron_logs_clear', { days: 30 }, function (r) {
+            OwAdmin.confirm('清理 30 天前的执行日志？该操作不可恢复。', function () {
+                OwApi.secure('admin_cron_logs_clear', { days: 30 }, function (r) {
                     toast(r.msg);
-                    if (r.ok) HaAdmin.cronLoad();
+                    if (r.ok) OwAdmin.cronLoad();
                 });
             });
         },
@@ -5368,7 +5617,7 @@
             this.page('plugin:' + id);
         },
         pluginToggle: function (name, en) {
-            HaApi.post('admin_plugin_toggle', { name: name, enabled: en }, function (r) {
+            OwApi.post('admin_plugin_toggle', { name: name, enabled: en }, function (r) {
                 toast(r.msg);
                 // 启停改变侧栏子菜单与可用页面，整页刷新保证状态一致
                 setTimeout(function () { location.reload(); }, 500);
@@ -5376,26 +5625,26 @@
         },
         /* 卸载：删除插件目录，二次确认后执行 */
         pluginUninstall: function (name) {
-            HaAdmin.confirm('确定卸载插件「' + name + '」吗？\n将停用并删除 plugins/' + name + ' 目录，不可恢复！', function () {
-                HaApi.secure('admin_plugin_uninstall', { name: name }, function (r) {
+            OwAdmin.confirm('确定卸载插件「' + name + '」吗？\n将停用并删除 plugins/' + name + ' 目录，不可恢复！', function () {
+                OwApi.secure('admin_plugin_uninstall', { name: name }, function (r) {
                     toast(r.msg);
                     setTimeout(function () { location.reload(); }, 500);
                 });
             });
         },
         pluginInstall: function () {
-            var f = $('haPluginZip');
+            var f = $('owPluginZip');
             if (!f.files || !f.files[0]) { toast('请选择 zip 文件'); return; }
-            HaApi.upload('admin_plugin_install', f.files[0], {}, function (r) { toast(r.msg); if (r.ok) HaAdmin.page('plugins'); });
+            OwApi.upload('admin_plugin_install', f.files[0], {}, function (r) { toast(r.msg); if (r.ok) OwAdmin.page('plugins'); });
         },
         /**
-         * 折叠分组开关（v1.2.53，配合 .ha-fold 样式）。
+         * 折叠分组开关（v1.2.53，配合 .ow-fold 样式）。
          * 只切 is-open 类，内容始终留在 DOM 里 —— 收起状态下表单值照样被 settingsSave 读到。
-         * @param {Element} hd 被点的 .ha-fold-hd（标题条）
+         * @param {Element} hd 被点的 .ow-fold-hd（标题条）
          */
         foldToggle: function (hd) {
             var box = hd && hd.parentNode;
-            if (!box || box.className.indexOf('ha-fold') < 0) return;
+            if (!box || box.className.indexOf('ow-fold') < 0) return;
             box.className = box.className.indexOf('is-open') >= 0
                 ? box.className.replace(/\bis-open\b/g, '')
                 : box.className + ' is-open';
@@ -5406,47 +5655,47 @@
                 var el = $(id);
                 return el ? (el.checked ? '1' : '0') : '';
             }
-            HaApi.post('admin_settings_save', {
-                site_name: $('haS_site_name').value,
-                site_url: $('haS_site_url') ? $('haS_site_url').value : '',
+            OwApi.post('admin_settings_save', {
+                site_name: $('owS_site_name').value,
+                site_url: $('owS_site_url') ? $('owS_site_url').value : '',
                 // v1.2.52：布尔项已从下拉改成开关（原生 checkbox）→ 读 checked 转成 '1'/'0'。
                 // 沿用原来的「元素不存在时给空串」写法：空串后端会跳过该键（不写库）。
-                allow_register: swv('haS_allow_register'),
-                reg_email_verify: swv('haS_reg_email_verify'),
-                guest_browse: swv('haS_guest_browse'),
-                guest_chat: swv('haS_guest_chat'),
-                guest_msg_interval: $('haS_guest_msg_interval') ? $('haS_guest_msg_interval').value : '',
+                allow_register: swv('owS_allow_register'),
+                reg_email_verify: swv('owS_reg_email_verify'),
+                guest_browse: swv('owS_guest_browse'),
+                guest_chat: swv('owS_guest_chat'),
+                guest_msg_interval: $('owS_guest_msg_interval') ? $('owS_guest_msg_interval').value : '',
                 // v1.2.2 消息服务器保留期（天），0 = 永久保留
-                msg_retain_days: $('haS_msg_retain_days') ? $('haS_msg_retain_days').value : '',
-                msg_rate_window: $('haS_msg_rate_window').value,
-                msg_rate_max: $('haS_msg_rate_max').value,
-                mail_rate_limit: $('haS_mail_rate_limit').value,
-                room_pass_ttl: $('haS_room_pass_ttl') ? $('haS_room_pass_ttl').value : '',
-                min_register_age: $('haS_min_register_age') ? $('haS_min_register_age').value : '',
-                room_create_allow: swv('haS_room_create_allow'),
-                room_private_create_allow: swv('haS_room_private_create_allow'),
-                login_fail_captcha: $('haS_login_fail_captcha') ? $('haS_login_fail_captcha').value : '',
-                login_fail_lock: $('haS_login_fail_lock') ? $('haS_login_fail_lock').value : '',
-                login_lock_minutes: $('haS_login_lock_minutes') ? $('haS_login_lock_minutes').value : '',
-                sound_default: swv('haS_sound_default'),
+                msg_retain_days: $('owS_msg_retain_days') ? $('owS_msg_retain_days').value : '',
+                msg_rate_window: $('owS_msg_rate_window').value,
+                msg_rate_max: $('owS_msg_rate_max').value,
+                mail_rate_limit: $('owS_mail_rate_limit').value,
+                room_pass_ttl: $('owS_room_pass_ttl') ? $('owS_room_pass_ttl').value : '',
+                min_register_age: $('owS_min_register_age') ? $('owS_min_register_age').value : '',
+                room_create_allow: swv('owS_room_create_allow'),
+                room_private_create_allow: swv('owS_room_private_create_allow'),
+                login_fail_captcha: $('owS_login_fail_captcha') ? $('owS_login_fail_captcha').value : '',
+                login_fail_lock: $('owS_login_fail_lock') ? $('owS_login_fail_lock').value : '',
+                login_lock_minutes: $('owS_login_lock_minutes') ? $('owS_login_lock_minutes').value : '',
+                sound_default: swv('owS_sound_default'),
                 // v1.2.51 调试模式（v1.2.52 起也是开关）
-                debug_mode: swv('haS_debug_mode')
+                debug_mode: swv('owS_debug_mode')
             }, function (r) { toast(r.msg); });
         }
     };
 
-    w.HaAuth = HaAuth;
-    w.HaChat = HaChat;
-    w.HaAdmin = HaAdmin;
-    w.HaApi = HaApi;   // 暴露给插件脚本（如用户管理插件 HaUM）使用
+    w.OwAuth = OwAuth;
+    w.OwChat = OwChat;
+    w.OwAdmin = OwAdmin;
+    w.OwApi = OwApi;   // 暴露给插件脚本（如用户管理插件 OwUM）使用
     // 通用助手同样暴露：插件脚本与主程序共用渲染与提示
     w.esc = esc; w.toast = toast; w.fmtUid = fmtUid; w.opts = opts; w.ROLE_CN = ROLE_CN;
     // 开关（State 按钮）通用轮子：前后台与插件共用同一套 HTML 与绑定逻辑
     w.switchHtml = switchHtml; w.bindSwitches = bindSwitches;
-    w.HaTip = HaTip;   // 表单说明气泡（v1.2.45），核心已自动启用，插件直接用 HaTip.scan()
+    w.OwTip = OwTip;   // 表单说明气泡（v1.2.45），核心已自动启用，插件直接用 OwTip.scan()
 
     /* ==========================================================================
-       HaGate：请求单飞闸门（v1.2.38，通用轮子，前后台与插件共用）
+       OwGate：请求单飞闸门（v1.2.38，通用轮子，前后台与插件共用）
        --------------------------------------------------------------------------
        解决什么：多个**互不相干的轻量状态查询**同时触发时（比如心跳、聊天更新、未读数），
        请求会并发打出去、响应乱序回，旧值覆盖新值；请求一多还会堆积成雪崩。
@@ -5466,14 +5715,14 @@
                         适合「只要最新值」的轮询式查询（旧的已经过时了）。
 
        用法：
-         HaGate.run('heartbeat_status', function (done) {
-             HaApi.post('heartbeat_status', {}, function (r) { done(null, r); });
+         OwGate.run('heartbeat_status', function (done) {
+             OwApi.post('heartbeat_status', {}, function (r) { done(null, r); });
          }, function (err, r) { ... });
 
          // 只要最新值（丢弃模式）+ 最小间隔 3s
-         HaGate.run('notification_count', task, cb, { drop: true, minGap: 3000 });
+         OwGate.run('notification_count', task, cb, { drop: true, minGap: 3000 });
        ========================================================================== */
-    var HaGate = {
+    var OwGate = {
         _q: {},        // key -> { busy, chain:[], lastAt }
         _minGap: 0,    // 默认最小间隔（ms），0 = 不限；可被 opts.minGap 覆盖
 
@@ -5529,5 +5778,5 @@
         /** 该 key 排队的数量（调试与测试用） */
         pending: function (key) { var g = this._q[key]; return g ? g.chain.length : 0; }
     };
-    w.HaGate = HaGate;
+    w.OwGate = OwGate;
 })(window);

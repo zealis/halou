@@ -16,18 +16,18 @@
  *
  * ## 按钮显隐由插件自己决定
  *
- * 核心在输入栏留了**锚点** `<span id="haAttachTools"></span>`，本插件的 chat.js
+ * 核心在输入栏留了**锚点** `<span id="owAttachTools"></span>`，本插件的 chat.js
  * 加载后往里注入两个按钮。核心因此不需要任何 if 判断 ——
- * 与 v1.2.37 第三方授权（`window.HaOauth` 决定入口是否渲染）是同一思路。
+ * 与 v1.2.37 第三方授权（`window.OwOauth` 决定入口是否渲染）是同一思路。
  *
  * ## 配置从核心迁来（v1.2.41）
  *
  * 原先是核心后台设置页的三个全局项：file_upload / file_max_size / file_exts。
  * 现改为本插件自有配置（表 plugin_attachment_config），并在**首次读取时**
- * 自动吸收核心旧值（haATInitOnce），吸收后核心不再读这三个键。
+ * 自动吸收核心旧值（owATInitOnce），吸收后核心不再读这三个键。
  * 为什么要迁移：用户很可能已在核心后台调过上限与扩展名，直接重置成默认等于丢配置。
  */
-if (!defined('HALOU_VERSION')) exit;   // 禁止直接 HTTP 访问本文件
+if (!defined('OWLSGO_VERSION')) exit;   // 禁止直接 HTTP 访问本文件
 
 /* ============================ 配置（原核心设置项迁入） ============================ */
 DB::run("CREATE TABLE IF NOT EXISTS plugin_attachment_config (
@@ -36,7 +36,7 @@ DB::run("CREATE TABLE IF NOT EXISTS plugin_attachment_config (
 )");
 
 /** 默认配置 */
-function haATDefaultConfig(): array
+function owATDefaultConfig(): array
 {
     return [
         'enabled' => '1',   // 是否允许上传附件（0=关闭）
@@ -49,7 +49,7 @@ function haATDefaultConfig(): array
  * 一次性迁移：把核心旧设置搬进插件配置。
  * ⚠️ 只能读一次 —— 若每次请求都回落核心旧值，用户在插件后台改的值会被核心覆盖回去。
  */
-function haATInitOnce(): void
+function owATInitOnce(): void
 {
     static $done = false;
     if ($done) return;
@@ -65,12 +65,12 @@ function haATInitOnce(): void
         DB::run('INSERT OR REPLACE INTO plugin_attachment_config (k, v) VALUES (?, ?)', [$newKey, (string)$v]);
     }
 }
-haATInitOnce();
+owATInitOnce();
 
 /** 读配置（缺失项补默认值） */
-function haATConfig(): array
+function owATConfig(): array
 {
-    $cfg = haATDefaultConfig();
+    $cfg = owATDefaultConfig();
     foreach (DB::all('SELECT k, v FROM plugin_attachment_config') as $r) {
         if (array_key_exists($r['k'], $cfg)) $cfg[$r['k']] = (string)$r['v'];
     }
@@ -79,10 +79,10 @@ function haATConfig(): array
 }
 
 /** 写配置（只接受白名单键；扩展名还要过安全表） */
-function haATSaveConfig(array $in): array
+function owATSaveConfig(array $in): array
 {
-    $def = haATDefaultConfig();
-    $safe = haATExtMime();
+    $def = owATDefaultConfig();
+    $safe = owATExtMime();
     foreach ($in as $k => $v) {
         if (!array_key_exists($k, $def)) continue;
         $v = trim((string)$v);
@@ -98,7 +98,7 @@ function haATSaveConfig(array $in): array
         }
         DB::run('INSERT OR REPLACE INTO plugin_attachment_config (k, v) VALUES (?, ?)', [(string)$k, $v]);
     }
-    return haATConfig();
+    return owATConfig();
 }
 
 /* ============================ 安全：扩展名 → MIME 白名单 ============================ */
@@ -113,7 +113,7 @@ function haATSaveConfig(array $in): array
  * ⚠️ office 2007+（docx/xlsx/pptx）本质是 zip 包，finfo 常报 application/zip，
  *   故其 MIME 列表里一并接受 zip 的 MIME，避免误伤正常文件。
  */
-function haATExtMime(): array
+function owATExtMime(): array
 {
     return [
         'zip'  => ['application/zip', 'application/x-zip-compressed'],
@@ -141,9 +141,9 @@ function haATExtMime(): array
 /* ============================ 上传实现 ============================ */
 
 /** 附件总开关（图片与文件共用） */
-function haATEnabled(): bool
+function owATEnabled(): bool
 {
-    return haATConfig()['enabled'] === '1';
+    return owATConfig()['enabled'] === '1';
 }
 
 /**
@@ -152,9 +152,9 @@ function haATEnabled(): bool
  * **下调**上限（设计文档「五次功能解锁」：3 级起 1/4 全局上限、10 级起 1/2）。
  * 只接受「比全局更小」的值：插件放行不了比站点配置更大的文件，避免越权。
  */
-function haATMaxBytes(?array $actor = null): int
+function owATMaxBytes(?array $actor = null): int
 {
-    $max = (int)haATConfig()['max_mb'] * 1048576;
+    $max = (int)owATConfig()['max_mb'] * 1048576;
     if ($actor !== null) {
         $tmp = $max;
         Plugin::fire('upload.maxsize', [&$tmp, $actor]);
@@ -164,11 +164,11 @@ function haATMaxBytes(?array $actor = null): int
 }
 
 /** 当前允许的扩展名（后台配置 ∩ 安全表） */
-function haATExts(): array
+function owATExts(): array
 {
-    $safe = haATExtMime();
+    $safe = owATExtMime();
     $out = [];
-    foreach (preg_split('/[\s,，;；]+/u', haATConfig()['exts']) ?: [] as $piece) {
+    foreach (preg_split('/[\s,，;；]+/u', owATConfig()['exts']) ?: [] as $piece) {
         $ext = strtolower(ltrim(trim((string)$piece), '.'));
         if ($ext !== '' && isset($safe[$ext])) $out[$ext] = true;
     }
@@ -176,7 +176,7 @@ function haATExts(): array
 }
 
 /** 读真实 MIME（finfo，绝不信任客户端声明的 type） */
-function haATRealMime(string $path): string
+function owATRealMime(string $path): string
 {
     if (class_exists('finfo')) {
         $f = new finfo(FILEINFO_MIME_TYPE);
@@ -190,13 +190,13 @@ function haATRealMime(string $path): string
  * 存图片消息：复用核心 Upload（头像/贴纸同一条本地存储通道），
  * 这里额外先卡一次体积上限（配置项在插件里，不能指望核心再读）。
  */
-function haATStoreImage(array $f, ?array $actor = null): array
+function owATStoreImage(array $f, ?array $actor = null): array
 {
-    if (!haATEnabled()) return [false, '站点已关闭附件上传'];
+    if (!owATEnabled()) return [false, '站点已关闭附件上传'];
     $err = (int)($f['error'] ?? UPLOAD_ERR_NO_FILE);
     if ($err !== UPLOAD_ERR_OK) return [false, '上传失败（错误码 ' . $err . '）'];
     $tmp = (string)($f['tmp_name'] ?? '');
-    $max = haATMaxBytes($actor);
+    $max = owATMaxBytes($actor);
     if ($tmp !== '' && is_file($tmp) && (int)@filesize($tmp) > $max) {
         return [false, '图片超过 ' . round($max / 1048576, 1) . ' MB 限制'];
     }
@@ -209,24 +209,24 @@ function haATStoreImage(array $f, ?array $actor = null): array
  *          ③ 双重白名单（后台配置 ∩ 内置安全表）④ 随机重命名 + 年月目录
  *          ⑤ 目录写 index.html 防列举
  */
-function haATStoreFile(array $f, ?array $actor = null): array
+function owATStoreFile(array $f, ?array $actor = null): array
 {
-    if (!haATEnabled()) return [false, '站点已关闭附件上传'];
+    if (!owATEnabled()) return [false, '站点已关闭附件上传'];
     $err = (int)($f['error'] ?? UPLOAD_ERR_NO_FILE);
     if ($err !== UPLOAD_ERR_OK) return [false, '上传失败（错误码 ' . $err . '）'];
     $tmp  = (string)($f['tmp_name'] ?? '');
     $orig = (string)($f['name'] ?? 'file');
     if ($tmp === '' || !is_file($tmp)) return [false, '临时文件不可读'];
 
-    $max  = haATMaxBytes($actor);
+    $max  = owATMaxBytes($actor);
     $size = (int)@filesize($tmp);
     if ($size <= 0) return [false, '文件内容为空'];
     if ($size > $max) return [false, '文件超过 ' . round($max / 1048576) . ' MB 限制'];   // ⚠️ $max 是字节，别直接当 MB 显示
 
-    $mime  = haATRealMime($tmp);
+    $mime  = owATRealMime($tmp);
     $extIn = strtolower((string)pathinfo($orig, PATHINFO_EXTENSION));
-    $allow = haATExts();
-    $safe  = haATExtMime();
+    $allow = owATExts();
+    $safe  = owATExtMime();
 
     if ($extIn === '' || !in_array($extIn, $allow, true) || !in_array($mime, $safe[$extIn] ?? [], true)) {
         // 声明的扩展名不可用：再看真实内容是否属于站点已开放的类型
@@ -263,7 +263,7 @@ function haATStoreFile(array $f, ?array $actor = null): array
    所以删除前必须数一下「除本条外还有几条消息在用这个文件」，
    为 0 才真正unlink，否则只删消息记录（这是「引用计数」，
    不需要新建表 —— messages 里本来就有 path，直接查即可）。 */
-function haAM_refCount(string $pathOrUrl, int $excludeMsgId = 0): int
+function owAM_refCount(string $pathOrUrl, int $excludeMsgId = 0): int
 {
     // ⚠️ 这里**必须匹配「哈希主体」而不是完整 path**，有两个坑：
     //
@@ -315,7 +315,7 @@ Plugin::route('plugin_attachment_manager_upload', function (array $ctx) use ($at
     $allowAtt = true; $attReason = '';
     Plugin::fire('attachment.guard', [&$allowAtt, &$attReason, $ctx['actor']]);
     if (!$allowAtt) Api::json(['ok' => false, 'msg' => $attReason !== '' ? $attReason : '当前等级无法上传图片'], 403);
-    [$ok, $urlOrMsg] = haATStoreImage($ctx['files']['file'], $ctx['actor']);
+    [$ok, $urlOrMsg] = owATStoreImage($ctx['files']['file'], $ctx['actor']);
     if (!$ok) Api::json(['ok' => false, 'msg' => $urlOrMsg], 400);
     Api::json(['ok' => true, 'url' => $urlOrMsg]);
 });
@@ -332,7 +332,7 @@ Plugin::route('plugin_attachment_manager_upload_file', function (array $ctx) use
     $allowAtt = true; $attReason = '';
     Plugin::fire('attachment.guard', [&$allowAtt, &$attReason, $ctx['actor']]);
     if (!$allowAtt) Api::json(['ok' => false, 'msg' => $attReason !== '' ? $attReason : '当前等级无法上传文件'], 403);
-    [$ok, $res] = haATStoreFile($ctx['files']['file'], $ctx['actor']);
+    [$ok, $res] = owATStoreFile($ctx['files']['file'], $ctx['actor']);
     if (!$ok) Api::json(['ok' => false, 'msg' => $res], 400);
     Sec::log('upload_file', $ctx['actor']['nickname'], ['size' => $res['size'], 'ext' => $res['ext']]);
     // v1.2.42：上传成功事件（等级信任插件据此外挂「今日上传文件」任务）
@@ -354,21 +354,21 @@ Plugin::route('plugin_attachment_manager_cfg_get', function (array $ctx) use ($a
     $amGuard($ctx);
     Api::json([
         'ok' => true,
-        'config' => haATConfig(),
-        'active_exts' => haATExts(),
-        'safe_exts' => array_keys(haATExtMime()),
+        'config' => owATConfig(),
+        'active_exts' => owATExts(),
+        'safe_exts' => array_keys(owATExtMime()),
     ]);
 });
 
 Plugin::route('plugin_attachment_manager_cfg_save', function (array $ctx) use ($amGuard) {
     $amGuard($ctx);
     $post = $ctx['post'];
-    $cfg = haATSaveConfig([
+    $cfg = owATSaveConfig([
         'enabled' => $post['enabled'] ?? '',
         'max_mb'  => $post['max_mb'] ?? '',
         'exts'    => $post['exts'] ?? '',
     ]);
-    Api::json(['ok' => true, 'config' => $cfg, 'active_exts' => haATExts()]);
+    Api::json(['ok' => true, 'config' => $cfg, 'active_exts' => owATExts()]);
 });
 
 /**
@@ -376,7 +376,7 @@ Plugin::route('plugin_attachment_manager_cfg_save', function (array $ctx) use ($
  * 通过 page.head 钩子注入 <link> 标签，确保后台样式生效。
  */
 Plugin::on('page.head', function () {
-    echo '<link rel="stylesheet" href="?action=assets&type=css&am=' . HALOU_VERSION . '">';
+    echo '<link rel="stylesheet" href="?action=assets&type=css&am=' . OWLSGO_VERSION . '">';
 });
 
 Plugin::asset('js', 'attachment-manager/chat.js');
@@ -388,7 +388,7 @@ Plugin::asset('js', 'attachment-manager/chat.js');
  * 跨驱动提取附件名用于搜索：file 类型取 JSON 的 name 字段，image 类型取 content 本身（URL）。
  * file 的 content 是 JSON，image 的 content 是纯 URL 字符串，直接 LIKE 匹配即可。
  */
-function haAM_search_expr(): string
+function owAM_search_expr(): string
 {
     switch (DB::driver()) {
         case 'mysql':
@@ -401,7 +401,7 @@ function haAM_search_expr(): string
 }
 
 /** 把字节数格式化为易读字符串 */
-function haAM_size_text(int $n): string
+function owAM_size_text(int $n): string
 {
     if ($n < 1024) return $n . ' B';
     if ($n < 1048576) return round($n / 1024, 1) . ' KB';
@@ -414,7 +414,7 @@ function haAM_size_text(int $n): string
  *   - 相对：uploads/image/xxx.png
  *   - 绝对：https://host/uploads/image/xxx.png
  */
-function haAM_image_abs(string $url): ?string
+function owAM_image_abs(string $url): ?string
 {
     $path = parse_url($url, PHP_URL_PATH);
     if ($path === null || $path === '') return null;
@@ -425,47 +425,47 @@ function haAM_image_abs(string $url): ?string
     return is_file($abs) ? $abs : null;
 }
 
-/* ---------- 后台页面（HTML 注入 #haAdminMain，交互函数见 admin.js） ---------- */
+/* ---------- 后台页面（HTML 注入 #owAdminMain，交互函数见 admin.js） ---------- */
 Plugin::adminPage('attachment-manager', '附件上传', function () {
     return '<h2>附件上传</h2>'
-        . '<p class="ha-admin-desc">配置聊天附件（图片 / 文件）的上传规则，并管理已上传的文件。'
+        . '<p class="ow-admin-desc">配置聊天附件（图片 / 文件）的上传规则，并管理已上传的文件。'
         . '停用本插件后，聊天输入框的图片与文件按钮会一并消失。</p>'
         // v1.2.41：以下三项由本插件接管（原先在核心「站点设置」里）
-        . '<div class="ha-card">'
-        . '<div class="ha-form-row">'
-        . '<div class="ha-form-item" style="min-width:140px"><label>允许上传附件</label>'
-        . '<select class="ha-input" id="haAtEnabled"><option value="1">允许</option><option value="0">禁止</option></select></div>'
-        . '<div class="ha-form-item" style="min-width:140px"><label>单文件大小上限(MB)</label>'
-        . '<input class="ha-input" id="haAtMaxMb" type="number" min="1" max="1024" value="10"></div>'
+        . '<div class="ow-card">'
+        . '<div class="ow-form-row">'
+        . '<div class="ow-form-item" style="min-width:140px"><label>允许上传附件</label>'
+        . '<select class="ow-input" id="owAtEnabled"><option value="1">允许</option><option value="0">禁止</option></select></div>'
+        . '<div class="ow-form-item" style="min-width:140px"><label>单文件大小上限(MB)</label>'
+        . '<input class="ow-input" id="owAtMaxMb" type="number" min="1" max="1024" value="10"></div>'
         . '</div>'
-        . '<div class="ha-form-item"><label>允许的文件扩展名</label>'
-        . '<input class="ha-input" id="haAtExts" placeholder="zip,pdf,txt,docx">'
+        . '<div class="ow-form-item"><label>允许的文件扩展名</label>'
+        . '<input class="ow-input" id="owAtExts" placeholder="zip,pdf,txt,docx">'
         . '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">逗号分隔。只有安全类型表内登记过的扩展名才会生效；'
         . 'svg / php / html 等可执行或可内嵌脚本的类型不予登记（即使填了也不会放行）。'
-        . '当前生效：<span id="haAtActive">-</span></p></div>'
-        . '<button class="ha-btn ha-btn-primary" onclick="HaAT.saveCfg()">保存配置</button>'
+        . '当前生效：<span id="owAtActive">-</span></p></div>'
+        . '<button class="ow-btn ow-btn-primary" onclick="OwAT.saveCfg()">保存配置</button>'
         . '</div>'
-        . '<div class="ha-card">'
-        . '<div class="ha-form-row">'
-        . '<div class="ha-form-item" style="flex:1;min-width:160px"><label>文件名包含</label>'
-        . '<input class="ha-input" id="haAMQ" placeholder="输入文件名关键词" onkeydown="if(event.key===\'Enter\')HaAM.load(1)"></div>'
-        . '<div class="ha-form-item" style="min-width:120px"><label>房间ID</label>'
-        . '<input class="ha-input" id="haAMRoom" type="number" min="0" placeholder="0=全部" value="0" onkeydown="if(event.key===\'Enter\')HaAM.load(1)"></div>'
-        . '<button class="ha-btn ha-btn-primary" onclick="HaAM.load(1)">搜索</button>'
-        . '<button class="ha-btn ha-btn-ghost" onclick="HaAM.resetFilter()">重置</button>'
+        . '<div class="ow-card">'
+        . '<div class="ow-form-row">'
+        . '<div class="ow-form-item" style="flex:1;min-width:160px"><label>文件名包含</label>'
+        . '<input class="ow-input" id="owAMQ" placeholder="输入文件名关键词" onkeydown="if(event.key===\'Enter\')OwAM.load(1)"></div>'
+        . '<div class="ow-form-item" style="min-width:120px"><label>房间ID</label>'
+        . '<input class="ow-input" id="owAMRoom" type="number" min="0" placeholder="0=全部" value="0" onkeydown="if(event.key===\'Enter\')OwAM.load(1)"></div>'
+        . '<button class="ow-btn ow-btn-primary" onclick="OwAM.load(1)">搜索</button>'
+        . '<button class="ow-btn ow-btn-ghost" onclick="OwAM.resetFilter()">重置</button>'
         . '</div></div>'
-        . '<div class="ha-card">'
+        . '<div class="ow-card">'
         . '<div style="margin-bottom:10px">'
-        . '<button class="ha-btn ha-btn-danger" id="haAMBatchDel" onclick="HaAM.batchDelete()" disabled>批量删除</button>'
-        . '<span id="haAMStat" style="margin-left:12px;color:var(--ha-text-sub,#999);font-size:12px"></span>'
+        . '<button class="ow-btn ow-btn-danger" id="owAMBatchDel" onclick="OwAM.batchDelete()" disabled>批量删除</button>'
+        . '<span id="owAMStat" style="margin-left:12px;color:var(--ow-text-sub,#999);font-size:12px"></span>'
         . '</div>'
         . '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">'
-        . '<table class="ha-table" id="haAMTable">'
-        . '<tr><th style="width:32px"><input type="checkbox" id="haAMCheckAll" onchange="HaAM.toggleAll(this)"></th>'
+        . '<table class="ow-table" id="owAMTable">'
+        . '<tr><th style="width:32px"><input type="checkbox" id="owAMCheckAll" onchange="OwAM.toggleAll(this)"></th>'
         . '<th>类型</th><th>文件名</th><th>大小</th><th>消息</th><th>上传者</th><th>上传时间</th><th>操作</th></tr>'
         . '</table>'
         . '</div>'
-        . '<div id="haAMList" style="display:none"></div>'
+        . '<div id="owAMList" style="display:none"></div>'
         . '<div id="HAMPager" style="margin-top:12px"></div>'
         . '</div>';
 });
@@ -490,7 +490,7 @@ Plugin::route('plugin_attachment_manager_list', function (array $ctx) use ($amGu
     $args = [];
     if ($roomId > 0) { $where .= ' AND m.room_id=?'; $args[] = $roomId; }
     if ($keyword !== '') {
-        $where .= ' AND ' . haAM_search_expr() . ' LIKE ?';
+        $where .= ' AND ' . owAM_search_expr() . ' LIKE ?';
         $args[] = '%' . $keyword . '%';
     }
 
@@ -545,7 +545,7 @@ Plugin::route('plugin_attachment_manager_list', function (array $ctx) use ($amGu
             'name' => $name,
             'ext'  => $ext,
             'size' => $size,
-            'size_text' => $size > 0 ? haAM_size_text($size) : '-',
+            'size_text' => $size > 0 ? owAM_size_text($size) : '-',
             'path' => $path,
             'room_id' => (int)$r['room_id'],
             'scope_text' => $scopeText,
@@ -588,7 +588,7 @@ Plugin::route('plugin_attachment_manager_delete', function (array $ctx) use ($am
         $refKey = $type === 'file'
             ? (string)((json_decode((string)$msg['content'], true)['path'] ?? ''))
             : (string)$msg['content'];
-        $stillUsed = $refKey !== '' && haAM_refCount($refKey, (int)$mid) > 0;
+        $stillUsed = $refKey !== '' && owAM_refCount($refKey, (int)$mid) > 0;
 
         if (!$stillUsed) {
             if ($type === 'file') {
@@ -598,7 +598,7 @@ Plugin::route('plugin_attachment_manager_delete', function (array $ctx) use ($am
                     if ($abs && is_file($abs)) @unlink($abs);
                 }
             } elseif ($type === 'image') {
-                $abs = haAM_image_abs((string)$msg['content']);
+                $abs = owAM_image_abs((string)$msg['content']);
                 if ($abs) @unlink($abs);
             }
         } else {
@@ -630,7 +630,7 @@ Plugin::route('plugin_attachment_manager_download', function (array $ctx) use ($
     } else {
         // image: content 是 URL（相对或绝对），用辅助函数解析物理路径
         $url = (string)$msg['content'];
-        $abs = haAM_image_abs($url);
+        $abs = owAM_image_abs($url);
         $name = basename(parse_url($url, PHP_URL_PATH) ?: $url);
     }
     if (!$abs || !is_file($abs)) Api::json(['ok' => false, 'msg' => '物理文件不存在'], 404);

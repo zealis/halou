@@ -14,11 +14,110 @@ class Admin
         return $sec . ' 秒';
     }
 
+    /** 全局配置（index.php 启动时注入，用于定位 data/logs） */
+    private static array $cfg = [];
+
+    /** 注入配置：与 Upload::init / Plugin::init 同一模式（$CFG 由 index.php 持有） */
+    public static function init(array $cfg): void
+    {
+        self::$cfg = $cfg;
+    }
+
     public static function requireAdmin(array $actor): void
     {
         if ($actor['role'] !== 'admin') {
             Api::json(['ok' => false, 'msg' => '需要管理员权限'], 403);
         }
+    }
+
+    /** 日志文件名白名单：只认这两种形态，其余一律拒绝（防 ../ 穿越与任意文件读取） */
+    private const SYSLOG_NAME = '/^debug(\.log|-\d{4}-\d{2}-\d{2}\.log)$/';
+
+    /** 系统日志目录（data/logs） */
+    private static function syslogDir(): string
+    {
+        $base = (string)(self::$cfg['data_dir'] ?? (dirname(__DIR__) . '/data'));
+        return rtrim($base, '/\\') . '/logs';
+    }
+
+    /**
+     * 列出日志文件，新的在前。
+     * @return array [['name'=>'debug.log','size'=>123,'mtime'=>1700000000,'kind'=>'debug'], ...]
+     */
+    private static function syslogFiles(): array
+    {
+        $dir = self::syslogDir();
+        $out = [];
+        if (!is_dir($dir)) return $out;
+        foreach ((array)@scandir($dir) as $f) {
+            $f = (string)$f;
+            if (!preg_match(self::SYSLOG_NAME, $f)) continue;
+            $fp = $dir . '/' . $f;
+            if (!is_file($fp)) continue;
+            $out[] = [
+                'name'  => $f,
+                'size'  => (int)@filesize($fp),
+                'mtime' => (int)@filemtime($fp),
+                'kind'  => $f === 'debug.log' ? 'debug' : 'daily',
+            ];
+        }
+        usort($out, fn($a, $b) => $b['mtime'] <=> $a['mtime']);
+        return $out;
+    }
+
+    /**
+     * 校验文件名并返回绝对路径；非法返回 null。
+     * 前端传来的 file 必须过这里，绝不直接拼路径。
+     */
+    private static function syslogPath(string $file): ?string
+    {
+        if (!preg_match(self::SYSLOG_NAME, $file)) return null;
+        $dir = self::syslogDir();
+        $p = $dir . '/' . $file;
+        if (!is_file($p)) return null;
+        // realpath 归一后再比较：Windows 下 realpath 返回反斜杠、配置里可能是正斜杠，
+        // 不统一分隔符会把合法路径误判成越界
+        $real = @realpath($p);
+        $base = @realpath($dir);
+        if ($real !== false && $base !== false) {
+            $norm = static fn(string $s): string => rtrim(str_replace('\\', '/', $s), '/');
+            if (strpos($norm($real), $norm($base) . '/') !== 0) return null;
+        }
+        return $real !== false ? $real : $p;
+    }
+
+    /**
+     * 读取日志尾部（默认末尾 200KB，够看又不炸页面）。
+     * 按字节截断可能落在多字节字符中间，只在切点处向前找到合法 UTF-8 起始字节再截，
+     * 最多丢 3 字节——不能对全文做 [\x80-\xFF] 替换，那样会把正常中文全变成乱码。
+     */
+    private static function syslogTail(string $path, int $bytes = 204800): string
+    {
+        clearstatcache(true, $path);
+        $size = (int)@filesize($path);
+        $fh = @fopen($path, 'rb');
+        if (!$fh) return '';
+        $cut = false;
+        if ($size > $bytes) {
+            fseek($fh, -$bytes, SEEK_END);
+            $out = "...（已省略前 " . round(($size - $bytes) / 1024) . " KB）\n";
+            $cut = true;
+        } else {
+            $out = '';
+        }
+        $body = (string)stream_get_contents($fh);
+        fclose($fh);
+        if ($cut) {
+            for ($k = 0; $k < 4 && $k < strlen($body); $k++) {
+                if ((ord($body[$k]) & 0xC0) === 0x80) {   // 续字节 → 前一个字符被切了一半
+                    $body = substr($body, $k);
+                } else {
+                    break;
+                }
+            }
+            if ($body !== '' && (ord($body[0]) & 0xC0) === 0x80) $body = '';
+        }
+        return $out . $body;
     }
 
     public static function handle(string $action, array $actor): void
@@ -247,6 +346,61 @@ class Admin
                     'actions' => DB::all('SELECT action, COUNT(*) AS n FROM security_logs GROUP BY action ORDER BY n DESC, action ASC'),
                 ]);
 
+            // ---------- 系统日志（文件日志查看，v1.2.60） ----------
+            // 调试模式开启时 PHP 把报错写进 data/logs/debug.log（见 index.php 的 OWLSGO_DEBUG 块）。
+            // 这里只做「查看 / 清空」，不改写入机制：日志存不存在、写了什么，仍由调试模式开关决定。
+            case 'admin_syslog':
+                Api::json([
+                    'ok'   => true,
+                    'files' => self::syslogFiles(),
+                    // 前端据此决定是否显示「调试模式已关闭」提示条
+                    'debug' => DB::setting('debug_mode', '0') === '1',
+                ]);
+
+            case 'admin_syslog_read':
+                $slFile = (string)$p('file', '');
+                $slPath = self::syslogPath($slFile);
+                // 非法文件名（穿越 / 不在白名单 / 不存在）一律按「文件不存在」处理，
+                // 不把真实路径或存在性回传给前端
+                if ($slPath === null) Api::json(['ok' => false, 'msg' => '日志文件不存在'], 404);
+                Api::json(['ok' => true, 'file' => $slFile, 'content' => self::syslogTail($slPath)]);
+
+            case 'admin_syslog_clear':
+                $scFile = (string)$p('file', '');
+                $scPath = self::syslogPath($scFile);
+                if ($scPath === null) Api::json(['ok' => false, 'msg' => '日志文件不存在'], 404);
+                if (@file_put_contents($scPath, '') === false) {
+                    Api::json(['ok' => false, 'msg' => '清空失败：文件不可写'], 500);
+                }
+                Api::json(['ok' => true, 'msg' => '已清空 ' . $scFile]);
+
+            // ---------- 安全日志：批量删除（v1.2.60） ----------
+            case 'admin_logs_batch':
+                $idsLB = array_values(array_unique(array_filter(
+                    array_map('intval', explode(',', (string)$p('ids', '')))
+                )));
+                if (!$idsLB) Api::json(['ok' => false, 'msg' => '未选择日志']);
+                $okLB = 0;
+                foreach ($idsLB as $idLB) {
+                    // DB::run 返回 PDOStatement，行数要取 rowCount()（与对象比大小无意义）
+                    if (DB::run('DELETE FROM security_logs WHERE id=?', [$idLB])->rowCount() > 0) $okLB++;
+                }
+                // 删除动作本身留痕：谁在什么时候清了哪些日志
+                Sec::log('admin_logs_batch_del', $actor['nickname'], ['ids' => $idsLB, 'ok' => $okLB]);
+                Api::json(['ok' => $okLB > 0, 'msg' => '批量删除：成功 ' . $okLB . ' 条']);
+
+            // ---------- 运行缓存（v1.2.60） ----------
+            case 'admin_opcache_reset':
+                // 手动刷新已编译脚本缓存：代码更新后 php-cgi 的 OPcache 可能仍在跑旧字节码
+                // （validate_timestamps 关闭或 revalidate_freq 未到），清一次最直接。
+                if (!function_exists('opcache_reset')) {
+                    Api::json(['ok' => false, 'msg' => '当前环境未启用 OPcache（phpStudy 需在面板 PHP 设置中勾选 OPcache）']);
+                }
+                if (!@opcache_reset()) {
+                    Api::json(['ok' => false, 'msg' => 'OPcache 清理失败（缓存可能处于只读或不可写状态）'], 500);
+                }
+                Api::json(['ok' => true, 'msg' => '已刷新编译脚本缓存']);
+
             // ---------- 站点设置 ----------
             case 'admin_settings_get':
                 $rows = DB::all('SELECT k, v FROM settings');
@@ -415,8 +569,8 @@ class Admin
                     if (isset($installed[$slug])) {
                         Api::json(['ok' => true, 'html' =>
                             '<h2>' . Sec::e($installed[$slug]['name']) . '</h2>'
-                            . '<div class="ha-card"><p style="margin:0 0 12px">该插件当前处于<b>停用</b>状态，设置页面不可用。启用后即可使用其功能与设置页。</p>'
-                            . '<button class="ha-btn ha-btn-primary" onclick="HaAdmin.pluginToggle(\'' . Sec::e($slug) . '\',1)">启用插件</button></div>']);
+                            . '<div class="ow-card"><p style="margin:0 0 12px">该插件当前处于<b>停用</b>状态，设置页面不可用。启用后即可使用其功能与设置页。</p>'
+                            . '<button class="ow-btn ow-btn-primary" onclick="OwAdmin.pluginToggle(\'' . Sec::e($slug) . '\',1)">启用插件</button></div>']);
                     }
                     Api::json(['ok' => false, 'msg' => '页面不存在'], 404);
                 }

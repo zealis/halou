@@ -1,10 +1,10 @@
 /* ---------- 等级信任（level-trust） ----------
-   作用域：全部类名以 ha-lt- 前缀限定。资料卡的行由核心「扩展点」插到
-   .ha-card-meta 的第一行，所以这里不需要依赖任何核心容器 id —— 弹窗挂在
+   作用域：全部类名以 ow-lt- 前缀限定。资料卡的行由核心「扩展点」插到
+   .ow-card-meta 的第一行，所以这里不需要依赖任何核心容器 id —— 弹窗挂在
    body 下，靠容器限定作用域是做不到的。
    阶段配色按「阶段号」走：1 新手灰蓝 / 2 日常主色 / 3 活跃青 / 4 核心紫 / 5 荣誉金。 */
 
-.ha-lt-badge {
+.ow-lt-badge {
     display: inline-block;
     padding: 0 6px;
     border-radius: 3px;
@@ -16,151 +16,151 @@
     vertical-align: 1px;                 /* 与右侧「阶段名」文字基线对齐 */
 }
 
-.ha-lt-s1 { background: #9AA5B1; }       /* 新手阶段 1-5   */
-.ha-lt-s2 { background: #0099FF; }       /* 日常阶段 6-15  —— 主色 --ha-primary-strong */
-.ha-lt-s3 { background: #13A8A8; }       /* 活跃阶段 16-30 */
-.ha-lt-s4 { background: #7A5AF8; }       /* 核心阶段 31-45 */
-.ha-lt-s5 { background: #D4A017; }       /* 荣誉阶段 46+   */
+.ow-lt-s1 { background: #9AA5B1; }       /* 新手阶段 1-5   */
+.ow-lt-s2 { background: #0099FF; }       /* 日常阶段 6-15  —— 主色 --ow-primary-strong */
+.ow-lt-s3 { background: #13A8A8; }       /* 活跃阶段 16-30 */
+.ow-lt-s4 { background: #7A5AF8; }       /* 核心阶段 31-45 */
+.ow-lt-s5 { background: #D4A017; }       /* 荣誉阶段 46+   */
 
 /* 60 级荣誉标识：金底 + 描边，与普通荣誉阶段区分 */
-.ha-lt-badge.ha-lt-honor {
+.ow-lt-badge.ow-lt-honor {
     background: linear-gradient(180deg, #E8B923, #C98A00);
     box-shadow: 0 0 0 1px rgba(180, 120, 0, .35);
 }
 
-/* v1.2.46：原 .ha-lt-stage（资料卡里的阶段名）已随「资料卡不显示阶段」删除。
-   阶段名的样式现在只在前台等级页用 .ha-lv-hero-stage。 */
+/* v1.2.46：原 .ow-lt-stage（资料卡里的阶段名）已随「资料卡不显示阶段」删除。
+   阶段名的样式现在只在前台等级页用 .ow-lv-hero-stage。 */
 
 /* 后台：任务进度条 */
-.ha-lt-tasks { margin-top: 8px; }
-.ha-lt-task {
+.ow-lt-tasks { margin-top: 8px; }
+.ow-lt-task {
     display: flex; display: -webkit-flex; align-items: center; -webkit-align-items: center;
     gap: 8px; font-size: 13px; padding: 3px 0;
 }
-.ha-lt-task-k { min-width: 132px; color: var(--ha-text-sub); }
-.ha-lt-task-v { font-weight: 600; }
-.ha-lt-task-v.done { color: #237804; }
+.ow-lt-task-k { min-width: 132px; color: var(--ow-text-sub); }
+.ow-lt-task-v { font-weight: 600; }
+.ow-lt-task-v.done { color: #237804; }
 
 /* ---------- 前台等级页 ?page=level（v1.2.44） ----------
-   作用域全部用 ha-lv- 前缀：这是独立页面，挂在 body 下，没有容器 id 可依赖。 */
+   作用域全部用 ow-lv- 前缀：这是独立页面，挂在 body 下，没有容器 id 可依赖。 */
 
-.ha-lv-hero { border-left: 4px solid #9AA5B1; }
-.ha-lv-hero.ha-lv-s2 { border-left-color: #0099FF; }
-.ha-lv-hero.ha-lv-s3 { border-left-color: #13A8A8; }
-.ha-lv-hero.ha-lv-s4 { border-left-color: #7A5AF8; }
-.ha-lv-hero.ha-lv-s5 { border-left-color: #D4A017; }
-.ha-lv-hero-lv { display: flex; align-items: center; gap: 10px; }
-.ha-lv-hero-stage { font-size: 14px; color: var(--ha-text-sub); }
-.ha-lv-hero-meta {
+.ow-lv-hero { border-left: 4px solid #9AA5B1; }
+.ow-lv-hero.ow-lv-s2 { border-left-color: #0099FF; }
+.ow-lv-hero.ow-lv-s3 { border-left-color: #13A8A8; }
+.ow-lv-hero.ow-lv-s4 { border-left-color: #7A5AF8; }
+.ow-lv-hero.ow-lv-s5 { border-left-color: #D4A017; }
+.ow-lv-hero-lv { display: flex; align-items: center; gap: 10px; }
+.ow-lv-hero-stage { font-size: 14px; color: var(--ow-text-sub); }
+.ow-lv-hero-meta {
     display: flex; flex-wrap: wrap; gap: 6px 20px;
     margin-top: 10px; font-size: 13px; color: #5C5C5C;
 }
-.ha-lv-hero-meta b { color: var(--ha-text-title); }
-.ha-lv-bar {
+.ow-lv-hero-meta b { color: var(--ow-text-title); }
+.ow-lv-bar {
     margin-top: 10px; height: 8px; border-radius: 4px;
     background: #EDF0F4; overflow: hidden;
 }
-.ha-lv-bar > i { display: block; height: 100%; background: var(--ha-primary-strong); border-radius: 4px; }
+.ow-lv-bar > i { display: block; height: 100%; background: var(--ow-primary-strong); border-radius: 4px; }
 
-.ha-lv-h3 { margin: 0 0 10px; font-size: 15px; color: var(--ha-text-title); }
-.ha-lv-task { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
-.ha-lv-task-k { width: 132px; flex-shrink: 0; color: var(--ha-text-sub); }
-.ha-lv-task-bar { flex: 1; height: 6px; border-radius: 3px; background: #EDF0F4; overflow: hidden; }
-.ha-lv-task-bar > i { display: block; height: 100%; background: #9AA5B1; }
-.ha-lv-task-v { width: 56px; text-align: right; font-weight: 600; }
-.ha-lv-task-v.done { color: #237804; }
-.ha-lv-task-alt {
+.ow-lv-h3 { margin: 0 0 10px; font-size: 15px; color: var(--ow-text-title); }
+.ow-lv-task { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
+.ow-lv-task-k { width: 132px; flex-shrink: 0; color: var(--ow-text-sub); }
+.ow-lv-task-bar { flex: 1; height: 6px; border-radius: 3px; background: #EDF0F4; overflow: hidden; }
+.ow-lv-task-bar > i { display: block; height: 100%; background: #9AA5B1; }
+.ow-lv-task-v { width: 56px; text-align: right; font-weight: 600; }
+.ow-lv-task-v.done { color: #237804; }
+.ow-lv-task-alt {
     font-size: 11px; color: #B06000; background: #FFF6E5;
     border: 1px solid #FFE1B0; border-radius: 2px; padding: 0 4px;
 }
-.ha-lv-task-sum { margin-top: 10px; font-size: 13px; color: #5C5C5C; }
-.ha-lv-ch { margin-top: 6px; font-size: 12px; color: var(--ha-text-sub); }
+.ow-lv-task-sum { margin-top: 10px; font-size: 13px; color: #5C5C5C; }
+.ow-lv-ch { margin-top: 6px; font-size: 12px; color: var(--ow-text-sub); }
 
-.ha-lv-formula {
+.ow-lv-formula {
     font-family: Menlo, Consolas, monospace; font-size: 13px;
-    background: #F5F5F5; border: 1px solid var(--ha-border);
+    background: #F5F5F5; border: 1px solid var(--ow-border);
     border-radius: 4px; padding: 10px 12px; margin-bottom: 10px;
     overflow-x: auto; -webkit-overflow-scrolling: touch;
 }
-.ha-lv-ul { margin: 0; padding-left: 20px; font-size: 13px; color: #5C5C5C; line-height: 1.9; }
-.ha-lv-tip {
-    margin-top: 10px; font-size: 12px; color: var(--ha-text-sub);
+.ow-lv-ul { margin: 0; padding-left: 20px; font-size: 13px; color: #5C5C5C; line-height: 1.9; }
+.ow-lv-tip {
+    margin-top: 10px; font-size: 12px; color: var(--ow-text-sub);
     background: #F5F5F5; border-radius: 4px; padding: 8px 10px; line-height: 1.8;
 }
 
-.ha-lv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.ha-lv-table th, .ha-lv-table td {
-    border: 1px solid var(--ha-border); padding: 7px 8px;
+.ow-lv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ow-lv-table th, .ow-lv-table td {
+    border: 1px solid var(--ow-border); padding: 7px 8px;
     text-align: left; vertical-align: top; line-height: 1.6;
 }
-.ha-lv-table th { background: #F5F5F5; font-weight: 600; color: var(--ha-text-sub); white-space: nowrap; }
-.ha-lv-table tr.is-cur { background: #F0F8FF; }
-.ha-lv-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-.ha-lv-yes { color: #237804; font-weight: 700; }
-.ha-lv-no { color: #C4C8CE; }
+.ow-lv-table th { background: #F5F5F5; font-weight: 600; color: var(--ow-text-sub); white-space: nowrap; }
+.ow-lv-table tr.is-cur { background: #F0F8FF; }
+.ow-lv-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.ow-lv-yes { color: #237804; font-weight: 700; }
+.ow-lv-no { color: #C4C8CE; }
 
 /* ---------- 阶段总览（v1.2.59）---------- */
-.ha-lv-stages {
+.ow-lv-stages {
     display: flex; display: -webkit-flex;
     justify-content: space-between; -webkit-justify-content: space-between;
     position: relative;
     margin-top: 8px;
 }
-.ha-lv-stage-connector {
+.ow-lv-stage-connector {
     position: absolute;
     top: 16px; left: 8%; right: 8%; height: 2px;
-    background: var(--ha-border);
+    background: var(--ow-border);
     z-index: 0;
 }
-.ha-lv-stage-item {
+.ow-lv-stage-item {
     flex: 1; text-align: center;
     position: relative; z-index: 1;
     padding: 0 2px;
 }
-.ha-lv-stage-dot-wrap {
+.ow-lv-stage-dot-wrap {
     height: 32px;
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     justify-content: center; -webkit-justify-content: center;
 }
-.ha-lv-stage-dot {
+.ow-lv-stage-dot {
     width: 12px; height: 12px; border-radius: 50%;
     background: var(--stage-color, #9AA5B1);
     box-shadow: 0 0 0 2px #FFFFFF;
 }
-.ha-lv-stage-item.is-cur .ha-lv-stage-dot {
+.ow-lv-stage-item.is-cur .ow-lv-stage-dot {
     width: 18px; height: 18px;
     box-shadow: 0 0 0 3px #FFFFFF, 0 0 0 5px var(--stage-color, #9AA5B1);
 }
-.ha-lv-stage-item.is-future .ha-lv-stage-dot {
+.ow-lv-stage-item.is-future .ow-lv-stage-dot {
     background: #FFFFFF;
     box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 3px var(--stage-color, #9AA5B1);
 }
-.ha-lv-stage-name { font-size: 13px; color: var(--ha-text-title); line-height: 1.4; }
-.ha-lv-stage-item.is-future .ha-lv-stage-name,
-.ha-lv-stage-item.is-past .ha-lv-stage-name { color: var(--ha-text-sub); }
-.ha-lv-stage-item.is-cur .ha-lv-stage-name { font-weight: 700; color: var(--ha-text-title); }
-.ha-lv-stage-range { font-size: 11px; color: var(--ha-text-sub); margin-top: 2px; }
+.ow-lv-stage-name { font-size: 13px; color: var(--ow-text-title); line-height: 1.4; }
+.ow-lv-stage-item.is-future .ow-lv-stage-name,
+.ow-lv-stage-item.is-past .ow-lv-stage-name { color: var(--ow-text-sub); }
+.ow-lv-stage-item.is-cur .ow-lv-stage-name { font-weight: 700; color: var(--ow-text-title); }
+.ow-lv-stage-range { font-size: 11px; color: var(--ow-text-sub); margin-top: 2px; }
 @media (max-width: 640px) {
     /* 窄屏表格横向滚动，不硬压列宽（压了中文会挤成两行更难读） */
-    .ha-lv-card-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .ha-lv-task-k { width: 96px; }
-    .ha-lv-stage-connector { top: 13px; left: 4%; right: 4%; }
-    .ha-lv-stage-dot-wrap { height: 26px; }
-    .ha-lv-stage-dot { width: 10px; height: 10px; }
-    .ha-lv-stage-item.is-cur .ha-lv-stage-dot { width: 16px; height: 16px; }
-    .ha-lv-stage-name { font-size: 12px; }
-    .ha-lv-stage-range { font-size: 10px; }
+    .ow-lv-card-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .ow-lv-task-k { width: 96px; }
+    .ow-lv-stage-connector { top: 13px; left: 4%; right: 4%; }
+    .ow-lv-stage-dot-wrap { height: 26px; }
+    .ow-lv-stage-dot { width: 10px; height: 10px; }
+    .ow-lv-stage-item.is-cur .ow-lv-stage-dot { width: 16px; height: 16px; }
+    .ow-lv-stage-name { font-size: 12px; }
+    .ow-lv-stage-range { font-size: 10px; }
 }
 
 /* 资料卡里的等级行：整行可点 */
-.ha-lt-row-link {
+.ow-lt-row-link {
     text-decoration: none; color: inherit;
     display: flex; align-items: baseline; cursor: pointer;
     border-radius: 3px; padding: 0 4px; margin: 0 -4px;   /* hover 背景不越出内容区 */
 }
 /* v1.2.47：hover 高亮条加高。
-   上面那条 `padding: 0 4px` 把核心 .ha-card-meta-row 的 `padding: 3px 0` 整个覆盖了
+   上面那条 `padding: 0 4px` 把核心 .ow-card-meta-row 的 `padding: 3px 0` 整个覆盖了
    （横向要 4px 是为了 hover 背景不越出内容区，纵向纯属被误伤），
    于是等级行只有 21.8px 高，而相邻的「积分 / 注册 / 签名」行都是 26.8px ——
    鼠标扫过去时那条灰色高亮条明显比别的行矮一截，贴着上下文字，像一根扁扁的灰杠。
@@ -168,32 +168,32 @@
    这里把纵向补回 3px，高亮条高度就和其它 meta 行完全一致（26.8px）。
    ⚠️ 别顺手改成 margin 方案：meta 区首行加margin 会把整块往下推，
    破坏 meta 顶部的 border-top 分隔线与内容的位置关系。 */
-.ha-lt-row-link { padding-top: 3px; padding-bottom: 3px; }
-.ha-lt-row-link:hover { background: var(--ha-bg-sub); }
+.ow-lt-row-link { padding-top: 3px; padding-bottom: 3px; }
+.ow-lt-row-link:hover { background: var(--ow-bg-sub); }
 
 /* ---------- 后台：参数分组标题 + 活跃趋势柱状图（v1.2.44） ---------- */
-.ha-lt-cap {
+.ow-lt-cap {
     margin: 16px 0 8px; font-size: 13px; color: #5C5C5C; font-weight: 600;
-    padding-left: 8px; border-left: 3px solid var(--ha-primary-strong);
+    padding-left: 8px; border-left: 3px solid var(--ow-primary-strong);
 }
-.ha-lt-cap:first-child { margin-top: 0; }
+.ow-lt-cap:first-child { margin-top: 0; }
 
-.ha-lt-trend { margin-top: 8px; }
-.ha-lt-trow { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
-.ha-lt-tname { width: 76px; flex-shrink: 0; font-size: 12px; color: var(--ha-text-sub); }
-.ha-lt-tbars {
+.ow-lt-trend { margin-top: 8px; }
+.ow-lt-trow { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.ow-lt-tname { width: 76px; flex-shrink: 0; font-size: 12px; color: var(--ow-text-sub); }
+.ow-lt-tbars {
     flex: 1; height: 46px; display: flex; align-items: flex-end; gap: 2px;
     background: #F5F5F5; border-radius: 3px; padding: 3px 4px;
 }
-.ha-lt-tbars > i {
+.ow-lt-tbars > i {
     flex: 1; min-width: 2px; border-radius: 1px 1px 0 0; display: block;
     -webkit-transition: height .2s; transition: height .2s;
 }
-.ha-lt-tmax { width: 68px; flex-shrink: 0; font-size: 11px; color: var(--ha-text-sub); text-align: right; }
-.ha-lt-tx {
+.ow-lt-tmax { width: 68px; flex-shrink: 0; font-size: 11px; color: var(--ow-text-sub); text-align: right; }
+.ow-lt-tx {
     display: flex; justify-content: space-between;
     margin: 4px 0 0 86px; padding-right: 78px;
-    font-size: 11px; color: var(--ha-text-sub);
+    font-size: 11px; color: var(--ow-text-sub);
 }
 
 /* 侧栏底部资料区里的等级徽章（v1.2.46）
@@ -201,7 +201,7 @@
    用资料卡的大号会把昵称挤没。
    v1.2.50 后微调：资料卡的基础徽章已由 12/18 收到 11/16，这里相应再收一档到 10/14，
    保持「侧栏比资料卡小一号」的相对关系。 */
-.ha-me-line .ha-lt-badge.ha-lt-badge-sm {
+.ow-me-line .ow-lt-badge.ow-lt-badge-sm {
     font-size: 10px; line-height: 14px; padding: 0 4px; border-radius: 3px;
     margin-left: 0; flex-shrink: 0; -webkit-flex-shrink: 0;
     vertical-align: middle; cursor: default;

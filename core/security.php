@@ -166,7 +166,7 @@ class Sec
     {
         $w = 120; $h = 40;
         $svg = "<svg xmlns='http://www.w3.org/2000/svg' width='$w' height='$h'>"
-             // v1.2.55：底纹 #F5F7FA → #F5F5F5，与全站浅灰 --ha-bg-sub 统一
+             // v1.2.55：底纹 #F5F7FA → #F5F5F5，与全站浅灰 --ow-bg-sub 统一
              . "<rect width='$w' height='$h' fill='#F5F5F5'/>";
         for ($i = 0; $i < 5; $i++) {
             $x1 = random_int(0, $w); $y1 = random_int(0, $h);
@@ -220,7 +220,7 @@ class Sec
         // 会话数据存活期与 Cookie（7 天）一致：默认 gc_maxlifetime 仅 24 分钟，
         // 关闭页面 / 电脑休眠半小时后回来刷新，会话数据已被 GC 清空 → 表现为「自动退出登录」
         @ini_set('session.gc_maxlifetime', (string)(86400 * 7));
-        session_name($cfg['session_name'] ?? 'HALOUSSESSID');
+        session_name($cfg['session_name'] ?? 'OWLSESSID');
         session_set_cookie_params([
             'lifetime' => 86400 * 7,
             'path'     => '/',

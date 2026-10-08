@@ -8,20 +8,20 @@
  *           不会自动获得管理员保护）；搜索仅支持数字用户 ID（昵称允许重名，见开发约束）。
  * 历史同步：改角色/称号时同步刷新 messages 快照（v1.0.39 语义，随功能迁移）。
  */
-if (!defined('HALOU_VERSION')) exit;   // 禁止直接 HTTP 访问本文件
+if (!defined('OWLSGO_VERSION')) exit;   // 禁止直接 HTTP 访问本文件
 
 /** 管理员鉴权：插件路由的公共守卫 */
 $umGuard = function (array $ctx): void {
     if (($ctx['actor']['role'] ?? '') !== 'admin') Api::json(['ok' => false, 'msg' => '需要管理员权限'], 403);
 };
 
-/* ---------- 后台页面（HTML 注入 #haAdminMain，交互函数见 assets/admin.js） ---------- */
+/* ---------- 后台页面（HTML 注入 #owAdminMain，交互函数见 assets/admin.js） ---------- */
 Plugin::adminPage('user-manager', '用户管理', function () {
-    return '<h2>用户管理</h2><p class="ha-admin-desc">搜索用户，管理身份与头衔。昵称允许重名，仅支持按用户 ID 精确查询。</p>'
-        . '<div class="ha-card"><h3 style="margin-bottom:10px">用户搜索</h3>'
-        . '<div class="ha-form-row"><div class="ha-form-item" style="flex:1"><input class="ha-input" id="haAQ" placeholder="输入用户 ID（纯数字）"></div>'
-        . '<button class="ha-btn ha-btn-primary" onclick="HaUM.search()">搜索用户</button></div></div>'
-        . '<div id="haAResult"></div>';
+    return '<h2>用户管理</h2><p class="ow-admin-desc">搜索用户，管理身份与头衔。昵称允许重名，仅支持按用户 ID 精确查询。</p>'
+        . '<div class="ow-card"><h3 style="margin-bottom:10px">用户搜索</h3>'
+        . '<div class="ow-form-row"><div class="ow-form-item" style="flex:1"><input class="ow-input" id="owAQ" placeholder="输入用户 ID（纯数字）"></div>'
+        . '<button class="ow-btn ow-btn-primary" onclick="OwUM.search()">搜索用户</button></div></div>'
+        . '<div id="owAResult"></div>';
 });
 
 /* ---------- 搜索：仅数字用户 ID 精确查询（原 admin_users） ---------- */
