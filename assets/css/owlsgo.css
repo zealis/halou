@@ -627,7 +627,9 @@ input[type=range] {
     flex-direction: column; -webkit-flex-direction: column;
     align-items: center; -webkit-align-items: center;
     gap: 4px;
-    padding: 8px 0;
+    /* v1.3.8：8px → 12px。品牌条底色 #E4E4E4 与 rail 底色 #F5F5F5 相邻，
+       首个图标贴着分隔线会显得挤，顶部多留一档呼吸空间。 */
+    padding: 12px 0;
 }
 .ow-rail-btn {
     width: 40px; height: 40px;
@@ -644,6 +646,9 @@ input[type=range] {
 .ow-rail-btn:hover { background: var(--ow-bg-chat-hover); color: var(--ow-text-title); }
 .ow-rail-btn.is-active { background: var(--ow-primary-strong); color: #FFFFFF; }
 .ow-rail-btn .ow-ico { display: block; }        /* 消掉 svg 基线间隙 */
+/* v1.3.8：入口文字标签。桌面纯图标条下隐藏；窄屏 rail 沉底变标签栏时显示
+   （微信/QQ 式：图标上、文字下）。插件注册入口时建议同样带这个 span。 */
+.ow-rail-lb { display: none; }
 /* 底部区（设置 / 更多一类）：margin-top:auto 沉到 rail 底部 */
 .ow-rail-foot {
     margin-top: auto;
@@ -1797,13 +1802,40 @@ input[type=range] {
     .ow-table { min-width: 620px; }
     .ow-table th, .ow-table td { padding: 7px 8px; }
     .ow-only-mobile { display: block; }
-    /* v1.3.4：窄屏 rail 收窄一档，把宽度让给列表与消息区 */
-    .ow-rail { width: 52px; }
-    .ow-rail-btn { width: 38px; height: 38px; }
+    /* v1.3.8：窄屏 rail 沉到屏幕底部，变成微信 / QQ 式标签栏（图标上、文字下）。
+       fixed + 全宽 + 横排，z-index 高于侧栏抽屉(90)；安全区用两段式 padding ——
+       老内核不认 env() 会丢整行声明，所以基础 padding 必须写在前面。 */
+    .ow-rail {
+        position: fixed;
+        left: 0; right: 0; bottom: 0; top: auto;
+        width: 100%;
+        flex-direction: row; -webkit-flex-direction: row;
+        justify-content: space-around; -webkit-justify-content: space-around;
+        align-items: center; -webkit-align-items: center;
+        border-right: none;
+        border-top: 1px solid var(--ow-border);
+        padding: 5px 0 6px;
+        padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+        z-index: 92;
+    }
+    .ow-rail-btn {
+        flex-direction: column; -webkit-flex-direction: column;
+        gap: 3px;
+        width: auto; height: auto;
+        padding: 4px 12px;
+    }
+    .ow-rail-lb { display: block; font-size: 11px; line-height: 1.2; }
+    /* 主区给底部标签栏让位：否则输入栏会被 fixed 的 rail 盖住 */
+    .ow-main { padding-bottom: 56px; }
+    /* 遮罩与右侧「群聊信息」面板同样止步于标签栏上沿 */
+    .ow-mask { bottom: 56px; }
+    .ow-online { bottom: 56px; }
+    /* 抽屉 / 遮罩同样止步于标签栏上沿 */
     .ow-sidebar {
         position: fixed;
-        /* 顶部留出工具栏高度，避免侧栏盖住「菜单」按钮导致无法收起 */
-        left: -260px; top: 57px; bottom: 0;
+        /* 顶部留出品牌条高度，避免侧栏盖住「菜单」按钮导致无法收起；
+           底部给沉底的 rail 标签栏让位（v1.3.8） */
+        left: -260px; top: 57px; bottom: 56px;
         z-index: 90;
         transition: left .2s;
         width: 250px;

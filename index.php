@@ -1226,9 +1226,11 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
     // 插件注册入口：服务端 Plugin::collect('sidebar.rail')（产出按钮 HTML），
     //              或前端 OwChat.onRail({ id, label, onShow })。
     // ⚠️ 按钮的 data-tab 与 switchTab 的面板标识同名；核心只认 chat / friends。
+    // ⚠️ 按钮内带 <span class="ow-rail-lb"> 文字标签：桌面隐藏（纯图标条），
+    //    窄屏（≤720px）rail 沉底变标签栏时显示 —— 插件注册的入口建议同样带 span。
     echo '<nav class="ow-rail" id="owRail">'
-       . '<button class="ow-rail-btn is-active" data-tab="chat" type="button" title="消息" aria-label="消息">' . ow_icon('chat', 20) . '</button>'
-       . '<button class="ow-rail-btn" data-tab="friends" type="button" title="联系人" aria-label="联系人">' . ow_icon('users', 20) . '</button>'
+       . '<button class="ow-rail-btn is-active" data-tab="chat" type="button" title="消息" aria-label="消息">' . ow_icon('chat', 20) . '<span class="ow-rail-lb">消息</span></button>'
+       . '<button class="ow-rail-btn" data-tab="friends" type="button" title="联系人" aria-label="联系人">' . ow_icon('users', 20) . '<span class="ow-rail-lb">联系人</span></button>'
        . Plugin::collect('sidebar.rail')
        . '</nav>';
 

@@ -42,6 +42,20 @@
 - 用最小 DOM 模拟（stub MutationObserver + uiBatchBar 写 DOM）实测：修复前 300ms 内 init 已执行
   22 次且持续增长，修复后稳定 1 次、列表请求 1 次。
 
+## v1.3.8（2026-10-09）：rail 与品牌条拉开间距 + 窄屏 rail 沉底成标签栏
+
+- **改进**：rail 顶部内边距 8px → 12px，与品牌条（#E4E4E4）之间留出呼吸空间，
+  首个图标不再贴着分隔线。
+- **新增**：窄屏（≤720px）rail 沉到屏幕底部，变成微信 / QQ 式标签栏（图标上、文字下）：
+  - `fixed` + 全宽横排，`justify-content: space-around`，z-index 92（高于抽屉 90）
+  - 入口按钮新增 `<span class="ow-rail-lb">` 文字标签：桌面隐藏（纯图标条），窄屏显示；
+    核心两个入口已带（消息 / 联系人），插件注册 `sidebar.rail` 入口时建议同样带 span
+  - 底部安全区用两段式 padding（基础 `6px` + `calc(6px + env(safe-area-inset-bottom))`），
+    老内核不认 env() 时丢整行声明、回退基础值
+  - 主区 `padding-bottom: 56px` 给标签栏让位（输入栏不被盖住）；
+    侧栏抽屉、右侧群信息面板、遮罩底部同步止步于 56px
+- 朋友圈之类入口暂不添加，待后续插件或版本。
+
 ## v1.3.7（2026-10-09）：品牌条底色改为 #E4E4E4
 
 - **改进**：`.ow-brand` 底色改为 `#E4E4E4`（比 `--ow-bg-chat` #F5F5F5 深一档），

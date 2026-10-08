@@ -240,12 +240,13 @@ OwChat.onMsgCtx(function (items, msg, env) {
 **v1.3.4 起它取代了原先侧栏顶部的横向「消息 / 联系人」标签条**，插件注册入口请用新名字。
 
 服务端 —— 注册一个入口按钮（记得在 `plugin.json` 的 `hooks` 里声明 `sidebar.rail`，
-否则按需加载不会触发；`ow_icon()` 是核心的线性 SVG 图标函数，**不要用 Emoji 或位图**）：
+否则按需加载不会触发；`ow_icon()` 是核心的线性 SVG 图标函数，**不要用 Emoji 或位图**）。
+`<span class="ow-rail-lb">` 是入口文字标签：桌面隐藏，窄屏 rail 沉底变标签栏时显示，建议照写：
 
 ```php
 Plugin::on('sidebar.rail', function () {
     return '<button class="ow-rail-btn" data-tab="myplugin" type="button" title="我的页面">'
-         . ow_icon('gear', 20) . '</button>';
+         . ow_icon('gear', 20) . '<span class="ow-rail-lb">我的页面</span></button>';
 });
 ```
 
