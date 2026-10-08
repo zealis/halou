@@ -84,6 +84,36 @@ class Sec
         return bin2hex(random_bytes(16));
     }
 
+    /**
+     * 匿名签名密钥（登录前 API 签名用）——**保证返回 32 位十六进制串**。
+     *
+     * ⚠️ 不要直接读 $_SESSION['anon_key']：会话被指纹守卫销毁、被 GC 回收、
+     * 或 php-cgi 多进程下丢失重建时 $_SESSION 会被清空，直接取会得到 null。
+     * v1.3.5 现场：守卫销毁会话 → 登录页 `Sec::signField($_SESSION['anon_key'])`
+     * 收到 null → TypeError → 整页 500（表现为「一开开发者工具就掉登录，然后页面报错」）。
+     *
+     * 兜底顺序：会话 → cookie 备份 → 新生成；取到后回写会话与 cookie，
+     * 与 verifySignAny() 的「会话密钥 + cookie 备份」双密钥口径保持一致，
+     * 所以即使会话重建，之前下发给页面的签名仍能通过校验。
+     */
+    public static function anonKey(): string
+    {
+        $k = (string)($_SESSION['anon_key'] ?? '');
+        if (preg_match('/^[a-f0-9]{32}$/', $k)) return $k;
+
+        $k = (string)($_COOKIE['owl_akey'] ?? '');
+        if (!preg_match('/^[a-f0-9]{32}$/', $k)) {
+            $k = self::clientKey();
+            setcookie('owl_akey', $k, [
+                'expires'  => time() + 86400 * 7, 'path' => '/', 'httponly' => true,
+                'secure'   => self::isHttps(), 'samesite' => 'Lax',
+            ]);
+            $_COOKIE['owl_akey'] = $k;
+        }
+        $_SESSION['anon_key'] = $k;
+        return $k;
+    }
+
     // ---------- 输出转义（XSS） ----------
     public static function e(?string $s): string
     {
@@ -370,6 +400,13 @@ class Sec
         if (DB::setting('sec_fp_guard', '1') === '0') return;   // v1.1.12 诊断开关
         if (!isset($_SESSION['sec_fp'])) return;   // 新会话（sessionStart 已写入）
 
+        // v1.3.5：拿不到 UA 时**不比对、更不销毁会话**。
+        // fingerprint() 的输入只有 UA（默认口径），UA 缺失会算出与存档必然不等的指纹，
+        // 于是「没有 UA 的请求」被判定为「Cookie 被窃后在别的环境重放」而销毁会话 ——
+        // 受害者正是探测类 / 工具发起的内部请求，表现就是「一开开发者工具就掉登录」。
+        // 拿不到 UA 时指纹本身不可信，放行（不销毁）比误杀正常用户更安全。
+        if ((string)($_SERVER['HTTP_USER_AGENT'] ?? '') === '') return;
+
         $now = self::fingerprint();
         $ok  = hash_equals((string)$_SESSION['sec_fp'], $now);
 
@@ -384,6 +421,15 @@ class Sec
         }
 
         if ($ok) return;
+
+        // v1.3.5：走到这里就真要销毁会话了 —— **无条件**落一条证据
+        //（不再依赖 sec_fp_trace 开关：它默认关着，等于「掉登录」时手上没有现场数据）。
+        // 只有 mismatch 才写，量极小；内容含 URI / UA / IP / 会话指纹 / 本次指纹。
+        @file_put_contents(
+            self::dataDir() . '/fp_trace.log',
+            self::fingerprintTraceLine(false, $now),
+            FILE_APPEND | LOCK_EX
+        );
 
         // v1.1.13 指纹口径变更（去掉 IP 段）后的平滑升级：
         // 老会话里存的是「UA|IP段」算出的旧值，与新算法必然不等 —— 那是**升级造成的**，

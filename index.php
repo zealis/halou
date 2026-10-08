@@ -61,7 +61,9 @@ if (empty($_COOKIE['owl_akey']) || !preg_match('/^[a-f0-9]{32}$/', (string)$_COO
     ]);
     $_COOKIE['owl_akey'] = $akey;
 }
-if (empty($_SESSION['anon_key'])) $_SESSION['anon_key'] = $_COOKIE['owl_akey'];
+// v1.3.5：统一走 Sec::anonKey() —— 会话被守卫销毁/GC 回收后它会按
+// 「cookie 备份 → 新生成」兜底并回写，避免后续直接读 $_SESSION['anon_key'] 拿到 null
+Sec::anonKey();
 
 $LOCK = $CFG['data_dir'] . '/install.lock';
 $installed = is_file($LOCK);
@@ -1130,7 +1132,7 @@ function renderAuth(string $mode): void
             : '';
         echo '<form class="ow-auth-form" data-mode="login">'
            . $regTip
-           . Sec::signField($_SESSION['anon_key'], 'login')
+           . Sec::signField(Sec::anonKey(), 'login')
            . '<div class="ow-form-item"><label>邮箱或用户 ID</label><input class="ow-input" name="identity" required autocomplete="username" placeholder="注册邮箱或用户 ID"></div>'
            . '<div class="ow-form-item"><label>密码</label><input class="ow-input" type="password" name="password" required autocomplete="current-password"></div>'
            . '<div class="ow-form-item" id="owCaptchaRow" style="display:none"><label>图形验证码</label>'
@@ -1141,7 +1143,7 @@ function renderAuth(string $mode): void
         // 是否要求邮箱验证由后台设置决定：关闭时不再显示验证码输入框与发码按钮
         $needMail = DB::setting('reg_email_verify', '1') === '1';
         echo '<form class="ow-auth-form" data-mode="register">'
-           . Sec::signField($_SESSION['anon_key'], 'register')
+           . Sec::signField(Sec::anonKey(), 'register')
            . '<div class="ow-form-item"><label>昵称</label><input class="ow-input" name="nickname" required placeholder="2-20 个字符，支持中英文"></div>'
            . '<div class="ow-form-item"><label>邮箱</label>'
            . ($needMail
@@ -1159,7 +1161,7 @@ function renderAuth(string $mode): void
            . '<div class="ow-auth-links"><a href="?page=login">已有账号，去登录</a><a href="?page=chat">返回聊天</a></div>';
     } else {
         echo '<form class="ow-auth-form" data-mode="reset">'
-           . Sec::signField($_SESSION['anon_key'], 'reset')
+           . Sec::signField(Sec::anonKey(), 'reset')
            . '<div class="ow-form-item"><label>注册邮箱</label><div class="ow-captcha-row"><input class="ow-input" type="email" name="email" required>'
            . '<button type="button" class="ow-btn ow-btn-ghost" data-sendcode="reset">发验证码</button></div></div>'
            . '<div class="ow-form-item"><label>邮箱验证码</label><input class="ow-input" name="code" required></div>'
@@ -1168,7 +1170,7 @@ function renderAuth(string $mode): void
            . '<div class="ow-auth-links"><a href="?page=login">返回登录</a></div>';
     }
     echo '</div><script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>'
-       . '<script>OwAuth.init(' . json_encode(['key' => $_SESSION['anon_key'], 'ts' => time()]) . ');</script>';
+       . '<script>OwAuth.init(' . json_encode(['key' => Sec::anonKey(), 'ts' => time()]) . ');</script>';
     Plugin::fire('page.footer');
     echo '</body></html>';
 }

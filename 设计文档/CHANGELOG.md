@@ -42,6 +42,22 @@
 - 用最小 DOM 模拟（stub MutationObserver + uiBatchBar 写 DOM）实测：修复前 300ms 内 init 已执行
   22 次且持续增长，修复后稳定 1 次、列表请求 1 次。
 
+## v1.3.5（2026-10-09）：修复会话被销毁后登录页 500（「一开 F12 就掉登录」）
+
+- **修复**：登录 / 注册 / 找回密码页直接读 `$_SESSION['anon_key']` 传给 `Sec::signField()`。
+  会话一旦被指纹守卫销毁（或被 GC 回收、php-cgi 多进程丢失重建），`$_SESSION` 被清空，
+  该值变成 null → `Sec::signField(): Argument #1 must be of type string, null given` →
+  **整页 500**，同时用户表现为「打开开发者工具后掉登录、页面报错」。
+  - 新增 `Sec::anonKey()`：按「会话 → cookie 备份 → 新生成」兜底并回写，
+    与 `verifySignAny()` 的双密钥口径一致（会话密钥 + cookie 备份），保证签名链路不断
+  - `renderAuth()` 的 login / register / reset 签名与 `OwAuth.init` 下发的 key 全部改用它
+- **修复**：指纹守卫在**拿不到 UA** 时不再比对、不再销毁会话。
+  `fingerprint()` 默认只绑 UA，UA 缺失会算出与存档必然不等的指纹，
+  于是「没有 UA 的请求」被当成 Cookie 重放而销毁正常会话（探测类 / 工具请求的典型特征）。
+  拿不到 UA 时指纹本身不可信，放行比误杀更安全。
+- **改进**：真正销毁会话时**无条件**写一条 `data/fp_trace.log`（原先只有 `sec_fp_trace=1`
+  才写，而该开关默认关闭，等于「掉登录」时永远没有现场证据）。只在 mismatch 时写，量极小。
+
 ## v1.3.4（2026-10-09）：新增左侧一级导航条 rail + 修复全屏两侧留白
 
 - **新增**：聊天页左侧新增一级导航条 `.ow-rail`（竖排图标条），切换控件由侧栏顶部的
