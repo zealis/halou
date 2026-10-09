@@ -1142,7 +1142,7 @@
             // 以前这里会拿 boot 里的第一个群直接加载，等于「还没点就已经在群里」，能直接发言。
             if (!this.room) {
                 this.applyInputGate('room');
-                this.renderMembers([], [], null);   // 右侧栏同步回到空态
+                this.renderMembers([], null);   // 右侧栏同步回到空态
                 return;
             }
             this.setRoomUrl(this.room, true);
@@ -2135,7 +2135,7 @@
                             if (meta && (rr.joined || rr.is_member)) meta.is_member = true;
                             self.switchRoom(id, rr.room.name, el);
                             // 立即刷新「所有成员」（刚加入的自己也要出现在列表里）
-                            if (rr.members) self.renderMembers(rr.members, rr.guests, self._canStatus);
+                            if (rr.members) self.renderMembers(rr.members, self._canStatus);
                         });
                     };
 
@@ -2526,7 +2526,7 @@
                     // v1.2.27：优先用新的成员口径（成员全量 + 在场游客）；
                     // 老服务端没有 members 字段时退回原来的在线名单，不报错。
                     self._canStatus = r.online_status;
-                    if (r.members) self.renderMembers(r.members, r.guests, r.online_status);
+                    if (r.members) self.renderMembers(r.members, r.online_status);
                     else self.renderOnline(r.online, r.online_status);
                     setTimeout(loop, 100);
                 });
@@ -3144,7 +3144,7 @@
         /**
          * 打开「搜索成员」弹窗（v1.3.24）。
          *
-         * 交互：输入昵称或数字 ID → 防抖 250ms 后查 → 结果列表。
+         * 交互：输入关键词 → 防抖 250ms 后查 → 结果列表（仅注册用户，v1.3.27 起游客不可被搜）。
          * 点某个人 → 打开**该用户的操作菜单**（资料 / 私信 / 举报 / 禁言…）。
          *
          * ⚠️ 为什么不直接把资料卡弹出来：用户要求「点击搜索出来的用户可以查看个人资料、
@@ -3154,18 +3154,21 @@
         openMembersSearch: function () {
             if (this.cfg.actor.kind !== 'user') { toast('游客不支持搜索成员'); return; }
             var self = this;
-            var h = '<div class="ow-panel-entry ow-msr-search-row">'
+            // h3 标题必须留着：openModal 的 ✕ 是 float:right，没有标题时它会和
+            // 输入框挤在同一行（v1.3.26 前的弹窗乱象根因）。
+            var h = '<h3>搜索成员</h3>'
+                  + '<div class="ow-msr-search-row">'
                   + '<input class="ow-input ow-msr-input" id="owMsrInput" type="text"'
-                  + ' placeholder="输入昵称或用户 ID" maxlength="50" autocomplete="off">'
+                  + ' placeholder="输入关键词" maxlength="50" autocomplete="off">'
                   + '</div>'
                   + '<div class="ow-msr-results" id="owMsrResults"></div>'
-                  + '<div class="ow-av-hint">仅显示本站注册用户与本群在场游客。</div>';
+                  + '<div class="ow-av-hint">仅显示本站注册用户。</div>';
             this.openModal(h, 420);
 
             var input = $('owMsrInput'), box = $('owMsrResults');
             if (!input || !box) return;
             input.focus();
-            box.innerHTML = '<div class="ow-msr-empty">输入昵称或 ID 开始搜索</div>';
+            box.innerHTML = '<div class="ow-msr-empty">输入关键词开始搜索</div>';
 
             // 防抖：每敲一个字就查会打满限流桶（10 次 / 3 秒）
             var timer = 0, lastQ = '';
@@ -3174,7 +3177,7 @@
                 if (q === lastQ) return;
                 lastQ = q;
                 if (q === '') {
-                    box.innerHTML = '<div class="ow-msr-empty">输入昵称或 ID 开始搜索</div>';
+                    box.innerHTML = '<div class="ow-msr-empty">输入关键词开始搜索</div>';
                     return;
                 }
                 box.innerHTML = '<div class="ow-msr-empty">搜索中…</div>';
@@ -3207,11 +3210,12 @@
             var html = '';
             for (var i = 0; i < list.length; i++) {
                 var u = list[i];
-                var uid = u.uid || 0, gid = u.gid || 0;
+                var uid = u.uid || 0;
+                // v1.3.27：结果只会有注册用户（服务端已剔除游客）
                 var meta = u.role === 'admin' ? '管理员'
                     : (u.role === 'vip' ? 'VIP'
-                    : (u.kind === 'guest' ? '游客' : (uid ? '用户 ID ' + uid : '')));
-                html += '<div class="ow-msr-item" data-uid="' + uid + '" data-gid="' + gid + '"'
+                    : (uid ? '用户 ID ' + uid : ''));
+                html += '<div class="ow-msr-item" data-uid="' + uid + '"'
                       + ' data-nick="' + esc(u.nickname) + '" data-kind="' + esc(u.kind) + '"'
                       + ' data-role="' + esc(u.role || '') + '">'
                       + '<img class="ow-msr-av" src="' + esc(u.avatar || '') + '" alt="">'
@@ -3230,8 +3234,7 @@
                         self.closeModal();
                         self.openUserActions(row.getAttribute('data-uid'), row.getAttribute('data-nick'), {
                             kind: row.getAttribute('data-kind'),
-                            role: row.getAttribute('data-role'),
-                            gid: parseInt(row.getAttribute('data-gid'), 10) || 0
+                            role: row.getAttribute('data-role')
                         });
                     };
                 })(rows[k]);
@@ -3635,40 +3638,35 @@
             box.innerHTML = html;
         },
 
-        /* ---------- 所有成员（v1.2.27 改口径） ----------
+        /* ---------- 所有成员（v1.2.27 改口径；v1.3.27 起不含游客） ----------
            以前这里渲染的是 online 表（45 秒心跳 = 「谁在线」），
            需求要的是「群里都有谁」—— 改成：
              · 注册用户：room_members **全量**（含离线，群主自动补位）
-             · 游客    ：online 表里本群的在场游客（心跳 45 秒，离开即消失）
-           游客只出现在公开群（不公开群游客进不来，服务端查询结果自然为空）。
+           v1.3.27：在场游客不再进「所有成员」—— 游客没有持久身份、
+           本就不是成员（服务端从不写 room_members，见 joinRoom），显示出来
+           反而让列表每次心跳后都变样。服务端 guests 字段仍下发（插件可用），前端忽略。
            在线点的显隐仍由服务端 canSeeOnlineStatus 决定，前端不自行判身份。 */
-        renderMembers: function (members, guests, canStatus) {
+        renderMembers: function (members, canStatus) {
             var box = $('owOnlineList'), cnt = $('owOnlineCount');
-            var ms = members || [], gs = guests || [];
-            if (cnt) cnt.innerHTML = ms.length + gs.length;
+            var ms = members || [];
+            if (cnt) cnt.innerHTML = ms.length;
             if (!box) return;
             var html = '', i;
             for (i = 0; i < ms.length; i++) html += this._memberRow(ms[i], canStatus);
-            for (i = 0; i < gs.length; i++) html += this._memberRow(gs[i], canStatus);
             box.innerHTML = html || '<li class="ow-online-empty">还没有成员</li>';
         },
 
-        /** 单行成员/游客。游客没有资料卡，名字不可点（点了只会弹「游客无法查看资料卡」） */
+        /** 单行成员（注册用户）。游客已不在成员列表渲染（v1.3.27），行结构只剩注册用户一种 */
         _memberRow: function (o, canStatus) {
-            var isGuest = o.kind === 'guest';
-            var dot = '';
-            if (canStatus && !isGuest) {
-                dot = '<span class="ow-online-dot' + (o.online ? '' : ' is-off') + '"></span>';
-            }
-            var nameAttr = isGuest ? '' : ' onclick="OwChat.userCard(' + (o.uid || 0) + ',\'' + esc(o.nickname) + '\')"';
-            var tag = isGuest
-                ? '<span class="ow-tag ow-tag-guest">游客</span>'
-                : roleTag(o.role, '', o.uid);
-            return '<li class="ow-online-item' + (isGuest ? ' is-guest' : '') + '">'
+            var dot = canStatus
+                ? '<span class="ow-online-dot' + (o.online ? '' : ' is-off') + '"></span>'
+                : '';
+            var nameAttr = ' onclick="OwChat.userCard(' + (o.uid || 0) + ',\'' + esc(o.nickname) + '\')"';
+            return '<li class="ow-online-item">'
                 + dot
                 + avatarHtml(o.avatar, o.nickname, true, o.role)
                 + '<span class="ow-online-name"' + nameAttr + '>' + esc(o.nickname) + '</span>'
-                + tag + '</li>';
+                + roleTag(o.role, '', o.uid) + '</li>';
         },
 
         /** 切群后立即拉一次成员，不等 poll（poll 最长 20 秒才返回） */
@@ -3677,7 +3675,7 @@
             if (!id) return;
             OwApi.post('room_members', { room_id: id }, function (r) {
                 if (!r.ok || self.room !== id) return;
-                self.renderMembers(r.members, r.guests, r.online_status);
+                self.renderMembers(r.members, r.online_status);
                 self.applyJoinGate(r.is_member, r.is_public);
             });
         },
@@ -3784,7 +3782,7 @@
                 var rl = self.cfg.rooms || [];
                 for (var i = 0; i < rl.length; i++) { if (rl[i].id === id) rl[i].is_member = true; }
                 self.applyJoinGate(true, true);
-                if (r.members) self.renderMembers(r.members, r.guests, self._canStatus);
+                if (r.members) self.renderMembers(r.members, self._canStatus);
                 else self.loadMembers();
             });
         },

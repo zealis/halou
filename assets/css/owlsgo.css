@@ -844,8 +844,20 @@ input[type=range] {
     /* 标题字号是 12px，hover 底色必须跟着缩 —— 默认的 28px 会把整行撑高一截 */
     border-radius: 4px;
     color: var(--ow-text-sub);
+    /* v1.3.27：继承的 line-height:36px 会把 15px 图标压到标题文字下方 ~8px（实测）。
+       改成 flex 居中，图标与「所有成员」文字在同一水平线。 */
+    display: inline-flex; display: -webkit-inline-flex;
+    align-items: center; -webkit-align-items: center;
+    justify-content: center; -webkit-justify-content: center;
+    line-height: 0;
 }
 .ow-members-search-btn:hover { color: var(--ow-primary-dark); }
+
+/* v1.3.27：弹窗输入行与结果区。
+   输入行原先挂着侧栏的 .ow-panel-entry（padding 9px 0 + cursor:pointer），
+   在弹窗里既撑高又误导可点；改独立样式。结果区限高滚动，人多时不撑破弹窗。 */
+.ow-msr-search-row { margin-bottom: 12px; }
+.ow-msr-results { max-height: 320px; overflow-y: auto; }
 
 /* 搜索结果行 */
 .ow-msr-item {
