@@ -884,6 +884,18 @@ if ($action !== '') {
             Api::json(['ok' => true, 'style' => Auth::avatarStyle($p('avatar_style')),
                 'data' => Auth::avatarVariants($p('avatar_style'))]);
 
+        // v1.3.24：右侧「所有成员」区的成员搜索（游客一律拒绝 —— 与 ?action=search 同口径）
+        case 'members_search':
+            if (($actor['kind'] ?? '') !== 'user') Api::json(['ok' => false, 'msg' => '游客不支持搜索成员'], 403);
+            $sRoomId = (int)$p('room_id');
+            $sRoom = Chat::room($sRoomId);
+            if (!$sRoom) Api::json(['ok' => false, 'msg' => '群聊不存在']);
+            // 与 ?action=search 同样的限流桶思路：连打会拖库（这是全站昵称 LIKE）
+            if (!Sec::rateLimit('members_search', 'u' . (int)$actor['id'] . '|' . $sRoomId, 10, 3)) {
+                Api::json(['ok' => false, 'msg' => '搜索太频繁，请稍后再试'], 429);
+            }
+            Api::json(['ok' => true, 'data' => Chat::searchMembers($actor, $sRoomId, (string)$p('q'))]);
+
         case 'user_card':
             // v1.3.16：带上生成式字段并把 avatar 换成**最终 URL** ——
             // 原样下发 avatar 列的话，资料卡拿到的是空串或 uploads 路径，
@@ -1375,7 +1387,15 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
        . '<div class="ow-panel-room-body" id="owRoomPanel"></div>'
        . '</div>'
        . '<div class="ow-panel-sec ow-panel-members">'
-       . '<div class="ow-side-title">所有成员 <span class="ow-badge-num" id="owOnlineCount">0</span></div>'
+       // v1.3.24：「所有成员」标题右侧的搜索按钮（点开按昵称 / ID 搜群成员）。
+       // 按钮**静态输出**但由 JS 控制显隐（游客不显示 —— 搜索接口对游客一律拒绝，
+       // 给一个必然报错的入口是反模式）。空标题容器不复用，这里另起一行保持语义清晰。
+       . '<div class="ow-side-title ow-side-title-members">所有成员'
+       . '<span class="ow-badge-num" id="owOnlineCount">0</span>'
+       . '<button class="ow-icon-btn ow-members-search-btn" id="owMembersSearch"'
+       . ' aria-label="搜索成员" title="搜索成员" style="display:none">'
+       . ow_icon('search', 15) . '</button>'
+       . '</div>'
        . '<ul class="ow-online-list" id="owOnlineList"></ul>'
        . '</div>'
        . '</aside>';

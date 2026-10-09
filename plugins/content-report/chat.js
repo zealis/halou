@@ -166,4 +166,20 @@
             });
         });
     }
+
+    /* v1.3.24：成员搜索结果里的「举报」。
+       与上面同一套判定（仅注册用户、自身开关），区别只在没有消息上下文 ——
+       msgId / ts 传 0，表示「未指向具体消息」（用户举报本身而非某条内容）。
+       服务端 plugin_content_report_submit 对 msg_id=0 有兼容处理。 */
+    if (typeof OwChat.onUserAction === 'function') {
+        OwChat.onUserAction(function (items, u) {
+            if (!u || !u.uid) return;                     // 仅举报注册用户
+            var me = (OwChat.cfg || {}).me || null;
+            if (me && me.id && u.uid === me.id && !cfgCache.allow_self) return;
+            items.push({
+                t: '举报',
+                run: function () { CR.openReport(u.uid, u.nickname || '', OwChat.room, 0, 0); }
+            });
+        });
+    }
 })(window, document);

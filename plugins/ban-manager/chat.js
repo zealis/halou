@@ -93,4 +93,17 @@
             items.push({ t: '禁言 TA', run: function () { BM.banDialog(m); } });
         });
     }
+
+    /* v1.3.24：成员搜索结果里的「禁言 TA」。
+       onUserAction 按**人**发起（没有消息上下文），而 canBan 只需要 {uid,gid,nickname,role}
+       —— 结构与消息行兼容，直接复用同一套判定与弹窗，无需第二份实现。
+       真正的权限校验仍在服务端 plugin_ban_manager_quick，这里只管显不显示。 */
+    if (typeof OwChat.onUserAction === 'function') {
+        OwChat.onUserAction(function (items, u) {
+            if (!u) return;
+            var t = { uid: u.uid || 0, gid: u.gid || 0, nickname: u.nickname, role: u.role || '' };
+            if (!BM.canBan(t)) return;
+            items.push({ t: '禁言 TA', run: function () { BM.banDialog(t); } });
+        });
+    }
 })(window, document);

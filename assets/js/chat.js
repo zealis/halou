@@ -1103,6 +1103,7 @@
             this.buildEmojiPanel();
             this.bindEvents();
             this.renderRoomPanel();      // v1.1.1：初始化右侧栏群聊设置区
+            this.syncMembersSearchBtn(); // v1.3.24：成员搜索按钮显隐（游客/私聊隐藏）
 
             // 地址路由：私聊 ?dm=user:12 优先（v1.1.0），否则规范化为 ?room=当前群聊（replace）
             var dmFromUrl = this.dmFromUrl();
@@ -1197,6 +1198,9 @@
             // v1.2.20：侧栏标签条（消息 / 联系人 / 插件标签）
             self.bindRail();
             $('owBtnSend').onclick = function () { self.send(); };
+            // v1.3.24：「所有成员」区的搜索按钮
+            var msBtn = $('owMembersSearch');
+            if (msBtn) msBtn.onclick = function () { self.openMembersSearch(); };
             var input = $('owInput');
             // 随内容自动增高；恢复上次手动拖出的高度
             try { self.inputUserH = parseInt(w.localStorage.getItem('owl_input_h') || '0', 10) || 0; } catch (e) {}
@@ -3125,6 +3129,179 @@
         _quoteExt: [],        // 引用内容钩子（前端侧）
         quote: null,          // 当前待发送的引用 {nick,text}
         onMsgCtx: function (fn) { if (typeof fn === 'function') this._ctxExt.push(fn); },
+
+        /* ---------- 成员搜索（v1.3.24） ---------- */
+        /** 搜索按钮的显隐：只对注册用户显示（游客搜索接口一律 403） */
+        syncMembersSearchBtn: function () {
+            var b = $('owMembersSearch');
+            if (!b) return;
+            var isUser = this.cfg.actor.kind === 'user';
+            // 私聊视图下「所有成员」区块整个被隐藏（renderRoomPanel 会置空），
+            // 按钮跟着一起藏，免得出现「点开是空的」
+            b.style.display = (isUser && !this.dm) ? '' : 'none';
+        },
+
+        /**
+         * 打开「搜索成员」弹窗（v1.3.24）。
+         *
+         * 交互：输入昵称或数字 ID → 防抖 250ms 后查 → 结果列表。
+         * 点某个人 → 打开**该用户的操作菜单**（资料 / 私信 / 举报 / 禁言…）。
+         *
+         * ⚠️ 为什么不直接把资料卡弹出来：用户要求「点击搜索出来的用户可以查看个人资料、
+         * 举报、禁言」，是**一组操作**而非单一动作。所以这里点人 → 弹操作菜单，
+         * 菜单项由 onUserAction 钩子汇总（与右键消息头像的 onMsgCtx 同一套思路）。
+         */
+        openMembersSearch: function () {
+            if (this.cfg.actor.kind !== 'user') { toast('游客不支持搜索成员'); return; }
+            var self = this;
+            var h = '<div class="ow-panel-entry ow-msr-search-row">'
+                  + '<input class="ow-input ow-msr-input" id="owMsrInput" type="text"'
+                  + ' placeholder="输入昵称或用户 ID" maxlength="50" autocomplete="off">'
+                  + '</div>'
+                  + '<div class="ow-msr-results" id="owMsrResults"></div>'
+                  + '<div class="ow-av-hint">仅显示本站注册用户与本群在场游客。</div>';
+            this.openModal(h, 420);
+
+            var input = $('owMsrInput'), box = $('owMsrResults');
+            if (!input || !box) return;
+            input.focus();
+            box.innerHTML = '<div class="ow-msr-empty">输入昵称或 ID 开始搜索</div>';
+
+            // 防抖：每敲一个字就查会打满限流桶（10 次 / 3 秒）
+            var timer = 0, lastQ = '';
+            var run = function () {
+                var q = (input.value || '').replace(/^\s+|\s+$/g, '');
+                if (q === lastQ) return;
+                lastQ = q;
+                if (q === '') {
+                    box.innerHTML = '<div class="ow-msr-empty">输入昵称或 ID 开始搜索</div>';
+                    return;
+                }
+                box.innerHTML = '<div class="ow-msr-empty">搜索中…</div>';
+                OwApi.post('members_search', { room_id: self.room, q: q }, function (r) {
+                    // 请求返回时会话可能已切走，丢弃过期结果
+                    if (self.dm || self.room !== roomId) return;
+                    if (!r || !r.ok) {
+                        box.innerHTML = '<div class="ow-msr-empty">'
+                            + esc((r && r.msg) ? r.msg : '搜索失败') + '</div>';
+                        return;
+                    }
+                    self.renderMemberSearch(box, r.data || [], roomId);
+                });
+            };
+            var roomId = self.room;
+            input.oninput = function () { if (timer) clearTimeout(timer); timer = setTimeout(run, 250); };
+            input.onkeydown = function (e) {
+                if (e.keyCode === 13) { e.preventDefault ? e.preventDefault() : (e.returnValue = false); if (timer) clearTimeout(timer); run(); }
+            };
+        },
+
+        /** 渲染搜索结果；点行 → 打开该用户的操作菜单 */
+        renderMemberSearch: function (box, list, roomId) {
+            var self = this;
+            if (!box) return;
+            if (!list.length) {
+                box.innerHTML = '<div class="ow-msr-empty">没有找到匹配的用户</div>';
+                return;
+            }
+            var html = '';
+            for (var i = 0; i < list.length; i++) {
+                var u = list[i];
+                var uid = u.uid || 0, gid = u.gid || 0;
+                var meta = u.role === 'admin' ? '管理员'
+                    : (u.role === 'vip' ? 'VIP'
+                    : (u.kind === 'guest' ? '游客' : (uid ? '用户 ID ' + uid : '')));
+                html += '<div class="ow-msr-item" data-uid="' + uid + '" data-gid="' + gid + '"'
+                      + ' data-nick="' + esc(u.nickname) + '" data-kind="' + esc(u.kind) + '"'
+                      + ' data-role="' + esc(u.role || '') + '">'
+                      + '<img class="ow-msr-av" src="' + esc(u.avatar || '') + '" alt="">'
+                      + '<div class="ow-msr-main">'
+                      + '<div class="ow-msr-nick">' + esc(u.nickname) + '</div>'
+                      + '<div class="ow-msr-meta">' + esc(meta) + '</div>'
+                      + '</div>'
+                      + (u.in_room ? '<span class="ow-msr-inroom">在群</span>' : '')
+                      + '</div>';
+            }
+            box.innerHTML = html;
+            var rows = box.getElementsByClassName('ow-msr-item'), k;
+            for (k = 0; k < rows.length; k++) {
+                (function (row) {
+                    row.onclick = function () {
+                        self.closeModal();
+                        self.openUserActions(row.getAttribute('data-uid'), row.getAttribute('data-nick'), {
+                            kind: row.getAttribute('data-kind'),
+                            role: row.getAttribute('data-role'),
+                            gid: parseInt(row.getAttribute('data-gid'), 10) || 0
+                        });
+                    };
+                })(rows[k]);
+            }
+        },
+
+        /**
+         * 「针对某个用户」的操作菜单（v1.3.24）。
+         *
+         * 为什么要有这层：现有 onMsgCtx 是**按消息**定位人的（右键某条消息的头像），
+         * 而成员搜索是**按人**发起的（没有具体消息上下文）。
+         * 新增 onUserAction(items, u, env) 钩子，u = {uid, gid, nickname, kind}，
+         * env 与 onMsgCtx 同构。禁言 / 举报插件挂这个钩子即可复用，
+         * 无需各自再写一份「怎么拿到这个人」的界面逻辑。
+         */
+        onUserAction: function (fn) { if (typeof fn === 'function') this._userActExt.push(fn); },
+        _userActExt: [],
+
+        /** 打开用户操作菜单。uid=0 且 gid>0 表示游客（游客只有「查看资料」会提示不可用）。 */
+        openUserActions: function (uid, nickname, extra) {
+            var self = this;
+            uid = parseInt(uid, 10) || 0;
+            extra = extra || {};
+            var me = this.cfg.actor;
+            // ⚠️ role 必须带上：禁言插件的 canBan 判「房主不能禁言管理员」用的就是它。
+            //   漏传会让 canBan 拿到空 role → 房主误判成「可以禁言管理员」，
+            //   前端菜单显示出来了，服务端再拒 —— 用户白点一次。
+            var u = {
+                uid: uid, gid: extra.gid || 0,
+                nickname: nickname || '', kind: extra.kind || 'user',
+                role: extra.role || ''
+            };
+            var items = [];
+
+            if (uid > 0) {
+                items.push({ t: '查看个人资料', run: function () { self.userCard(uid, nickname); } });
+                // 私信只对「对方也是注册用户」成立（跨身份私聊 v1.1.2 起已下线）
+                if (me.kind === 'user' && uid !== (me.id || 0)) {
+                    items.push({ t: '发私信', run: function () { self.openDmWith({ uid: uid, nickname: nickname }); } });
+                }
+            } else {
+                items.push({ t: '查看个人资料', run: function () { toast('游客没有个人资料'); } });
+            }
+            // 禁言 / 举报等由插件经 onUserAction 注入（权限判定在各自的服务端）
+            for (var i = 0; i < this._userActExt.length; i++) {
+                try { this._userActExt[i](items, u, { roomId: this.room, actor: me }); } catch (e) {}
+            }
+            if (!items.length) return;
+
+            // 复用消息右键菜单（同款 DOM 与事件绑定，不另造一套）
+            // ⚠️ 条目必须是 <a>：bindEvents 里是向上找最近的 <a> 再按 data-i 取项，
+            //   用 <div> 会点了没反应（那是为了兼容锚点语义写的向上查找）。
+            // ⚠️ 还要先把旧的 transform 清掉：右键菜单定位靠 inline left/top，
+            //   若上一次留下 translateX(-50%)，这次用 left 百分比就会被平移两次。
+            this._ctxItems = items;
+            var menu = $('owCtxMenu');
+            menu._from = 'member-search';
+            var html = '', k;
+            for (k = 0; k < items.length; k++) {
+                html += '<a class="ow-ctx-item" href="javascript:;" data-i="' + k + '">'
+                      + esc(items[k].t) + '</a>';
+            }
+            menu.innerHTML = html;
+            // 没有触发源（不是右键），按视口水平居中、固定在偏上位置
+            var w2 = w.innerWidth || 900, mw = menu.offsetWidth || 150;
+            menu.style.left = Math.max(8, Math.round(w2 / 2 - mw / 2)) + 'px';
+            menu.style.top = '150px';
+            menu.style.display = 'block';
+            // 点外部关闭由 bindEvents 里的 document.onclick 统一处理（已存在）
+        },
         /** 插件扩展点：构造引用内容时可改写（服务端另有 message.quote 钩子做最终校验） */
         onQuote: function (fn) { if (typeof fn === 'function') this._quoteExt.push(fn); },
         showCtxMenu: function (x, y, m) { this.showUserMenu(x, y, m); },
@@ -3629,6 +3806,8 @@
          *   fn({ roomId, ownerId, isAdmin, isOwner })，#owREExtras 必定存在。
          */
         renderRoomPanel: function () {
+            // v1.3.24：切群 / 进私聊都会走到这里，成员搜索按钮的显隐跟着刷新
+            if (this.syncMembersSearchBtn) this.syncMembersSearchBtn();
             var box = $('owRoomPanel');
             if (!box) return;
             var me = this.cfg.me || {}, isAdmin = this.cfg.actor.role === 'admin';

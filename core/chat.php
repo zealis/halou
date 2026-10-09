@@ -1225,6 +1225,70 @@ class Chat
         return self::sortConversations($out);
     }
 
+    /**
+     * 在**本群成员**中按昵称 / ID 搜索（v1.3.24：右侧「所有成员」区的搜索弹窗）。
+     *
+     * 为什么不用通用 Chat::search：那个是全站搜索（可搜消息、可搜跨群的人），
+     * 这里的语义是「看看这个群里有哪些人」—— 限定 room_members + 本群游客，
+     * 结果集天然小、也不必担心搜到无关的人。
+     *
+     * 只返回**能联系上的人**：注册用户（含不在本群的成员，用于补拉）+ 本群在场游客。
+     * 游客没有用户行、昵称形如「游客xxxx」，按昵称 LIKE 匹配即可。
+     */
+    public static function searchMembers(array $actor, int $roomId, string $q, int $limit = 30): array
+    {
+        $q = trim($q);
+        if ($q === '') return [];
+        // 与 Chat::search 的清洗口径一致：压空白、去控制符、去 LIKE 通配符
+        $q = preg_replace('/[\x00-\x1f\x7f]/u', '', $q) ?? '';
+        $q = preg_replace('/\s+/u', ' ', $q) ?? '';
+        $q = mb_substr($q, 0, 50);
+        if ($q === '') return [];
+        $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $q) . '%';
+
+        $out = [];
+        // ① 注册用户：全站按昵称 / 数字 ID 搜（不限是否在群内 —— 群里的人可能还没加入成员表）
+        $idNum = ctype_digit($q) ? (int)$q : 0;
+        $sql = 'SELECT id, nickname, avatar, avatar_type, avatar_style, avatar_seed, role
+                FROM users WHERE status=1 AND (nickname LIKE ?' . ($idNum > 0 ? ' OR id=?' : '') . ')
+                ORDER BY (nickname=?) DESC, id ASC LIMIT ?';
+        $args = $idNum > 0 ? [$like, $idNum, $q, $limit * 2] : [$like, $q, $limit * 2];
+        foreach (DB::all($sql, $args) as $u) {
+            $uid = (int)$u['id'];
+            $out[] = [
+                'kind' => 'user', 'uid' => $uid, 'gid' => 0,
+                'nickname' => (string)$u['nickname'], 'role' => (string)$u['role'],
+                'avatar' => Auth::avatarUrlFor($u, (string)$uid),
+                // 是否已在本群（用于结果行上打「已在群」标记）
+                'in_room' => (int)DB::val('SELECT 1 FROM room_members WHERE room_id=? AND user_id=?', [$roomId, $uid]) > 0,
+            ];
+            if (count($out) >= $limit) return $out;
+        }
+        // ② 本群在场游客（游客只在 room online 心跳里，按昵称模糊匹配）
+        $rows = DB::all(
+            'SELECT DISTINCT g.id, g.nickname FROM online o
+             JOIN guests g ON g.id = o.guest_id
+             WHERE o.room_id=? AND g.nickname LIKE ? ORDER BY g.id LIMIT 20',
+            [$roomId, $like]
+        );
+        foreach ($rows as $g) {
+            if (count($out) >= $limit) break;
+            // ⚠️ 必须整行查 guests 再走 Auth::avatarUrlFor —— 那样才是「与该游客在别处
+            // 显示的同一个头像」的口径（读 avatar_style / avatar_seed 两个字段，
+            // v1.3.14 起游客也有自己的风格与档位）。这里再自己拼一个种子会得到
+            // 与成员列表不一致的脸。存量游客行没有档位时回落 client_key，与 actor() 相同。
+            $g = DB::one('SELECT id, nickname, client_key, avatar_type, avatar_style, avatar_seed FROM guests WHERE id=?', [(int)$g['id']]);
+            if (!$g) continue;
+            $out[] = [
+                'kind' => 'guest', 'uid' => 0, 'gid' => (int)$g['id'],
+                'nickname' => (string)$g['nickname'], 'role' => 'guest',
+                'avatar' => Auth::avatarUrlFor($g, (string)$g['client_key']),
+                'in_room' => true,
+            ];
+        }
+        return $out;
+    }
+
     // ---------- 搜索（v1.2.31） ----------
 
     /**
