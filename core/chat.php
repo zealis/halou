@@ -277,7 +277,12 @@ class Chat
         $uid = (int)($actor['id'] ?? 0);
         if ($uid <= 0) return [false, '请先登录'];
         if ((int)($room['owner_id'] ?? 0) === $uid) return [true, '你是群主，无需加入'];
-        if (self::isMember($room, $actor)) return [true, '已在本群'];   // 幂等：不重复插
+        // 幂等预检必须**直查 room_members 行**，不能用 isMember()：
+        // isMember() 对超管恒真（既有「超管进任意群」口径），走它会永远命中
+        // 「已在本群」提前返回、从不插行；而群列表的 is_member（rooms()）
+        // 只认表行，于是超管每次点别人创建的群都再弹「是否加入」。
+        if ((int)DB::val('SELECT 1 FROM room_members WHERE room_id=? AND user_id=?',
+            [(int)$room['id'], $uid]) > 0) return [true, '已在本群'];
         DB::insert('room_members', [
             'room_id' => (int)$room['id'],
             'user_id' => $uid,
