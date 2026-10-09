@@ -28,11 +28,22 @@ class Chat
         // 游客没有联系人：身份随会话消亡，写进表也无法回查
         if (($actor['kind'] ?? '') !== 'user') return [];
         $me = (int)$actor['id'];
+        // v1.3.10：改为**双向可见**。
+        // friends 表每行表示「user_id 单方面把 friend_id 加进了联系人」，
+        // 原先只取 f.user_id = 我（= 我添加的人），于是别人添加我只会写进
+        // (对方 → 我) 那一行，我这边完全查不到 —— 表现就是
+        // 「别人加我为好友了，我的联系人列表不显示」。
+        // 现在按「与我有任一方向关系」取人，并按对方去重（双方都加过会存在两行）。
+        // MIN(created_at) 取最早一次建立时间，列表仍按昵称排序，结果稳定。
+        // ⚠️ 三个占位符必须分开写：PDO 原生预处理不允许同一命名占位重复绑定。
         $rows = DB::all(
-            'SELECT u.id, u.nickname, u.avatar, u.role, u.title, f.created_at
-             FROM friends f JOIN users u ON u.id = f.friend_id
-             WHERE f.user_id = ?
-             ORDER BY u.nickname COLLATE NOCASE ASC', [$me]);
+            'SELECT u.id, u.nickname, u.avatar, u.role, u.title, MIN(f.created_at) AS created_at
+             FROM friends f
+             JOIN users u ON u.id = CASE WHEN f.user_id = ? THEN f.friend_id ELSE f.user_id END
+             WHERE f.user_id = ? OR f.friend_id = ?
+             GROUP BY u.id, u.nickname, u.avatar, u.role, u.title
+             ORDER BY u.nickname COLLATE NOCASE ASC',
+            [$me, $me, $me]);
         $out = [];
         foreach ($rows as $r) {
             $out[] = [
@@ -78,8 +89,11 @@ class Chat
         if (($actor['kind'] ?? '') !== 'user') return [false, '请先登录'];
         $me = (int)$actor['id'];
         if ($friendId <= 0) return [false, '参数错误'];
-        // 只删「我加的这条」行 —— 不动对方那边可能存在的对称行（那是对方的关系）
-        DB::run('DELETE FROM friends WHERE user_id=? AND friend_id=?', [$me, $friendId]);
+        // v1.3.10：联系人关系已改成双向可见，删除时两个方向一起清 ——
+        // 只删我发起的这一行的话，对方那条 (对方 → 我) 还在，
+        // 我这边的列表里仍会留着他（等于删不掉）。
+        DB::run('DELETE FROM friends WHERE (user_id=? AND friend_id=?) OR (user_id=? AND friend_id=?)',
+            [$me, $friendId, $friendId, $me]);
         return [true, '已删除联系人'];
     }
 
