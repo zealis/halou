@@ -169,19 +169,17 @@
                 if (ex) ex.value = c.exts || '';
                 var act = $('owAtActive');
                 if (act) act.textContent = (r.active_exts || []).join('、') || '（无）';
-                // v1.2.0：压缩开关 + imagewebp() 实测支持状态；v1.3.0：细分复选框
-                var cp = $('owAtCompress'), cq = $('owAtCompressQ'), wp = $('owAtWebp');
+                // v1.2.0：压缩开关；v1.3.1：细分改通用开关行（checked 置位后 bindSwitches 同步轨道）
+                var cp = $('owAtCompress'), cq = $('owAtCompressQ');
                 if (cp) cp.value = c.compress === '1' ? '1' : '0';
                 if (cq) cq.value = c.compress_q || '80';
                 var mk = function (id, v) { var el = $(id); if (el) el.checked = v === '1'; };
                 mk('owAtcAvatar', c.compress_avatar);
                 mk('owAtcImage', c.compress_image);
                 mk('owAtcSticker', c.compress_sticker);
-                if (wp) {
-                    OwAT.webpReady = !!r.webp_ready;
-                    if (r.webp_ready) { wp.textContent = '✓ 可用'; wp.style.color = '#1a7f37'; }
-                    else { wp.textContent = '✗ 不可用（GD 未编译 WebP）'; wp.style.color = '#C41D1F'; }
-                }
+                var sw = $('owAtcSwitches');
+                if (sw && typeof w.bindSwitches === 'function') w.bindSwitches(sw);
+                OwAT.webpReady = !!r.webp_ready;
             });
         },
 

@@ -536,6 +536,18 @@ Plugin::route('plugin_attachment_manager_upload_avatar', function (array $ctx) u
 });
 
 /* ============================ 后台配置路由 ============================ */
+/* ---------- 后台页开关行（与核心 switchHtml / content-report 同款结构，
+   admin.js 读配置后置 checked 再调 bindSwitches 同步视觉） ---------- */
+function owATSwitchHtml(string $id, string $label, bool $on, string $hint = ''): string
+{
+    return '<div class="ow-switch-row">'
+        . '<span class="ow-switch-label">' . htmlspecialchars($label, ENT_QUOTES) . '</span>'
+        . '<input type="checkbox" class="ow-switch-input" id="' . htmlspecialchars($id, ENT_QUOTES) . '"' . ($on ? ' checked' : '') . '>'
+        . '<label class="ow-switch' . ($on ? ' is-on' : '') . '" for="' . htmlspecialchars($id, ENT_QUOTES) . '"></label>'
+        . ($hint !== '' ? '<p class="ow-switch-hint">' . htmlspecialchars($hint, ENT_QUOTES) . '</p>' : '')
+        . '</div>';
+}
+
 /** 管理员鉴权：插件路由的公共守卫。
  *  ⚠️ 必须定义在**所有 use($amGuard) 之前** —— use() 捕获的是变量**值**，
  *     定义在后面会捕获到 null，调用时直接致命错误。 */
@@ -643,26 +655,25 @@ Plugin::adminPage('attachment-manager', '附件上传', function () {
         . '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">逗号分隔。只有安全类型表内登记过的扩展名才会生效；'
         . 'svg / php / html 等可执行或可内嵌脚本的类型不予登记（即使填了也不会放行）。'
         . '当前生效：<span id="owAtActive">-</span></p></div>'
-        // v1.2.0：图片压缩（WebP）。头像与聊天图片上传前转码；贴纸收藏的是站内图，源头即已覆盖。
-        // 说明文字放 .ow-form-item 内的无 class 小字 <p> → 核心 OwTip 自动收进 label 的 ⓘ 气泡。
+        // v1.2.0：图片压缩（WebP）。v1.3.1：细分开关改通用开关行（与核心 switchHtml 同款，
+        // admin.js bindSwitches 同步视觉）；「imagewebp() 支持」状态块与底部一句话移除 ——
+        // 环境不支持时保存校验会 toast 并把开关关回，不需要常驻展示。
+        // 说明文字放 .ow-form-item / .ow-switch-row 内的小字 <p> → 核心 OwTip 自动收进 ⓘ 气泡。
         . '<div class="ow-form-row">'
         . '<div class="ow-form-item" style="min-width:160px"><label>图片压缩</label>'
         . '<select class="ow-input" id="owAtCompress"><option value="0">关闭（原图直存）</option><option value="1">开启（转 WebP）</option></select>'
-        . '<p style="font-size:12px;color:#5C5C5C">动图 GIF 自动跳过保动画；超过 3000 万像素不转；'
-        . '转完不变小的保留原图；只影响此后新上传的图，存量不动；需 PHP GD 编译 WebP 支持（右侧为实测结果）。</p></div>'
+        . '<p style="font-size:12px;color:#5C5C5C">需 PHP GD 编译 WebP 支持；本机不支持时开关会被自动关回。</p></div>'
         . '<div class="ow-form-item" style="min-width:120px"><label>压缩质量(1-100)</label>'
         . '<input class="ow-input" id="owAtCompressQ" type="number" min="1" max="100" value="80"></div>'
-        . '<div class="ow-form-item" style="min-width:150px"><label>imagewebp() 支持</label>'
-        . '<span id="owAtWebp" style="display:inline-block;padding-top:8px;font-size:13px">检测中…</span></div>'
         . '</div>'
-        // v1.3.0：细分开关 —— 总开关开启后按类别生效（复选框，unchecked 不提交=0）
-        . '<div class="ow-form-item" style="margin-bottom:8px"><label>压缩范围（总开关开启后生效）</label>'
-        . '<label class="ow-chk-inline"><input type="checkbox" id="owAtcAvatar"> 头像</label>'
-        . '<label class="ow-chk-inline"><input type="checkbox" id="owAtcImage"> 消息图片</label>'
-        . '<label class="ow-chk-inline"><input type="checkbox" id="owAtcSticker"> 贴纸上传</label>'
+        . '<div id="owAtcSwitches">'
+        . owATSwitchHtml('owAtcAvatar', '压缩头像', owATConfig()['compress_avatar'] === '1',
+            '转 WebP 后核心仍会把头像裁成 100px 方图，压缩主要省在上传体积')
+        . owATSwitchHtml('owAtcImage', '压缩消息图片', owATConfig()['compress_image'] === '1',
+            '动图 GIF 自动跳过保动画；超过 3000 万像素不转；转完不变小的保留原图；存量图片不受影响')
+        . owATSwitchHtml('owAtcSticker', '压缩贴纸上传', owATConfig()['compress_sticker'] === '1',
+            '贴纸面板直接上传的图；收藏站内已有图片不受影响')
         . '</div>'
-        . '<p style="font-size:12px;color:#5C5C5C;margin:2px 0 8px">开启后新头像与聊天图片转 WebP：<b>省流量省磁盘、加载更快</b>；'
-        . '代价是有损，截图与文字图会轻微发虚。</p>'
         . '<button class="ow-btn ow-btn-primary" onclick="OwAT.saveCfg()">保存配置</button>'
         . '</div>'
         . '<div class="ow-card">'

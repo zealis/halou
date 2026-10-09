@@ -72,9 +72,3 @@
         max-width: 140px;
     }
 }
-
-/* v1.3.0：压缩范围细分复选框（行内排布，与主 label 区分） */
-.ow-chk-inline {
-    display: inline-flex; align-items: center; gap: 4px;
-    margin-right: 14px; font-size: 13px; font-weight: normal; cursor: pointer;
-}
