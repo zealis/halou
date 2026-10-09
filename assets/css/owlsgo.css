@@ -1149,14 +1149,17 @@ input[type=range] {
     .ow-time-divider { margin: 12px 0 10px; }
     .ow-time-divider span { font-size: 11px; padding: 0 8px; }
 }
-/* ---------- 右下角「N 条未读 ↓」跳转按钮（v1.3.21） ----------
+/* ---------- 「N 条未读 ↓」跳转按钮（v1.3.21，v1.3.22 改挂到输入栏上方） ----------
    进会话时若定位到上次已读位置，就浮出这个按钮，点击直达最新消息。
-   定位上下文是 .ow-main（它已是 position:relative），所以 fixed 相对它计算 ——
-   侧栏宽度变化、滚动条出现与否都不会让按钮偏移。 */
-.ow-unread-jump {
-    position: absolute;                /* 相对 .ow-main，比 fixed 更稳（不受祖先 transform 影响） */
+   v1.3.22：定位上下文从 .ow-main 改为 **.ow-inputbar**（它已是 position:relative），
+   用 bottom:100% + margin-bottom 表达「贴在输入栏上沿之外」。
+   这么改的理由：输入栏高度是动态的（用户上拉 / 输入框自动增高），
+   任何写死的 bottom 偏移都会在输入栏变高后错位 —— 现在无论多高都自动跟随。 */
+.ow-inputbar .ow-unread-jump {
+    position: absolute;
     right: 20px;
-    bottom: 14px;
+    bottom: 100%;                     /* 相对输入栏上沿 */
+    margin-bottom: 10px;              /* 与输入栏的间距 */
     z-index: 40;                       /* 高于消息（.ow-msg 无 z-index），低于输入栏浮层（92+） */
     display: -webkit-inline-flex; display: inline-flex;
     -webkit-align-items: center; align-items: center;
@@ -1173,9 +1176,9 @@ input[type=range] {
     box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
     cursor: pointer;
 }
-.ow-unread-jump:hover { background: var(--ow-hover-bg); color: var(--ow-primary-dark); }
-.ow-unread-jump:active { background: var(--ow-active-bg); }
-.ow-unread-jump .ow-ico { display: block; flex-shrink: 0; }   /* 消掉 svg 基线间隙 */
+.ow-inputbar .ow-unread-jump:hover { background: var(--ow-hover-bg); color: var(--ow-primary-dark); }
+.ow-inputbar .ow-unread-jump:active { background: var(--ow-active-bg); }
+.ow-inputbar .ow-unread-jump .ow-ico { display: block; flex-shrink: 0; }   /* 消掉 svg 基线间隙 */
 
 .ow-msg {
     display: flex; display: -webkit-flex;
@@ -1387,6 +1390,10 @@ input[type=range] {
     background-image: var(--ow-bg-chat-grad);
     padding: 8px 12px 12px;
     flex-shrink: 0; -webkit-flex-shrink: 0;
+    /* v1.3.22：成为「N 条未读 ↓」按钮的定位上下文。
+       输入栏是**动态高度**（用户可上拉 + 输入框自动增高），
+       按钮要用 bottom:100% 贴住它的上沿，必须有 position 才能算。 */
+    position: relative;
 }
 .ow-toolbar { display: flex; display: -webkit-flex; gap: 4px; margin-bottom: 6px; }
 .ow-input-row { display: flex; display: -webkit-flex; gap: 10px; align-items: flex-end; -webkit-align-items: flex-end; }

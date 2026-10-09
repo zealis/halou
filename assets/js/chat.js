@@ -1604,28 +1604,65 @@
         jumpToUnread: function (done) {
             var self = this;
             var finish = function () { if (typeof done === 'function') done(); };
+
+            // 把定位消息滚到视口顶部偏上 8px（不顶死，留一点上下文）。
+            // 抽成独立函数：定位后还要补更早消息，补完必须**重定位** ——
+            // fillIfShort 会在上方插入节点，scrollHeight 变化、视口相对位置跟着漂。
+            var locate = function (anchorId) {
+                var box = $('owMessages');
+                var el = $('owMsg' + anchorId);
+                if (!box || !el) return false;
+                // el.offsetTop 相对 offsetParent，box.offsetTop 同理；用差值避免依赖父级定位方式
+                box.scrollTop = el.offsetTop - box.offsetTop - 8;
+                return true;
+            };
+
             this.unreadAnchor(function (anchorId, count) {
                 if (!anchorId) { self.scrollBottom(); finish(); return; }
+                // 定位期间屏蔽 onMsgScroll 的「滚到底」判定（理由见该方法注释）
+                self._locating = true;
                 self._unreadAnchor = anchorId;
                 self._unreadCount = count;
                 // 定位点可能很靠后（未读很多），先把「定位点及其之后」这一段拉出来
-                self.loadFromAnchor(anchorId, function (ok) {
+                self.loadFromAnchor(anchorId, function () {
                     // 等 DOM 布局稳定（图片/引用可能还在撑高度）
                     setTimeout(function () {
-                        var box = $('owMessages');
-                        var el = $('owMsg' + anchorId);
-                        if (box && el) {
-                            // offsetTop 是相对 offsetParent；用差值算更稳（不依赖父级定位方式）
-                            box.scrollTop = el.offsetTop - box.offsetTop - 8;
-                            self.showUnreadJump(count);
-                        } else {
+                        if (!locate(anchorId)) {
                             // 定位点没渲染出来（消息已过期/被清理）→ 退回滚到底
+                            self._locating = false;
                             self.scrollBottom();
+                            finish();
+                            return;
                         }
-                        finish();
+                        self.showUnreadJump(count);
+                        // 补更早的消息让上下文完整；补完重定位，保证视口还停在定位点。
+                        // ⚠️ 必须延后一帧，且补完再 locate 一次 ——
+                        //   上方插入节点会把已定位的内容往上推，不重定位就会看到"跳了一下"。
+                        setTimeout(function () {
+                            var before = $('owMessages').scrollHeight;
+                            self.fillIfShort();
+                            setTimeout(function () {
+                                var box = $('owMessages');
+                                // 定位流程收尾才释放闸门（无论成败都要放，否则永久失去滚到底检测）
+                                self._locating = false;
+                                if (!box) { finish(); return; }
+                                // fillIfShort 可能是异步（内部 loadHistory 还要发请求），
+                                // 这里只做「高度变了就重新对一次」的兜底：
+                                // 若它已经完成，补一次即可；若还没完成，onMsgScroll
+                                // 与后续的 loadHistory 会各自维持现有视口，不会失效。
+                                if (box.scrollHeight !== before) locate(anchorId);
+                                finish();
+                            }, 80);
+                        }, 0);
                     }, 60);
                 }, anchorId);
             });
+        },
+
+        /** 跳转按钮当前是否可见（长轮询据此决定要不要打断用户） */
+        _unreadJumpVisible: function () {
+            var btn = $('owUnreadJump');
+            return !!(btn && btn.style.display !== 'none' && btn.style.display !== '');
         },
 
         /** 显示/隐藏右下角跳转按钮。count<=0 即隐藏（已读完了） */
@@ -1657,6 +1694,11 @@
          * 只在按钮可见时才做事：平时滚动不该产生额外请求。
          */
         onMsgScroll: function () {
+            // ⚠️ 定位动作本身也会触发 scroll 事件。若此时按钮**还没显示**就跳过 ——
+            //   否则「未读只有 1~2 条、定位点离底部不到 24px」的场景下，
+            //   定位刚做完就被这个判定当成「用户已滚到底」，按钮一闪就没了，
+            //   等于白做。（showUnreadJump 在 locate() 之后才调用，所以这个闸门有效。）
+            if (this._locating) return;
             var btn = $('owUnreadJump');
             if (!btn || btn.style.display === 'none' || btn.style.display === '') return;
             var box = $('owMessages');
@@ -2179,7 +2221,7 @@
                 }
                 for (var i = 0; i < r.data.length; i++) self.addMessage(r.data[i], true);
                 if (r.data.length) self.since = r.data[r.data.length - 1].id;
-                self.scrollBottom();
+                // v1.3.21：与群聊一致，滚动交给 jumpToUnread 决定（见 switchRoom 同处注释）
                 if (r.data.length < 30) self.historyDone = true;
                 if (!r.data.length) self.historyDone = true;
                 // v1.2.6 懒加载：消息太少填不满屏幕时自动往前补，
@@ -2218,10 +2260,10 @@
                     for (var i = 0; i < r.messages.length; i++) { self.addMessage(r.messages[i]); hasNew = true; }
                     if (r.messages.length) self.since = r.messages[r.messages.length - 1].id;
                     if (hasNew) {
-                        self.scrollBottom();
+                        // v1.3.21：同群聊 —— 停在定位点时不打断（见 startPoll 内同处注释）
+                        if (self._unreadJumpVisible()) self.showUnreadJump(0);
+                        else self.scrollBottom();
                         if (self.sound) beep();
-                        // v1.3.19：同群聊，正在看的私聊收到即算已读
-                        self.markRead(self.since);
                     }
                     $('owLatency').innerHTML = '● ' + (new Date().getTime() - t0) + ' ms';
                     $('owLatency').style.color = '#237804';
@@ -2364,8 +2406,12 @@
             }
             this.room = id; this.roomName = name; this.since = 0; this.historyDone = false;
             // v1.3.21：切会话必须复位未读状态，否则上一个会话的跳转按钮会跟着过来
-            // （按钮文案是「N 条未读」，带着走就完全对不上当前会话）
-            this._unreadAnchor = 0; this._unreadCount = 0; this.showUnreadJump(0);
+            // （按钮文案是「N 条未读」，带着走就完全对不上当前会话）。
+            // ⚠️ _locating 也要复位：定位是异步的（要发请求 + 等布局），
+            // 期间切走的话那个 setTimeout 仍会跑并释放闸门 —— 但若切走发生在
+            // 「置 true」与「释放」之间且流程被打断，闸门会永久卡住（滚到底不再判定已读）。
+            this._unreadAnchor = 0; this._unreadCount = 0; this._locating = false;
+            this.showUnreadJump(0);
             // v1.3.1：游客点选群聊本身就算「已进入」，立即解锁输入区。
             // 游客没有成员关系（applyJoinGate 对它恒放行），这里先解一次闸门，
             // 免得等 room_members 异步回来才解锁、点完还发不出去。
@@ -2396,7 +2442,10 @@
                     if (r.ok) {
                         for (var i = 0; i < r.data.length; i++) self.addMessage(r.data[i], true);
                         if (r.data.length) self.since = r.data[r.data.length - 1].id;
-                        self.scrollBottom();
+                        // v1.3.21：**这里不再无条件 scrollBottom()** ——
+                        // 滚动到哪由下面的 jumpToUnread 决定（有未读→定位到已读位置，
+                        // 无未读→才滚到底）。原来那句无条件滚底会把随后的定位覆盖掉，
+                        // 表现为「有未读却还是直接进到最下面」。
                         if (r.data.length < 30) self.historyDone = true;
                         // 从私聊切回群聊时群聊长轮询是停的，需在此重新拉起
                         if (!self._roomPollRunning) { self._roomPollRunning = true; self.startPoll(); }
@@ -2461,10 +2510,12 @@
                         hasNew = true;
                     }
                     if (hasNew) {
-                        self.scrollBottom();
+                        // v1.3.21：用户若还停在未读定位点（按钮可见），**不要**把他拽到底部。
+                        // 微信的行为是留在原地，只在底部露出「N 条新消息」提示 ——
+                        // 正在读的时候被强行拉走是最烦人的那种打断。
+                        if (self._unreadJumpVisible()) self.showUnreadJump(0);
+                        else self.scrollBottom();
                         if (self.sound) beep();
-                        // v1.3.19：正在看的会话收到的消息直接算已读（不必等下次进会话）
-                        self.markRead(r.since);
                         // v1.1.0：当前群有消息时立刻前置该会话（其余会话由 startConvPoll 兜底）
                         self.loadConversations();
                     }
@@ -2967,8 +3018,20 @@
                 // ⚠️ 插入新节点会改变 scrollHeight，必须**先记旧高度、插完再按差值回推**，
                 // 否则浏览器会保持 scrollTop 不变 → 视口猛地跳到新加载内容的位置（老实现就这毛病）。
                 var oldH = box.scrollHeight, i;
+                // 定位态下记一下定位消息当前距视口顶部的距离：上方插入节点后按它回推，
+                // 而不是按 scrollHeight 差值 —— 后者会把视口连同内容一起往下拽，
+                // 表现为「刚定位好就又跳了一下」。
+                var keepAnchor = null, anchorEl = null;
+                if (self._unreadJumpVisible() && self._unreadAnchor) {
+                    anchorEl = $('owMsg' + self._unreadAnchor);
+                    if (anchorEl) keepAnchor = anchorEl.offsetTop - box.offsetTop - box.scrollTop;
+                }
                 for (i = r.data.length - 1; i >= 0; i--) self.addMessageBefore(r.data[i], first);
-                box.scrollTop = box.scrollHeight - oldH;
+                if (keepAnchor !== null && anchorEl) {
+                    box.scrollTop = anchorEl.offsetTop - box.offsetTop - keepAnchor;
+                } else {
+                    box.scrollTop = box.scrollHeight - oldH;
+                }
 
                 // 不足一屏（scrollHeight <= clientHeight）说明还有空间，继续往前拉，
                 // 避免新群/新会话只显示最后几条、上方却是一片空白。
@@ -3005,7 +3068,12 @@
                 if (nowIsDm !== isDm || (isDm && self.dm.peer !== peer)) { finish(); return; }
                 if (!r || !r.ok || !r.data.length) { finish(); return; }
                 for (var i = 0; i < r.data.length; i++) self.addMessage(r.data[i]);
-                self.since = r.data[r.data.length - 1].id;
+                // ⚠️ since **只能前进**。首屏已经把 since 设到最新一条（末条 id 最大），
+                //   而这里取的是「定位点那段」的末条，id 必然更小 —— 直接赋值会把
+                //   since 回退，长轮询随即把整段消息当作「新的」重发，
+                //   于是 addMessage 又跑一遍 + scrollBottom 触发，定位彻底失效。
+                var tailId = r.data[r.data.length - 1].id;
+                if (tailId > self.since) self.since = tailId;
                 finish();
             });
         },

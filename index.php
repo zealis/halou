@@ -1316,16 +1316,19 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
        . '</header>'
        // v1.2.6：消息区初始为空，更早的消息靠向上滚动懒加载（不再有「加载更早消息…」入口）
        . '<div class="ow-messages" id="owMessages"></div>'
-       // v1.3.21：右下角「N 条未读 ↓」跳转按钮（进会话定位到上次已读位置后出现，
-       // 点击直达最新消息）。默认隐藏，由 OwChat.showUnreadJump() 控制显隐与文案。
-       // 放在消息区**之后、输入栏之前** —— 它是 fixed 定位（相对 .ow-main），
-       // 不占文档流高度；DOM 顺序上属于消息区，读代码时一眼能看出归属。
+       // v1.3.22：「N 条未读 ↓」跳转按钮改为**放在输入栏内部**（.ow-inputbar 的第一个子元素）。
+       // v1.3.21 原本是 .ow-main 的绝对定位兄弟节点，用户反馈「应该显示在 ow-inputbar 上方」——
+       // 而 .ow-inputbar 是**动态高度**（用户可上拉，输入框还能自动增高），
+       // 靠 CSS 给个固定 bottom 偏移必然对不齐：输入栏一变高，按钮就陷进消息区或压住工具条。
+       // 放进输入栏内部后，让 .ow-inputbar 成为定位上下文（position:relative），
+       // 按钮用 bottom:100% + margin-bottom 表达「贴在输入栏上沿之外」——
+       // 这样输入栏无论多高，按钮都自动跟着走，不需要任何 JS 计算。
+       . '<div class="ow-inputbar">'
        . '<button class="ow-unread-jump" id="owUnreadJump" type="button" style="display:none">'
        . '<svg class="ow-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
        . ' stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
        . '<polyline points="6 9 12 15 18 9"/></svg>'
        . '<span id="owUnreadJumpText">条未读</span></button>'
-       . '<div class="ow-inputbar">'
        // v1.2.27：未加入群聊时的闸门提示（默认隐藏，由 OwChat.applyJoinGate 控制）。
        // 正常流程下点击公开群聊会先弹「是否加入」，取消则不进入；这里是 URL 直达 /
        // 已被移出成员 / 服务端拒绝发言等异常态的兜底入口。
