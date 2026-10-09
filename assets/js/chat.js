@@ -2,7 +2,11 @@
    Owlsgo-Chat 前端（纯原生 ES5，无框架无依赖，兼容旧内核浏览器）
    包含：OwAuth（登录/注册/找回）、OwChat（聊天主程序，长轮询）、OwAdmin（管理后台）
    ========================================================================== */
-(function (w) {
+/* ⚠️ IIFE 形参是 (w, d)：d 即 document。
+   本文件是 'use strict'，任何未声明的标识符都会抛 ReferenceError 而不是静默变 undefined
+   —— 曾经在主题切换里误用了未定义的 d，点击直接失效且控制台之外的表现只是"没反应"。
+   新增代码请统一用 w / d，不要假设有别的全局别名。 */
+(function (w, d) {
     'use strict';
 
     /* ---------- 纯 JS MD5（标准实现，用于 API 签名 sign = md5(key|ts|action)） ----------
@@ -3166,8 +3170,7 @@
                   + '<input class="ow-input ow-msr-input" id="owMsrInput" type="text"'
                   + ' placeholder="输入昵称或用户 ID" maxlength="50" autocomplete="off">'
                   + '</div>'
-                  + '<div class="ow-msr-results" id="owMsrResults"></div>'
-                  + '<p class="ow-form-hint">仅显示本站注册用户与本群在场游客。</p>';
+                  + '<div class="ow-msr-results" id="owMsrResults"></div>';
             this.openModal(h, 420);
 
             var input = $('owMsrInput'), box = $('owMsrResults');
@@ -4719,7 +4722,10 @@
          */
         applyTheme: function (mode, persist) {
             var real = (mode === 'auto') ? (this.sysPrefersDark() ? 'dark' : 'light') : mode;
-            var el = d.documentElement;
+            // ⚠️ 用 document 而不是 IIFE 的 d：本文件里有多处 `var d = new Date(...)` /
+            // `var d = OW_ICONS[...]`，一旦本函数内出现同名局部变量就会遮蔽外层 d，
+            // 且 'use strict' 下会直接抛错 —— 症状是"点了没反应"。
+            var el = document.documentElement;
             if (el.getAttribute('data-theme') !== real) el.setAttribute('data-theme', real);
             // color-scheme 让浏览器原生控件（滚动条、表单、::selection）跟着变，
             // 否则深色页面会配一条亮色滚动条 —— 很扎眼。
@@ -6719,4 +6725,4 @@
         pending: function (key) { var g = this._q[key]; return g ? g.chain.length : 0; }
     };
     w.OwGate = OwGate;
-})(window);
+})(window, document);
