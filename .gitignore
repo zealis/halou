@@ -5,6 +5,8 @@
 !/uploads/.gitkeep
 # 站点配置属于部署环境（含本机绝对路径），不纳入源码仓库
 /nginx-server.conf
+# 设计文档全部只留本机，不推送 GitHub（含 CHANGELOG、开发文档、PLUGIN.md、图标素材等）
+/设计文档/
 # 插件目录纳入源码仓库（v1.2.15 撤销 v1.0.45 的 /plugins/ 整目录排除）。
 # 原因：整目录排除使 13 个插件的源码完全依赖本机，git clone / clean / 换机即永久丢失，
 # 而插件与核心同为产品代码、且相互耦合（插件 CSS 会经 ?action=assets&type=css
