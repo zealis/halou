@@ -4421,10 +4421,10 @@
                 + '<div class="ow-av-current">' + cur + '<div class="ow-av-current-tip">当前头像</div></div>'
                 + '<div class="ow-av-actions">'
                 + (canUpload
-                    ? '<button class="ow-btn ow-btn-block" type="button" id="owAvUpload">' + owIco('image', 16) + '上传头像</button>'
+                    ? '<button class="ow-btn ow-av-btn ow-av-btn-block" type="button" id="owAvUpload">' + owIco('image', 16) + '上传头像</button>'
                     : '')
-                + '<button class="ow-btn ow-btn-block" type="button" id="owAvGallery">' + owIco('smile', 16) + '浏览插图</button>'
-                + (isRoom ? '<button class="ow-btn ow-btn-block ow-btn-ghost" type="button" id="owAvReset">恢复默认（用创建者头像）</button>' : '')
+                + '<button class="ow-btn ow-av-btn ow-av-btn-block" type="button" id="owAvGallery">' + owIco('smile', 16) + '浏览插图</button>'
+                + (isRoom ? '<button class="ow-btn ow-av-btn ow-av-btn-block ow-btn-ghost" type="button" id="owAvReset">恢复默认（用创建者头像）</button>' : '')
                 + '</div>'
                 + '<div class="ow-av-styles" id="owAvStyles" style="display:none"></div>'
                 + '</div>';
@@ -4515,7 +4515,7 @@
                     var label = '';
                     var list = self.cfg.avatarStyles || [];
                     for (var k = 0; k < list.length; k++) if (list[k].slug === slug) label = list[k].label;
-                    var h = '<button class="ow-btn ow-btn-ghost ow-av-back" type="button" id="owAvBack">'
+                    var h = '<button class="ow-btn ow-btn-ghost ow-av-btn ow-av-back" type="button" id="owAvBack">'
                           + '<svg class="ow-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
                           + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg>'
                           + '全部风格</button>'

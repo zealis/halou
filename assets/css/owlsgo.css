@@ -1956,7 +1956,26 @@ input[type=range] {
 @media (max-width: 720px) { .ow-av-grid { grid-template-columns: repeat(4, 1fr); } }
 
 /* 头像二级界面（选风格 → 挑该风格的 45 个变体，v1.3.14） */
-.ow-av-back { margin-bottom: 10px; display: -webkit-flex; display: flex; align-items: center; gap: 4px; }
+/* v1.3.18：头像弹窗**统一按钮样式** —— 所有按钮（上传头像 / 浏览插图 / 恢复默认 / 全部风格）
+   都带 .ow-av-btn，几何完全一致（高 36px、同字号内边距、圆角 6px、图标与文字间距 6px）。
+   ⚠️ 之前「全部风格」按钮巨大，是因为 .ow-av-back 写了 display:flex ——
+      按钮一旦成为 flex 容器就是块级元素，会撑满 420px 弹窗宽度。
+      这里改用 inline-flex，宽度回归内容宽。 */
+.ow-av-btn {
+    display: inline-flex; display: -webkit-inline-flex;
+    align-items: center; -webkit-align-items: center;
+    justify-content: center; -webkit-justify-content: center;
+    gap: 6px;
+    box-sizing: border-box;
+    height: 36px;
+    padding: 0 16px;
+    font-size: 14px;
+    line-height: 1;
+    border-radius: 6px;
+}
+/* 纵向操作区的按钮占满一行（宽度差异是布局需要，高度/字号仍与其它按钮一致） */
+.ow-av-btn-block { display: flex; display: -webkit-flex; width: 100%; }
+.ow-av-back { margin-bottom: 10px; }
 .ow-av-subtitle { font-size: 13px; color: var(--ow-text-title); font-weight: 600; margin-bottom: 8px; }
 /* 变体格子不带文字，尺寸与风格格保持一致 */
 .ow-av-cell[data-seed] span { display: none; }
