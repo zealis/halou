@@ -1149,16 +1149,40 @@ function pageHead(string $title): void
        . '<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">'
        . '<title>' . Sec::e($title) . ' - ' . $site . '</title>'
        . '<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">'
+       . owThemeBootstrap()   // v1.3.25：先定主题再加载样式，避免首屏闪一下浅色
        . '<link rel="stylesheet" href="assets/css/owlsgo.css?v=' . OWLSGO_VERSION . '">';
     Plugin::fire('page.head');
     echo '</head>';
+}
+
+/**
+ * 主题预置脚本（v1.3.25）。
+ *
+ * ⚠️ 必须**内联在 <head> 且在样式表之前**：主题的 data-theme 要在首次绘制前就写好。
+ * 若放到 chat.js 里（body 末尾执行），深色用户每次刷新都会先闪一帧浅色 ——
+ * 就是常说的 FOUC / 主题闪烁。这是深浅色切换最容易忽略的一步。
+ *
+ * 逻辑与前端 applyTheme() 保持一致（auto 由 matchMedia 解析），
+ * 但这里是 ES5 且不能依赖任何已加载的模块，所以单独写一份精简版。
+ */
+function owThemeBootstrap(): string
+{
+    return '<script>(function(){try{'
+        . "var m=localStorage.getItem('owl_theme');"
+        . "if(m!=='light'&&m!=='dark'&&m!=='auto')m='auto';"
+        . "var d=(m==='auto')?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):m;"
+        . "document.documentElement.setAttribute('data-theme',d);"
+        . "document.documentElement.style.colorScheme=d;"
+        . '}catch(e){}})();</script>';
 }
 
 function renderInstall(string $err): void
 {
     echo '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'
        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
-       . '<title>安装 Owlsgo-Chat</title><link rel="stylesheet" href="assets/css/owlsgo.css?v=' . OWLSGO_VERSION . '"></head>'
+       . '<title>安装 Owlsgo-Chat</title>'
+       . owThemeBootstrap()
+       . '<link rel="stylesheet" href="assets/css/owlsgo.css?v=' . OWLSGO_VERSION . '"></head>'
        . '<body class="ow-auth-body"><div class="ow-auth-card" style="max-width:520px">'
        . '<div class="ow-auth-logo"><img src="assets/img/logo.svg" alt="Owlsgo-Chat"><h1>安装 Owlsgo-Chat</h1><p>纯原生 PHP · 零依赖 · v' . OWLSGO_VERSION . '</p></div>'
        . ($err ? '<div class="ow-alert ow-alert-error">数据库连接失败：' . Sec::e($err) . '（SQLite 模式无需配置，可直接继续）</div>' : '')

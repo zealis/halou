@@ -1104,6 +1104,9 @@
             this.bindEvents();
             this.renderRoomPanel();      // v1.1.1：初始化右侧栏群聊设置区
             this.syncMembersSearchBtn(); // v1.3.24：成员搜索按钮显隐（游客/私聊隐藏）
+            // v1.3.25：主题已在 <head> 的内联脚本里预置好（防首屏闪一下浅色），
+            // 这里只补「监听系统主题变化」。再次 applyTheme 是幂等的，不会闪。
+            this.initTheme();
 
             // 地址路由：私聊 ?dm=user:12 优先（v1.1.0），否则规范化为 ?room=当前群聊（replace）
             var dmFromUrl = this.dmFromUrl();
@@ -3156,12 +3159,15 @@
             var self = this;
             // h3 标题必须留着：openModal 的 ✕ 是 float:right，没有标题时它会和
             // 输入框挤在同一行（v1.3.26 前的弹窗乱象根因）。
+            // v1.3.25：结果区给个**最小高度**，否则空态/加载态时弹窗高度会跳
+            // （从"一行提示"突然撑到"一屏结果"），看着像闪了一下。
             var h = '<h3>搜索成员</h3>'
                   + '<div class="ow-msr-search-row">'
                   + '<input class="ow-input ow-msr-input" id="owMsrInput" type="text"'
-                  + ' placeholder="输入关键词" maxlength="50" autocomplete="off">'
+                  + ' placeholder="输入昵称或用户 ID" maxlength="50" autocomplete="off">'
                   + '</div>'
-                  + '<div class="ow-msr-results" id="owMsrResults"></div>';
+                  + '<div class="ow-msr-results" id="owMsrResults"></div>'
+                  + '<p class="ow-form-hint">仅显示本站注册用户与本群在场游客。</p>';
             this.openModal(h, 420);
 
             var input = $('owMsrInput'), box = $('owMsrResults');
@@ -4685,6 +4691,99 @@
             menu.style.top = Math.max(4, r.top - mh - 8) + 'px';
         },
 
+        /* ---------- 日夜模式（v1.3.25） ---------- */
+        /**
+         * 主题偏好：'light' | 'dark' | 'auto'（跟随系统）。
+         *
+         * 关键设计：**auto 由 JS 解析，CSS 只认 light / dark**。
+         * 若让 CSS 认识 auto，深色变量就要在 `[data-theme="dark"]` 与
+         * `@media (prefers-color-scheme: dark)` 里各写一份 —— 两份必然漂移。
+         * 由 JS 用 matchMedia 判定后落成具体值，CSS 只需一份深色变量，
+         * 还能顺带监听系统主题变化实时切换（CSS 方案做不到这点）。
+         */
+        themeKey: 'owl_theme',
+        getTheme: function () {
+            var v = '';
+            try { v = w.localStorage.getItem(this.themeKey) || ''; } catch (e) {}
+            // 兼容：旧版本或异常值一律回落 auto
+            return (v === 'light' || v === 'dark' || v === 'auto') ? v : 'auto';
+        },
+        /** 系统是否处于深色（不支持 matchMedia 的老浏览器返回 false） */
+        sysPrefersDark: function () {
+            return !!(w.matchMedia && w.matchMedia('(prefers-color-scheme: dark)').matches);
+        },
+        /**
+         * 应用主题：把偏好落成 light / dark 写到 <html data-theme>。
+         * @param {string} mode 'light'|'dark'|'auto'
+         * @param {boolean} persist 是否写入 localStorage（首屏应用时不写）
+         */
+        applyTheme: function (mode, persist) {
+            var real = (mode === 'auto') ? (this.sysPrefersDark() ? 'dark' : 'light') : mode;
+            var el = d.documentElement;
+            if (el.getAttribute('data-theme') !== real) el.setAttribute('data-theme', real);
+            // color-scheme 让浏览器原生控件（滚动条、表单、::selection）跟着变，
+            // 否则深色页面会配一条亮色滚动条 —— 很扎眼。
+            el.style.colorScheme = real;
+            if (persist) {
+                try { w.localStorage.setItem(this.themeKey, mode); } catch (e) {}
+            }
+        },
+        /** 初始化：应用已存偏好 + 监听系统主题变化（仅 auto 时生效） */
+        initTheme: function () {
+            var self = this;
+            this.applyTheme(this.getTheme(), false);
+            if (w.matchMedia) {
+                var mq = w.matchMedia('(prefers-color-scheme: dark)');
+                // ⚠️ 用 addListener 兼容老 Safari(<14)，它没有 addEventListener 版 API
+                var onChange = function () {
+                    if (self.getTheme() === 'auto') self.applyTheme('auto', false);
+                };
+                if (mq.addEventListener) mq.addEventListener('change', onChange);
+                else if (mq.addListener) mq.addListener(onChange);
+            }
+        },
+        /** 渲染日夜模式三选一（放进设置弹窗） */
+        themeSegHtml: function () {
+            var cur = this.getTheme();
+            var opts = [
+                ['light', '浅色', '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/>'],
+                ['dark', '深色', '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>'],
+                ['auto', '跟随系统', '<rect x="2.5" y="4" width="19" height="12.5" rx="1.6"/><path d="M8.5 20.5h7M12 16.5v4"/>']
+            ];
+            var h = '<div class="ow-seg" id="owThemeSeg">';
+            for (var i = 0; i < opts.length; i++) {
+                var o = opts[i];
+                h += '<button type="button" class="ow-seg-btn' + (cur === o[0] ? ' is-active' : '') + '"'
+                   + ' data-theme-mode="' + o[0] + '">'
+                   + '<svg class="ow-ico" width="14" height="14" viewBox="0 0 24 24" fill="none"'
+                   + ' stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"'
+                   + ' aria-hidden="true">' + o[2] + '</svg>'
+                   + o[1] + '</button>';
+            }
+            h += '</div>';
+            return h;
+        },
+        /** 绑定分段控件的点击（设置弹窗打开后调用） */
+        bindThemeSeg: function () {
+            var self = this, box = $('owThemeSeg');
+            if (!box) return;
+            var btns = box.getElementsByTagName('button'), i;
+            for (i = 0; i < btns.length; i++) {
+                (function (btn) {
+                    btn.onclick = function () {
+                        var mode = btn.getAttribute('data-theme-mode');
+                        self.applyTheme(mode, true);
+                        var all = box.getElementsByTagName('button'), k;
+                        for (k = 0; k < all.length; k++) {
+                            var on = all[k].getAttribute('data-theme-mode') === mode;
+                            if (all[k].classList) all[k].classList[on ? 'add' : 'remove']('is-active');
+                            else all[k].className = on ? 'ow-seg-btn is-active' : 'ow-seg-btn';
+                        }
+                    };
+                })(btns[i]);
+            }
+        },
+
         openSettings: function () {
             var me = this.cfg.me;
             if (!me) return;
@@ -4701,6 +4800,12 @@
                 // v1.2.37：第三方应用授权已剥离为插件 oauth-core，**按需加载**。
                 // 入口按钮按 window.OwOauth 是否存在来渲染 —— 插件停用时它的 chat.js
                 // 不加载，这里自然什么都不显示，核心不需要任何开关判断。
+                // v1.3.25：日夜模式三选一（浅色 / 深色 / 跟随系统）。
+                // 主题是**本地偏好**，不随「保存」提交 —— 点了立即生效更符合直觉，
+                // 混进保存会让「改个主题还要点保存」显得莫名其妙。
+                + '<div class="ow-form-item"><label>日夜模式</label>'
+                + this.themeSegHtml()
+                + '<p class="ow-form-hint">跟随系统会随操作系统的深浅色设置自动切换。</p></div>'
                 + ((w.OwOauth) ? '<div class="ow-form-item"><label>第三方授权</label>'
                     + '<button class="ow-btn ow-btn-ghost ow-btn-block" onclick="OwOauth.open()">管理应用授权</button>'
                     + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">'
@@ -4708,6 +4813,7 @@
                 + '<button class="ow-btn ow-btn-primary ow-btn-block" onclick="OwChat.saveSettings()">保存</button>'
             );
             var self = this;
+            this.bindThemeSeg();   // v1.3.25：日夜模式分段控件
             $('owSetAvatarFile').onchange = function () {
                 if (!this.files || !this.files[0]) return;
                 // 选完图不直接上传：先进入裁剪弹窗，由滑块手动缩放后再导出

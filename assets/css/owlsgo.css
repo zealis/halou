@@ -49,7 +49,100 @@
        落在同一水平线上**（见文件末尾 v1.1.17 的桌面端对齐块）。
        改这个值只需改这一处，两侧同时跟随，不会各自漂移。 */
     --ow-topbar-h: 57px;
+    /* v1.3.25：以下是**为了深/浅色切换**补的语义变量。
+       原先这些位置写死 #FFFFFF / #F5F5F5，深色模式无法覆盖 —— 只能靠逐个
+       选择器重写，既啰嗦又容易漏。收进变量后，深色只需在 [data-theme="dark"]
+       里重定义一次，与其余变量同一套机制。 */
+    --ow-surface: #FFFFFF;          /* 浮层/卡片/气泡的"面"：白卡片、消息气泡、折叠块 */
+    --ow-surface-2: #FFFFFF;        /* 顶栏、页头这类"通栏条"的底色 */
+    --ow-panel-bg: #FFFFFF;         /* 面板底色（.ow-fold 等带边框的内容块） */
+    /* 徽标类（未读红点、置顶标记、标签）上的文字色 —— 与 --ow-surface 无关，
+       深色下仍是白字，但单独成变量便于将来调。 */
+    --ow-on-accent: #FFFFFF;
 }
+
+/* ---------- 分段控件（v1.3.25：日夜模式三选一） ----------
+   等分三格、选中态主色实心（与 .ow-rail-btn / 开关同一套「选中 = 主色」语言）。
+   ⚠️ 按钮一律 inline-flex —— 用 flex 会让 button 变块级、吃满父容器宽度
+   （项目里踩过两次：v1.3.17 的 .ow-btn-block、v1.3.18 的 .ow-av-back）。 */
+.ow-seg {
+    display: -webkit-flex; display: flex;
+    gap: 6px;
+}
+.ow-seg-btn {
+    -webkit-flex: 1; flex: 1;
+    display: -webkit-inline-flex; display: inline-flex;
+    -webkit-align-items: center; align-items: center;
+    -webkit-justify-content: center; justify-content: center;
+    gap: 5px;
+    box-sizing: border-box;
+    height: 34px;
+    padding: 0 8px;
+    font-size: 13px;
+    line-height: 1;
+    border: 1px solid var(--ow-border-control);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ow-text);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.ow-seg-btn:hover { background: var(--ow-hover-bg); }
+.ow-seg-btn.is-active {
+    background: var(--ow-primary-strong);
+    border-color: var(--ow-primary-strong);
+    color: var(--ow-on-accent);
+}
+.ow-seg-btn .ow-ico { display: block; -webkit-flex: none; flex: none; }
+.ow-form-hint {
+    font-size: 12px;
+    color: var(--ow-text-sub);
+    margin-top: 6px;
+}
+
+/* ===================== 深色主题（v1.3.25） =====================
+   机制：只**重定义 CSS 变量**，不重写任何选择器。
+   —— 本项目 269 处颜色都走 var(--ow-*)，所以覆盖变量就等于换肤，
+      不必逐个组件写深色规则（那既啰嗦又必然漏掉某些角落）。
+
+   为什么只有一个 [data-theme="dark"] 块就够了：
+   「跟随系统」由 JS 解析（matchMedia）后再落成 light 或 dark 写进 data-theme，
+   CSS 不需要认识 auto —— 否则深色变量得在属性选择器和 @media 里各写一份，
+   两份必然漂移。JS 侧还能顺带监听系统主题变化实时切换。
+   ⚠️ 新增颜色变量时，**这里也要补一份**，否则深色下会露出浅色。
+*/
+[data-theme="dark"] {
+    --ow-primary: #3DB3FF;          /* 品牌蓝在深底上提亮，保持可辨 */
+    --ow-primary-strong: #1E90FF;   /* 实心按钮：白字对比 3.6:1，配合 hover 更深的蓝 */
+    --ow-primary-dark: #6FC5FF;     /* 深色下"悬停/选中"要**更亮**才看得出来（与浅色相反） */
+    --ow-bg: #1C1C1E;               /* 主背景 */
+    --ow-bg-sub: #242427;           /* 次级底：卡片内小块 */
+    --ow-bg-chat: #1A1A1C;          /* 聊天区：比主背景再暗一档，拉开层次 */
+    --ow-bg-chat-hover: #303035;    /* hover 反馈：深底上要**更亮** */
+    --ow-border: #35353A;           /* 装饰分隔线 */
+    --ow-border-control: #6B6B72;   /* 输入控件边框：深底 3.2:1，满足 UI 组件 3:1 */
+    --ow-text: #DCDCE0;             /* 正文：对主背景 10.6:1 */
+    --ow-text-sub: #A2A2AA;         /* 副文本：对主背景 5.9:1 */
+    --ow-text-title: #F2F2F5;       /* 标题：对主背景 15.3:1 */
+    --ow-green: #52C41A;            /* 成功/可发言 */
+    --ow-yellow: #FFC53D;           /* 称号标签等 */
+    --ow-red: #FF7875;              /* 危险/管理员标签（深底上要提亮才够对比） */
+    --ow-orange: #FFA940;           /* VIP 标签 */
+    --ow-blue-light: #14323F;       /* 浅蓝底 → 深青底 */
+    --ow-hover-bg: #303035;         /* hover（同上，深底更亮） */
+    --ow-active-bg: #35353B;        /* 选中态：比 hover 再亮一档 */
+    --ow-surface: #2A2A2E;          /* 卡片/气泡的"面" */
+    --ow-surface-2: #232326;        /* 通栏条（顶栏/页头） */
+    --ow-panel-bg: #242428;         /* 带边框内容块 */
+    --ow-on-accent: #FFFFFF;        /* 徽标/实心按钮上的文字，深浅都是白 */
+}
+/* 深色下少数**写死的浅色**需要反向调整。
+   这些是当初按浅底设计的小块（@提及高亮、管理员/VIP 标签底、禁言底色等），
+   深底上会变成刺眼的亮斑，故单独压暗并同步文字色。 */
+[data-theme="dark"] .ow-msg.mention .ow-msg-content { background: #4A3B10; border-color: #8A6D1A; }
+[data-theme="dark"] .ow-tag-admin { background: #14323F; color: #8FD3FF; border-color: #2A5E78; }
+[data-theme="dark"] .ow-mem-mute,
+[data-theme="dark"] .ow-badge-muted { background: #3A2A2A; color: #FFA39E; }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
@@ -226,7 +319,7 @@ button { font-family: inherit; cursor: pointer; }
     border: 1px solid var(--ow-border);
     border-radius: 6px;
     margin-bottom: 12px;
-    background: #FFFFFF;
+    background: var(--ow-panel-bg);   /* v1.3.25：#FFFFFF → 变量（深色可覆盖） */
     overflow: hidden;
 }
 .ow-fold-hd {
@@ -834,7 +927,10 @@ input[type=range] {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     gap: 5px;
-    padding: 12px 10px 6px 16px;      /* 右侧留 10px：给按钮的 hover 底色留位 */
+    /* v1.3.25：左右**同宽**（原为右 10 / 左 16，"所有成员"与搜索按钮看着不对称）。
+       按钮自带 24px 的 hover 底，右侧再留 12px 即可，与左侧 16px 视觉等距
+       （按钮底色本身算作留白的一部分）。 */
+    padding: 12px 12px 6px 16px;
 }
 .ow-side-title-members .ow-badge-num { flex: none; -webkit-flex: none; }
 .ow-members-search-btn {
@@ -893,6 +989,14 @@ input[type=range] {
 }
 .ow-msr-empty { padding: 24px 10px; text-align: center; font-size: 13px; color: var(--ow-text-sub); }
 .ow-msr-tip { font-size: 12px; color: var(--ow-text-sub); margin-top: 10px; text-align: center; }
+/* v1.3.25：结果区限高滚动 —— 结果多时撑爆 420px 弹窗、把按钮顶出可视区。 */
+.ow-msr-results {
+    max-height: 320px;
+    min-height: 120px;                 /* 空态/加载态也占位，弹窗高度不跳 */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.ow-msr-search-row { margin-bottom: 10px; }
 .ow-room-list { flex: 1; -webkit-flex: 1; overflow-y: auto; padding: 0 8px; }
 .ow-room-item {
     display: flex; display: -webkit-flex;
@@ -1299,9 +1403,10 @@ input[type=range] {
     padding: 8px 12px;
     border-radius: 8px;
     /* v1.2.7：气泡底色 #FFFFFF（纯白）。原为 --ow-bg-sub(#F5F7FA) 浅灰。
+       v1.3.25：改成 var(--ow-surface)，深色模式才有得覆盖。
        依赖边框（--ow-border #E0E4E8）与消息区底色（--ow-bg-chat #F5F5F5）区分层次，
        白底 + 1px 边框在 #F5F5F5 底上仍有足够可辨的轮廓。 */
-    background: #FFFFFF;
+    background: var(--ow-surface);
     border: 1px solid var(--ow-border);
     word-break: break-word;
     word-wrap: break-word;          /* 老内核 */
@@ -1315,7 +1420,7 @@ input[type=range] {
 /* v1.2.7：自己消息的气泡也改为 #FFFFFF。原先是 --ow-blue-light(#E6F7FF 浅蓝)，
    靠色相区分左右；改白后左右气泡同为白底，改由**位置（左右分栏）+ 头像**区分，
    边框色也从 #91d5ff 回到中性 --ow-border，避免与白底冲突显得脏。 */
-.ow-msg.mine .ow-msg-content { background: #FFFFFF; border-color: var(--ow-border); text-align: left; }
+.ow-msg.mine .ow-msg-content { background: var(--ow-surface); border-color: var(--ow-border); text-align: left; }
 /* v1.2.7：@ 提及原为 #fffbe6（浅黄），在纯白气泡体系下与白色几乎无法分辨。
        加深到 #FFF3C4 并把边框同步加深，保留「这条是在叫我」的视觉提示。 */
 .ow-msg.mention .ow-msg-content { background: #FFF3C4; border-color: #E6B800; }
@@ -2000,7 +2105,7 @@ input[type=range] {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
     height: 52px; padding: 0 16px;
-    background: #FFFFFF; border-bottom: 1px solid var(--ow-border);
+    background: var(--ow-surface-2); border-bottom: 1px solid var(--ow-border);   /* v1.3.25 */
 }
 .ow-page-brand { font-size: 15px; font-weight: 600; color: var(--ow-text-title); }
 .ow-page-back {
