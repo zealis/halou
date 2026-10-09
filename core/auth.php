@@ -438,6 +438,9 @@ class Auth
         static $s = null;
         if ($s !== null) return $s;
         $s = [
+            // v1.3.15：用户指定的开头两个 —— 小可爱（注册默认）与豆苗（游客默认）
+            'open-peeps'       => ['小可爱', 'backgroundColor=ff8fab,ffb703,4cc9a7,4d96ff,b57bff'],
+            'sprouts'          => ['豆苗', 'patternProbability=0&cheeksProbability=0'],
             'adventurer'       => ['冒险者', 'backgroundColor=&detailsProbability=0&earringsProbability=0&glassesProbability=0'],
             'avataaars'        => ['阿凡达', 'backgroundColor=ffd5a8,ff9db4&backgroundColorFill=linear&backgroundColorAngle=45'],
             'big-ears'         => ['大耳朵', 'detailsProbability=0'],
@@ -458,11 +461,9 @@ class Auth
             'micah'            => ['米卡', 'backgroundColor=&earringsProbability=0&glassesProbability=0&facialHairProbability=0'],
             'miniavs'          => ['迷你人', 'backgroundColor=ffe3ea,e3edff,e2f5e9,fdf1d4,efe6ff'],
             'notionists'       => ['概念派', 'backgroundColor=&beardProbability=0&gestureProbability=0&glassesProbability=0&clothesGraphicProbability=0'],
-            'open-peeps'       => ['小可爱', 'backgroundColor=ff8fab,ffb703,4cc9a7,4d96ff,b57bff'],
             'pixel-art-neutral' => ['像素', ''],
             'shape-grid'       => ['网格', ''],
             'shapes'           => ['几何', ''],
-            'sprouts'          => ['豆苗', 'patternProbability=0&cheeksProbability=0'],
             'thumbs'           => ['大拇指', ''],
             'toon-head'        => ['卡通头', 'beardProbability=0&rearHairProbability=0'],
             'voxel-art'        => ['体素', 'beardProbability=0&glassesProbability=0&cheeksProbability=0'],
@@ -518,7 +519,13 @@ class Auth
     public static function avatarGeneratedUrl(string $style, string $seed): string
     {
         $style = self::avatarStyle($style);
-        $seed  = $seed !== '' ? $seed : (string)random_int(1, 100000);
+        $seed  = $seed !== '' ? $seed : (string)random_int(1, self::AVATAR_SEED_COUNT);
+        // v1.3.15：有定制 seed 表的风格，把「档位号」映射成真实 seed
+        $map = self::avatarSeedMap($style);
+        if ($map) {
+            $i = (int)$seed;
+            $seed = (string)($map[$i >= 1 && $i <= count($map) ? $i - 1 : 0]);
+        }
         $source = self::avatarSource();
         $url = ($source === 'identicon')
             ? self::avatarIdenticon($seed)
@@ -594,6 +601,32 @@ class Auth
             $out .= str_pad(dechex($n), 2, '0', STR_PAD_LEFT);
         }
         return $out;
+    }
+
+    /**
+     * open-peeps 专用的 45 个 seed（v1.3.15）。
+     *
+     * 为什么需要：DiceBear 10.x 的 open-peeps 不支持 skinTone 参数（实测传了也不生效，
+     * 返回配色与默认完全一致），肤色只能由 seed 决定。而默认 seed 1..45 的肤色分布是
+     * 浅 13 / 中 9 / 深 14 —— 深色偏多，正是用户反馈的「一堆黑人」。
+     * 这里从 1..200 实测肤色后按 **白 18 / 黄 13 / 深 14** 挑选并**打散**排列
+     * （打散是为了网格里肤色均匀，不出现前 18 格全是白人）。
+     * 数组下标 +1 = 用户看到的「第 N 个头像」，与其它风格的口径完全一致。
+     */
+    private const OPEN_PEEPS_SEEDS = [
+        2, 15, 21, 25, 31, 33, 1, 10, 18, 47, 6, 20, 29, 39, 49,
+        41, 43, 50, 51, 56, 58, 69, 78, 89, 105, 114, 63, 83, 93, 107,
+        60, 65, 67, 68, 75, 85, 126, 142, 156, 172, 124, 134, 147, 155, 165,
+    ];
+
+    /**
+     * 风格的「档位 → 真实 seed」映射表。没有定制 seed 的风格返回空数组。
+     * 保存的是**档位号**（1..45），出 URL 时才映射成真实 seed —— 换风格表不影响已存数据。
+     */
+    public static function avatarSeedMap(string $style): array
+    {
+        if (self::avatarStyle($style) === 'open-peeps') return self::OPEN_PEEPS_SEEDS;
+        return [];
     }
 
     /**

@@ -4494,7 +4494,12 @@
                     box.innerHTML = h;
                     var cells = box.getElementsByTagName('button');
                     for (var j = 0; j < cells.length; j++) {
-                        cells[j].onclick = function () { renderVariants(this.getAttribute('data-slug')); };
+                        (function (btn) {
+                            btn.onclick = function () {
+                                if (!btn.getAttribute('data-slug')) return;
+                                renderVariants(btn.getAttribute('data-slug'));
+                            };
+                        })(cells[j]);
                     }
                 });
             };
@@ -4523,17 +4528,20 @@
                     }
                     h += '</div><div class="ow-av-hint">共 ' + r.data.length + ' 个头像，点一下即刻生效。</div>';
                     box.innerHTML = h;
-                    var back = $('owAvBack');
-                    if (back) back.onclick = renderStyles;
+                    // ⚠️ 顺序有讲究：先只给「带 data-seed 的变体格」绑事件，
+                    //   再单独绑返回按钮 —— 反过来的话，下面的循环会把返回按钮的 onclick
+                    //   覆盖成一个「没有 data-seed 就 return」的空函数，点击就没反应了。
                     var cells = box.getElementsByTagName('button');
                     for (var j = 0; j < cells.length; j++) {
+                        if (!cells[j].getAttribute('data-seed')) continue;
                         (function (btn) {
                             btn.onclick = function () {
-                                if (!btn.getAttribute('data-seed')) return;
                                 self.saveAvatarStyle(slug, rid, btn.getAttribute('data-seed'));
                             };
                         })(cells[j]);
                     }
+                    var back = $('owAvBack');
+                    if (back) back.onclick = renderStyles;
                 });
             };
 
