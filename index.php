@@ -866,8 +866,12 @@ if ($action !== '') {
                 'data' => Auth::avatarVariants($p('avatar_style'))]);
 
         case 'user_card':
-            $u = DB::one('SELECT id,nickname,role,title,avatar,points,created_at,last_login FROM users WHERE id=?', [(int)$p('id')]);
+            // v1.3.16：带上生成式字段并把 avatar 换成**最终 URL** ——
+            // 原样下发 avatar 列的话，资料卡拿到的是空串或 uploads 路径，
+            // 于是显示的还是旧的首字色块 / identicon。
+            $u = DB::one('SELECT id,nickname,role,title,avatar,avatar_type,avatar_style,avatar_seed,points,created_at,last_login FROM users WHERE id=?', [(int)$p('id')]);
             if (!$u) Api::json(['ok' => false, 'msg' => '用户不存在']);
+            $u['avatar'] = Auth::avatarUrlFor($u, (string)$u['id']);
             // v1.1.24：带出「我是否已把 TA 加为联系人」，前端据此在「加为联系人 / 删除联系人」
             // 之间二选一（不给两个都能点、其中必报错的按钮）。
             // 游客无联系人概念，直接 false。

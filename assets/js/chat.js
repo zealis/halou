@@ -761,8 +761,8 @@
         return h;
     }
 
-    /* 头像：有图用图；无图时游客固定米金底（#E5D5A0，深字保证可读），
-       用户按昵称长度从色盘取色，群聊用固定的双人剪影图（见 roomAvatarHtml） */
+    /* 头像：服务端 avatarUrlFor() 给什么就显示什么（上传图 / DiceBear / 内置 identicon）。
+       v1.3.11 起不再有「首字色块」与「游客固定米金底」这类前端兜底 —— 那些都挪到服务端统一算了。 */
     function avatarHtml(url, name, sm, role) {
         /* v1.3.11：删除「首字色块」兜底（游客固定米色、用户按昵称长度取色）。
            服务端 avatarUrlFor() 保证 url 非空（上传图 / DiceBear / 内置 identicon），
