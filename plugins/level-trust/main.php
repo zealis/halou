@@ -19,9 +19,9 @@
  *   高阶段任务支持「替代」（无文件、无好友时不卡人），见 owLTStage() 的 alt。
  *
  * ── 五次功能解锁（设计文档第五节）────────────────────────────
- *   3 级  自定义头像、单文件 ≤ 1/4 全局上限
+ *   3 级  自定义头像、贴纸收藏（3 张起，按 sticker_tiers 分档递增）、单文件 ≤ 1/4 全局上限
  *   10 级 加好友、创建 3 个群聊、单文件 ≤ 1/2 全局上限
- *   20 级 上传/设置贴纸、创建 5 个群聊
+ *   20 级 创建 5 个群聊（贴纸上限见后台档位表：20:100 … 60:999）
  *   35 级 管理权限候选资格（本插件不做，仅标记）
  *   50 级 创建最多 8 个群、高级文件权限（= 全局上限）
  *   ⚠️ 全部限制可由后台「等级信任 → 限制开关」一键关闭（默认开启）。
@@ -160,7 +160,7 @@ function owLTDefaults(): array
         'gating'        => '1',     // 是否按等级限制功能（0=只看等级不做限制）
         // ---- 能力解锁等级 ----
         'lv_avatar'     => '3',     // 自定义头像
-        'lv_sticker'    => '20',    // 上传/设置贴纸
+        'lv_sticker'    => '3',     // 上传/设置贴纸（v1.3.30：20 → 3，数量按 sticker_tiers 分档）
         'lv_friend'     => '10',    // 添加好友
         'lv_file'       => '3',     // 能上传文件（否则禁止）
         'lv_file_half'  => '10',    // 单文件上限放宽到全局 1/2
@@ -170,6 +170,9 @@ function owLTDefaults(): array
         // ---- 建群名额与积分 ----
         'room_min_level' => '10',   // 达到该等级起才有免费名额
         'room_tiers'     => "10:3\n20:5\n50:8",   // 等级:免费名额，逐行
+        // v1.3.30：贴纸收藏上限分档（等级:张数，逐行，取最高命中档）。
+        // 20 级=100 与核心旧全局上限对齐（存量用户无感），60 级=999 封顶。
+        'sticker_tiers'  => "3:3\n6:10\n10:30\n20:100\n30:200\n40:400\n50:700\n60:999",
         'room_point_cost' => '50',  // 每超出 1 个群（或等级不够时）消耗的积分；0=不允许付费建群
         // ---- 加权参数 ----
         'w_cap_ratio'    => '0.5',  // 加权封顶比例：W ≤ ratio × D
@@ -263,6 +266,32 @@ function owLTRoomQuota(int $level): int
     if ($level < owLTInt('room_min_level')) return 0;
     $n = 0;
     foreach (owLTRoomTiers() as $t) {
+        if ($level >= $t['lv']) $n = $t['n'];
+    }
+    return $n;
+}
+
+/**
+ * 某等级的贴纸收藏上限（v1.3.30，核心 addSticker 经 sticker.quota 钩子取这里）。
+ * 档位格式同 room_tiers（每行「等级:张数」，取最高命中档）；
+ * 未达首档 = 0，配合 lv_sticker 的上传闸门，语义是「还没解锁」。
+ */
+function owLTStickerQuota(int $level): int
+{
+    static $cached = null;
+    if ($cached === null) {
+        $cached = [];
+        foreach (preg_split('/[\r\n,;]+/', owLTCfg('sticker_tiers')) ?: [] as $line) {
+            $line = trim((string)$line);
+            if ($line === '') continue;
+            if (!preg_match('/^(\d{1,4})\s*[:：]\s*(\d{1,4})$/u', $line, $m)) continue;
+            $cached[] = ['lv' => (int)$m[1], 'n' => (int)$m[2]];
+        }
+        usort($cached, fn($a, $b) => $a['lv'] <=> $b['lv']);
+    }
+    if (!$cached) return $level >= owLTInt('lv_sticker') ? 100 : 0;   // 档位表被清空 → 回落旧行为
+    $n = 0;
+    foreach ($cached as $t) {
         if ($level >= $t['lv']) $n = $t['n'];
     }
     return $n;
@@ -652,6 +681,7 @@ function owLTUnlocks(int $level): array
     return [
         'avatar'   => $level >= owLTInt('lv_avatar'),
         'sticker'  => $level >= owLTInt('lv_sticker'),
+        'sticker_quota' => owLTStickerQuota($level),   // 贴纸收藏上限（0=未解锁）
         'friend'   => $level >= owLTInt('lv_friend'),
         'ratio'    => $level >= owLTInt('lv_file_full') ? 1.0
                     : ($level >= owLTInt('lv_file_half') ? 0.5
@@ -735,6 +765,14 @@ Plugin::on('upload.guard', function (bool &$allow, string &$reason, string $kind
     } elseif ($kind === 'sticker' && !$u['sticker']) {
         $allow = false; $reason = '上传贴纸需 ' . owLTInt('lv_sticker') . ' 级解锁（当前 Lv.' . $lv . '）';
     }
+});
+
+/** 贴纸收藏上限档位（v1.3.30）：核心 Upload::addSticker 经此钩子取数。
+ *  gating 关闭 / 超管 → 不动 $limit，保持核心默认 100。 */
+Plugin::on('sticker.quota', function (int &$limit, array $actor) {
+    if (owLTCfg('gating') !== '1') return;
+    if (($actor['role'] ?? '') === 'admin') return;
+    $limit = owLTStickerQuota(owLTLevelOf((int)($actor['id'] ?? 0)));
 });
 
 /** 加好友闸门：10 级起 */
@@ -931,7 +969,7 @@ function owLTUnlockMatrix(): array
             'stage' => owLTStageName(owLTStageNo($lv)),
             'quota' => (int)$u['quota'],
             'avatar' => $u['avatar'],
-            'sticker' => $u['sticker'],
+            'sticker' => $u['sticker_quota'],   // 展示为张数上限（0=未解锁）
             'friend' => $u['friend'],
             'file' => $ratio <= 0 ? '不可上传' : ($ratio >= 1 ? '全局上限' : ('1/' . (int)round(1 / $ratio) . ' 上限')),
             'mod' => $u['mod_cand'],
@@ -974,6 +1012,8 @@ Plugin::page('level', '等级', function (array $actor, $user = null) {
             . '<span>累计完成 <b>' . $days . '</b> 天</span>'
             . '<span>加权 <b>' . $weight . '</b> 天（封顶 ' . round(owLTFloat('w_cap_ratio') * 100) . '% × 天数）</span>'
             . '<span>连续登录 <b>' . (int)$row['login_streak'] . '</b> 天</span>'
+            . '<span>贴纸上限 <b>' . (int)$u['sticker_quota'] . '</b> 张（已收藏 '
+            . (int)DB::val('SELECT COUNT(*) FROM stickers WHERE owner_key=?', ['user' . $uid]) . '）</span>'
             . '<span>距 Lv.' . ($lv + 1) . ' 还需 <b>' . max(0, $nextAt - $cur) . '</b> 级进度</span>'
             . '</div>'
             . '<div class="ow-lv-bar"><i style="width:' . $pct . '%"></i></div>';
@@ -1087,7 +1127,7 @@ Plugin::page('level', '等级', function (array $actor, $user = null) {
 
     /* ---------- 能力解锁对比 ---------- */
     $h .= '<div class="ow-card"><h3 class="ow-lv-h3">能力解锁对比</h3><table class="ow-lv-table">'
-        . '<tr><th>等级</th><th>阶段</th><th>建群名额</th><th>头像</th><th>贴纸</th>'
+        . '<tr><th>等级</th><th>阶段</th><th>建群名额</th><th>头像</th><th>贴纸上限</th>'
         . '<th>加好友</th><th>单文件上限</th><th>管理候选</th><th>荣誉</th></tr>';
     foreach (owLTUnlockMatrix() as $r) {
         $y = '<span class="ow-lv-yes">✓</span>';
@@ -1097,7 +1137,7 @@ Plugin::page('level', '等级', function (array $actor, $user = null) {
             . '<td>' . Sec::e($r['stage']) . '</td>'
             . '<td>' . ((int)$r['quota'] > 0 ? (int)$r['quota'] . ' 个' : $n) . '</td>'
             . '<td>' . ($r['avatar'] ? $y : $n) . '</td>'
-            . '<td>' . ($r['sticker'] ? $y : $n) . '</td>'
+            . '<td>' . ((int)$r['sticker'] > 0 ? (int)$r['sticker'] . ' 张' : $n) . '</td>'
             . '<td>' . ($r['friend'] ? $y : $n) . '</td>'
             . '<td>' . Sec::e($r['file']) . '</td>'
             . '<td>' . ($r['mod'] ? $y : $n) . '</td>'
@@ -1332,6 +1372,12 @@ Plugin::adminPage('level-trust', '等级信任', function () {
         . '<textarea class="ow-input" id="owCfg_room_tiers" rows="3" style="font-family:Menlo,Consolas,monospace">'
         . Sec::e(owLTCfg('room_tiers')) . '</textarea>'
         . '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">每行一条「等级:名额」，取最高命中档。默认 10:3 / 20:5 / 50:8</p>'
+        . '</div>'
+        . '<div class="ow-form-item" style="flex:1;min-width:220px"><label>贴纸收藏上限档位</label>'
+        . '<textarea class="ow-input" id="owCfg_sticker_tiers" rows="3" style="font-family:Menlo,Consolas,monospace">'
+        . Sec::e(owLTCfg('sticker_tiers')) . '</textarea>'
+        . '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">每行一条「等级:张数」，取最高命中档；未达首档 = 未解锁。'
+        . '默认 3:3 / 6:10 / 10:30 / 20:100 / 30:200 / 40:400 / 50:700 / 60:999</p>'
         . '</div></div>';
 
     $head .= '<h4 class="ow-lt-cap">阶段阈值与任务量</h4><div class="ow-form-row">'

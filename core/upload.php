@@ -278,8 +278,15 @@ class Upload
             return [false, '仅支持收藏本站上传的图片'];
         }
         $owner = $actor['kind'] . $actor['id'];
-        if ((int)DB::val('SELECT COUNT(*) FROM stickers WHERE owner_key=?', [$owner]) >= 100) {
-            return [false, '贴纸收藏已满（100 张）'];
+        // v1.3.30：收藏上限开放给插件（sticker.quota 钩子）—— 等级信任插件按等级
+        // 分档收紧（Lv.3=3 张 … Lv.60=999 张）；无插件响应时保持原全局 100 张。
+        // $limit <= 0 表示「未解锁」，直接拒。
+        $limit = 100;
+        if (class_exists('Plugin')) Plugin::fire('sticker.quota', [&$limit, $actor]);
+        $limit = (int)$limit;
+        if ($limit <= 0) return [false, '贴纸功能未解锁'];
+        if ((int)DB::val('SELECT COUNT(*) FROM stickers WHERE owner_key=?', [$owner]) >= $limit) {
+            return [false, '贴纸收藏已满（' . $limit . ' 张）'];
         }
         DB::insert('stickers', ['owner_key' => $owner, 'url' => $url, 'created_at' => time()]);
         return [true, '已收藏'];

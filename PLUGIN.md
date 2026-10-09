@@ -100,6 +100,11 @@ Plugin::adminPage('user-manager', '用户管理', function () {
 - 注册后，后台侧栏「插件管理」分类下出现该插件的子页（一插件一页）；分类标题本身仍指向插件列表页。
 - 页面 HTML 通过 `admin_plugin_page` 接口取回并注入 `#owAdminMain`；回调 **echo 输出**与 **return 字符串**两种写法都支持。
 - 页面 HTML 是经 `innerHTML` 注入的，**内联 `<script>` 不会执行**——交互函数必须写在插件自己的 JS 文件里（见下）。
+- **表单的提示与说明一律用 ow-tip 展示（v1.3.30 全站规范）**：说明文字写成 `.ow-form-item` 内的
+  **无 class、字号 ≤12.5px** 的 `<p style="font-size:12px">`，主程序 `OwTip.scan()` 会自动把它收进
+  label 右侧的 ⓘ 悬浮气泡（后台页注入后已自动扫描；前台动态渲染的容器需自行调 `OwTip.scan(el)`）。
+  页面上**不要**内嵌长段说明——可见文字只留一句短的（好处 + 代价），细节全部进 ⓘ。
+  参考实现：`plugins/attachment-manager/` 的「图片压缩」区块。
 
 ## API 路由（Plugin::route）
 
