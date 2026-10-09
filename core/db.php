@@ -255,6 +255,12 @@ class DB
             // 放业务表上会让「A 置顶」影响 B 的列表。
             "CREATE TABLE IF NOT EXISTS conversation_pins (
                 id $id, user_id $int NOT NULL, peer_key $str NOT NULL, created_at $ts NOT NULL)",
+            // 会话已读位点（v1.3.19）：**按用户**生效，存「该会话最后读到哪条消息 id」。
+            // 为什么不放 message_hides 那样的一行一消息 —— 那是隐藏（累积），
+            // 已读是单调递增的一个水位，一条记录即可，历史体积恒定。
+            // peer_key 与 conversation_pins 同口径：'room:5' / 'dm:user:20'。
+            "CREATE TABLE IF NOT EXISTS conversation_reads (
+                id $id, user_id $int NOT NULL, peer_key $str NOT NULL, last_id $int NOT NULL DEFAULT 0, updated_at $ts NOT NULL)",
         ];
         foreach ($tables as $sql) self::$pdo->exec($sql);
 
@@ -270,6 +276,7 @@ class DB
             'CREATE UNIQUE INDEX IF NOT EXISTS idx_friends_pair ON friends (user_id, friend_id)',
             // 同一用户对同一会话只能置顶一次，重复点由代码先查后写，这里兜底防重行
             'CREATE UNIQUE INDEX IF NOT EXISTS idx_conv_pins_key ON conversation_pins (user_id, peer_key)',
+            'CREATE UNIQUE INDEX IF NOT EXISTS idx_conv_reads_key ON conversation_reads (user_id, peer_key)',
         ] as $sql) {
             try { self::$pdo->exec($sql); } catch (Throwable $e) { /* MySQL 8 不支持 IF NOT EXISTS，忽略 */ }
         }

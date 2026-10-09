@@ -890,6 +890,105 @@ class Chat
         return $set;
     }
 
+    // ---------- 已读位点 / 未读数（v1.3.19） ----------
+
+    /**
+     * 取「各会话最后已读到哪条消息 id」。返回 peer_key => last_id。
+     * 游客没有用户行，无法跨设备保存阅读进度 —— 直接返回空，列表不显示未读徽标
+     *（否则游客一刷新就满屏红点，反而干扰）。游客的「已读」由前端按当前会话即时判断。
+     */
+    public static function readMarks(array $actor): array
+    {
+        if (($actor['kind'] ?? '') !== 'user') return [];
+        $uid = (int)($actor['id'] ?? 0);
+        if ($uid <= 0) return [];
+        $out = [];
+        foreach (DB::all('SELECT peer_key, last_id FROM conversation_reads WHERE user_id=?', [$uid]) as $r) {
+            $out[(string)$r['peer_key']] = (int)$r['last_id'];
+        }
+        return $out;
+    }
+
+    /**
+     * 标记已读（幂等）。$lastId 是「读到的最后一条消息 id」。
+     *
+     * ⚠️ **只增不减**：用 max(现值, 传入值) 而不是无条件 UPDATE。
+     * 前端可能在「历史拉取完成」与「轮询收到新消息」两处先后调用，顺序不保证；
+     * 若允许回写，会出现「较新的位点被较早的请求覆盖回去」→ 未读数回退、红点反复闪。
+     */
+    public static function markRead(array $actor, string $peerKey, int $lastId): array
+    {
+        if (($actor['kind'] ?? '') !== 'user') return [true, ''];   // 游客静默成功，别弹错
+        $uid = (int)($actor['id'] ?? 0);
+        if ($uid <= 0) return [true, ''];
+        $peerKey = mb_substr(trim($peerKey), 0, 40);
+        if ($peerKey === '') return [false, '参数错误'];
+        $lastId = max(0, $lastId);
+        $cur = (int)DB::val('SELECT last_id FROM conversation_reads WHERE user_id=? AND peer_key=?', [$uid, $peerKey]);
+        if ($lastId <= $cur) return [true, ''];                       // 已是更靠后的位点，忽略
+        if ($cur > 0) {
+            DB::run('UPDATE conversation_reads SET last_id=?, updated_at=? WHERE user_id=? AND peer_key=?',
+                [$lastId, time(), $uid, $peerKey]);
+        } else {
+            DB::run('INSERT INTO conversation_reads (user_id, peer_key, last_id, updated_at) VALUES (?,?,?,?)',
+                [$uid, $peerKey, $lastId, time()]);
+        }
+        return [true, ''];
+    }
+
+    /**
+     * 计算每个会话的未读数（peer_key => 数量）。返回的 key 只含「有未读」的会话。
+     *
+     * 口径（与微信 / QQ 一致）：
+     *  - **不数自己的消息** —— 自己发的没有「未读」可言；
+     *  - 排除已删除 / 已撤回的；
+     *  - 只数「id 大于该会话已读位点」的消息，即位点之后新到的；
+     *  - **没有位点记录的会话返回 0**（历史不算未读）。理由：不然升级后第一天
+     *    每个会话都是几千条红点，那是噪声而不是提醒。
+     *
+     * 实现：一个会话一条 COUNT 查询（带位点条件，走主键范围扫描）。
+     * 会话列表本身只有几十条，这个量级完全可接受；换来的是口径准确、
+     * 不需要「把所有 id > min(位点) 的行捞回 PHP 再分桶」那种易错的写法。
+     */
+    private static function unreadCounts(array $actor, array $readMarks, array $lastMsgId): array
+    {
+        if (($actor['kind'] ?? '') !== 'user') return [];
+        $uid = (int)($actor['id'] ?? 0);
+        if ($uid <= 0) return [];
+
+        $out = [];
+        foreach ($readMarks as $key => $mark) {
+            $mark = (int)$mark;
+            if ($mark <= 0) continue;                       // 没建立过有效位点 → 不算未读
+            $lastId = (int)($lastMsgId[$key] ?? 0);
+            if ($lastId <= $mark) continue;                 // 之后没有新消息
+            $n = 0;
+            if (strpos($key, 'room:') === 0) {
+                $rid = (int)substr($key, 5);
+                if ($rid > 0) {
+                    $n = (int)DB::val(
+                        'SELECT COUNT(*) FROM messages
+                         WHERE room_id=? AND id>? AND deleted=0 AND recalled=0
+                           AND (user_id IS NULL OR user_id<>?) AND (guest_id IS NULL OR guest_id=0)',
+                        [$rid, $mark, $uid]
+                    );
+                }
+            } elseif (strpos($key, 'dm:') === 0) {
+                // 私聊只算「对方发给我」的：room_id=0 且 to_user_id=我
+                $pid = (int)substr($key, strrpos($key, ':') + 1);
+                if ($pid > 0) {
+                    $n = (int)DB::val(
+                        'SELECT COUNT(*) FROM messages
+                         WHERE room_id=0 AND to_user_id=? AND user_id=? AND id>? AND deleted=0 AND recalled=0',
+                        [$uid, $pid, $mark]
+                    );
+                }
+            }
+            if ($n > 0) $out[$key] = $n;
+        }
+        return $out;
+    }
+
     /**
      * 切换置顶（幂等语义：按当前状态取反）。返回 [ok, msg, pinned(bool)]。
      * 只影响调用者自己的会话列表顺序，不影响对方。
@@ -945,6 +1044,7 @@ class Chat
         $out = [];
         $hidden = self::hiddenIds($actor);   // v1.1.14：摘要也不能漏，漏了就等于没隐藏
         $pins = self::pinnedKeys($actor);    // v1.2.28：置顶是个人偏好，随会话一起下发
+        $marks = self::readMarks($actor);    // v1.3.19：已读位点（未读数的基线）
 
         // 群聊：各房间最后一条消息（一条 GROUP BY 取回，避免逐房间查询）
         $last = [];
@@ -970,12 +1070,19 @@ class Chat
                 'last_text' => isset($hidden[$meta['id']]) ? '' : ($lastText[$meta['id']] ?? ''),
                 'need_password' => $r['need_password'], 'can_edit' => $r['can_edit'], 'mine' => $r['mine'],
                 'pinned' => isset($pins[$key]),
+                'last_id' => (int)$meta['id'],   // v1.3.19：前端标记已读时回传
             ];
         }
 
         // 私聊：与我有关的私聊消息按对方分组，各取最新一条。
         // v1.1.2：跨身份私聊已下线 → 游客身份没有任何私聊会话，游客分支整体跳过。
-        if ($actor['kind'] !== 'user') return self::sortConversations($out);
+        if ($actor['kind'] !== 'user') {
+            // v1.3.19：游客不显示未读徽标（无用户行存不了阅读进度，一刷新就满屏红点）。
+            // 字段仍补上，保持结构一致，前端不必分支判断。
+            foreach ($out as &$c) { $c['unread'] = 0; $c['last_id'] = 0; }
+            unset($c);
+            return self::sortConversations($out);
+        }
         $mineUser = (int)$actor['id'];
         $conds = ['(user_id > 0 AND user_id = ?)', '(to_user_id > 0 AND to_user_id = ?)'];
         $args = [$mineUser, $mineUser];
@@ -1011,6 +1118,7 @@ class Chat
                 'peer_key' => self::convKey('dm', $key, $pId),
                 'name' => $info['name'], 'avatar' => $info['avatar'],
                 'last_at' => (int)$m['created_at'], 'last_text' => self::convText($m),
+                'last_id' => (int)$m['id'],       // v1.3.19：前端标记已读时回传
                 'need_password' => false, 'can_edit' => false, 'mine' => false,
                 'pinned' => isset($pins[self::convKey('dm', $key, $pId)]),
                 // v1.2.28：右侧栏「删除好友」只在对方确实是好友时才渲染，
@@ -1019,6 +1127,14 @@ class Chat
                     [$mineUser, $pId]) > 0,
             ];
         }
+        // v1.3.19：未读数统一在这里算完再下发。lastMsgId 用各会话的末条 id
+        // 做「之后有没有新消息」的快速短路，避免给每个会话都跑一次 COUNT。
+        $lastMsgId = [];
+        foreach ($out as $c) $lastMsgId[(string)$c['peer_key']] = (int)$c['last_id'];
+        $unread = self::unreadCounts($actor, $marks, $lastMsgId);
+        foreach ($out as &$c) $c['unread'] = (int)($unread[(string)$c['peer_key']] ?? 0);
+        unset($c);
+
         return self::sortConversations($out);
     }
 

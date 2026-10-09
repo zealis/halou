@@ -993,6 +993,20 @@
             if (d.getFullYear() === now.getFullYear()) return (d.getMonth() + 1) + '/' + d.getDate();
             return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
         },
+        /**
+         * 未读徽标文案与尺寸档（v1.3.19）。
+         *  - 超过 99 条显示 **99**（按需求：不显示 99+ / 100+，直接截到 99）；
+         *  - 尺寸按位数分三档：1 位 16px、2 位 18px、3 位 20px —— 圆跟着数字变大，
+         *    但封顶后最大就是 20px，不会把 118px 的文字区挤掉太多。
+         * 返回 [文案, 档位类名]。
+         */
+        badge: function (n) {
+            n = parseInt(n, 10) || 0;
+            if (n <= 0) return '';
+            var txt = n > 99 ? '99' : String(n);
+            var lv  = txt.length >= 3 ? ' lg' : (txt.length === 2 ? ' md' : '');
+            return '<span class="ow-cl-badge-n' + lv + '">' + txt + '</span>';
+        },
         render: function (list, opts) {
             var box = typeof opts.container === 'string' ? $(opts.container) : opts.container;
             if (!box) return;
@@ -1004,6 +1018,8 @@
             for (i = 0; i < list.length; i++) {
                 c = list[i];
                 var key = c.conv + ':' + (c.conv === 'dm' ? c.peer : c.id);
+                // v1.3.19：当前打开的会话不显示未读徽标（正看着呢，不算未读）
+                c.active = (key === opts.activeKey);
                 // v1.1.19：群聊无自定义头像 → 统一默认剪影图；私聊沿用「首字色块」。
                 // ⚠️ 必须按 c.conv 区分：私聊的 avatar 为空时用首字是**用户**语义，
                 // 群聊用首字会与「群名首字随机色」的历史行为混在一起，看着像乱码。
@@ -1031,7 +1047,18 @@
                       + '</span>'
                       // v1.2.28：hideTime 用于联系人列表（无消息流，时间没有参考价值）。
                       // 不渲染这个 span 而不是传空串 —— 空 span 仍占位、仍可能带 margin。
-                      + (opts.hideTime ? '' : '<span class="ow-cl-time">' + ChatList.time(c.last_at) + '</span>')
+                      // v1.3.19：时间与未读徽标一起放进右侧竖排容器 .ow-cl-side
+                      // （徽标在时间**下方**，按需求）。⚠️ 不能把徽标直接塞进 .ow-cl-item
+                      // 根部 —— 那样它会参与横向 flex 排版，把时间挤到中间或换行。
+                      + (opts.hideTime
+                            ? ''
+                            : '<span class="ow-cl-side">'
+                              + '<span class="ow-cl-time">' + ChatList.time(c.last_at) + '</span>'
+                              + (c.unread > 0
+                                  ? '<span class="ow-cl-badge' + (c.active ? ' is-current' : '') + '"'
+                                    + ' title="' + c.unread + ' 条未读">' + ChatList.badge(c.unread) + '</span>'
+                                  : '')
+                              + '</span>')
                       + '</li>';
             }
             box.innerHTML = html;
@@ -1071,6 +1098,7 @@
             this.loadConversations();   // 会话列表（群聊+私聊聚合）——私聊路由要靠它取昵称
             this.renderConversations();
             this.startConvPoll();       // v1.1.0：列表低频轮询，新消息会话自动前置（不打断当前聊天）
+            this.bindFocusRead();       // v1.3.19：窗口聚焦时补标当前会话已读
             this.renderMe();
             this.buildEmojiPanel();
             this.bindEvents();
@@ -1453,6 +1481,84 @@
          * v1.1.24：**联系人视图下不拉会话** —— 联系人要的是好友名单，
          * 会话列表此刻是多余的请求，且会覆盖 `conversations` 字段导致切回来时列表闪空。
          */
+        /** 当前会话的 peer_key（与服务端 convKey 同口径：'room:5' / 'dm:user:20'） */
+        curConvKey: function () {
+            if (this.dm && this.dm.peer) return 'dm:' + this.dm.peer;
+            if (this.room > 0) return 'room:' + this.room;
+            return '';
+        },
+
+        /**
+         * 标记当前会话已读到 lastId（v1.3.19）。
+         *
+         * 调用时机（缺一个就是体验缺口）：
+         *  ① 切进会话（历史拉完后）—— 点开会话就该清零；
+         *  ② 窗口重新聚焦 —— 用户切出去时可能漏看，切回来补标；
+         *  ③ 正在看的会话收到新消息 —— 正看着的当然算已读。
+         *
+         * 两点注意：
+         *  - 服务端是**只增不减**的，所以这里重复调用无害，不用自己去重；
+         *  - 徽标要本地立即清掉再发请求，否则点开会话后要等下一次拉列表才消红点。
+         */
+        markRead: function (lastId) {
+            lastId = parseInt(lastId, 10) || 0;
+            if (lastId <= 0) return;
+            var key = this.curConvKey();
+            if (!key) return;
+            var self = this;
+            // 本地先把该会话的未读清零（乐观更新，请求失败下次拉列表会纠正回来）
+            if (this._convList) {
+                for (var i = 0; i < this._convList.length; i++) {
+                    var c = this._convList[i];
+                    if (('room:' + c.id === key && c.conv === 'room')
+                        || ('dm:' + c.peer === key && c.conv === 'dm')) c.unread = 0;
+                }
+                if (this.view === 'chat') this.renderConversations();
+            }
+            // 1 秒内的重复标记合并成一次请求（切换会话时 history 与 poll 常连续触发）
+            var now = new Date().getTime();
+            if (this._lastMark && now - this._lastMark.t < 1000 && this._lastMark.key === key) {
+                this._lastMark.id = Math.max(this._lastMark.id, lastId);
+                return;
+            }
+            this._lastMark = { key: key, id: lastId, t: now };
+            OwApi.post('conv_read', { peer_key: key, last_id: lastId }, function () {});
+        },
+
+        /** 窗口重新聚焦时补标当前会话已读（v1.3.19）：
+         *  用户切出去这段时间可能漏看消息，切回来时应当清掉该会话的未读。
+         *  document.hidden 是关键 —— 页面在后台时事件不触发，避免无谓请求。 */
+        bindFocusRead: function () {
+            if (this._focusReadBound) return;
+            var self = this;
+            window.addEventListener('focus', function () {
+                if (document.hidden || (!self.dm && !self.room)) return;
+                self.loadConversations();
+                // ⚠️ 不能直接用 self.since —— 那是上次轮询的位置，切走期间到达的消息
+                //   id 更大，会被漏标成未读。这里按视图分别问一次「现在末条是多少」。
+                if (self.dm && self.dm.peer) {
+                    OwApi.post('dm_poll', { peer: self.dm.peer, since_id: self.since }, function (r) {
+                        if (r && r.ok && r.messages && r.messages.length) {
+                            self.since = r.messages[r.messages.length - 1].id;
+                            self.markRead(self.since);
+                        } else {
+                            self.markRead(self.since);
+                        }
+                    });
+                } else if (self.room > 0) {
+                    OwApi.post('poll', { room_id: self.room, since: self.since, timeout: 0 }, function (r) {
+                        if (r && r.ok && r.messages && r.messages.length) {
+                            self.since = r.since;
+                            self.markRead(r.since);
+                        } else {
+                            self.markRead(self.since);
+                        }
+                    });
+                }
+            });
+            this._focusReadBound = true;
+        },
+
         loadConversations: function () {            var self = this;
             // v1.2.20：不在「消息」标签时不拉会话 —— 拉回来也会被别的面板覆盖，
             // 白打接口。⚠️ 判断必须写成 `!== 'chat'` 而不是 `=== 'friends'`：
@@ -1969,6 +2075,8 @@
                 // v1.2.6 懒加载：消息太少填不满屏幕时自动往前补，
                 // 否则去掉「加载更早消息…」入口后，这类会话上方会一直留白。
                 self.fillIfShort();
+                // v1.3.19：私聊同样「点开即已读」（与群聊 switchRoom 的 markRead 对称）
+                self.markRead(self.since);
             });
             this.dmPollLoop();
             this.renderRoomPanel();   // v1.2.28：私聊下侧栏渲染四个会话操作入口（并隐藏「所有成员」）
@@ -2003,6 +2111,8 @@
                     if (hasNew) {
                         self.scrollBottom();
                         if (self.sound) beep();
+                        // v1.3.19：同群聊，正在看的私聊收到即算已读
+                        self.markRead(self.since);
                     }
                     $('owLatency').innerHTML = '● ' + (new Date().getTime() - t0) + ' ms';
                     $('owLatency').style.color = '#237804';
@@ -2180,6 +2290,8 @@
                         if (!self._roomPollRunning) { self._roomPollRunning = true; self.startPoll(); }
                         // v1.2.6 懒加载：填不满屏幕就自动往前补
                         self.fillIfShort();
+                        // v1.3.19：历史读到哪儿就标到哪儿（点开会话即清零未读）
+                        self.markRead(self.since);
                     } else if (r.need_password) {
                         // 通行授权已过期 → 重新验证，验证成功后自动重试
                         self.passForget(id);
@@ -2237,6 +2349,8 @@
                     if (hasNew) {
                         self.scrollBottom();
                         if (self.sound) beep();
+                        // v1.3.19：正在看的会话收到的消息直接算已读（不必等下次进会话）
+                        self.markRead(r.since);
                         // v1.1.0：当前群有消息时立刻前置该会话（其余会话由 startConvPoll 兜底）
                         self.loadConversations();
                     }

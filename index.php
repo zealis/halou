@@ -440,6 +440,11 @@ if ($action !== '') {
             Api::json(['ok' => $r[0], 'msg' => $r[1]]);
 
         // ---------- 私聊会话（v1.1.0） ----------
+        // v1.3.19：标记会话已读（前端进入会话 / 窗口聚焦时调用）
+        case 'conv_read':
+            [$ok, $msg] = Chat::markRead($actor, (string)$p('peer_key'), (int)$p('last_id'));
+            Api::json(['ok' => $ok, 'msg' => $msg]);
+
         case 'conversations':   // 会话列表：群聊 + 私聊聚合，置顶优先 + 按最后活跃时间倒序
             $list = Chat::conversations($actor);
             // total = 会话总数（群聊数 + 私聊会话数），侧栏「聊天」徽标用

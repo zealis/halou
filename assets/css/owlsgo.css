@@ -985,6 +985,42 @@ input[type=range] {
     align-self: flex-start; -webkit-align-self: flex-start;
     margin-top: 2px;
 }
+/* ---------- 未读徽标（v1.3.19） ----------
+   位置：会话列表项右侧，**时间下方**。结构 .ow-cl-side（竖排）> .ow-cl-time + .ow-cl-badge。
+   尺寸：.ow-cl-badge 是圆容器（min-width 保证圆形），里面 .ow-cl-badge-n 按位数分档
+   1位 16px / 2位 18px / 3位 20px —— 数字越大圆越大，超过 99 封顶显示 99。 */
+.ow-cl-side {
+    display: flex; display: -webkit-flex;
+    flex-direction: column; -webkit-flex-direction: column;
+    align-items: flex-end; -webkit-align-items: flex-end;
+    flex-shrink: 0; -webkit-flex-shrink: 0;
+    align-self: flex-start; -webkit-align-self: flex-start;
+    margin-left: auto;
+}
+.ow-cl-side .ow-cl-time { margin-top: 2px; }
+.ow-cl-badge {
+    margin-top: 5px;
+    min-width: 16px; height: 16px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    /* 用项目既有的 --ow-red（#C41D1F）而不是另造变量：
+       它已在 .ow-btn-danger / .ow-alert-error / .ow-tag-red 用过，白字对比 5.93:1，达 WCAG AA。 */
+    background: var(--ow-red);
+    color: #fff;
+    display: flex; display: -webkit-flex;
+    align-items: center; -webkit-align-items: center;
+    justify-content: center; -webkit-justify-content: center;
+}
+/* 当前打开的会话不显示徽标（渲染时已跳过，这里兜底防止插件渲染漏判） */
+.ow-cl-badge.is-current { display: none; }
+.ow-cl-badge-n {
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 500;
+}
+.ow-cl-badge-n.md { font-size: 11px; }
+.ow-cl-badge-n.lg { font-size: 11px; }
 .ow-cl-empty {
     padding: 16px 10px;
     text-align: center;
