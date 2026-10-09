@@ -340,6 +340,13 @@ class Auth
     public static function setAvatar(array $user, string $type, string $path = '', string $style = '', string $seed = ''): array
     {
         $uid = (int)$user['id'];
+        // v1.3.20：换头像后**同步本人历史消息的快照**，否则列表里的头像与设置里对不上。
+        //
+        // 背景：messages.avatar 是「发送当时的快照」，而 messages.nickname 一直
+        // 都在 updateProfile 里被同步更新（改昵称会让历史消息一起变），头像却是
+        // v1.3.11 拆出去后**漏了这条同步** —— 于是出现「改昵称全站一致、改头像只变自己」
+        // 的不一致。快照保留的初衷是「用户注销后仍能显示当时的样子」，
+        // 而注销后 avatarMap 查不到人，本来就会回落到快照，两种做法不冲突。
         if ($type === 'upload') {
             $path = ltrim(trim($path), '/');
             if ($path === '') return [false, '缺少头像文件'];
@@ -347,6 +354,7 @@ class Auth
             if (strpos($path, 'uploads/') !== 0) return [false, '头像路径非法'];
             DB::run('UPDATE users SET avatar=?, avatar_type=?, avatar_style=?, avatar_seed=? WHERE id=?',
                 [$path, 'upload', '', '', $uid]);
+            self::syncMessageAvatar($uid, $path);
             return [true, '头像已更新'];
         }
         if ($type === 'generated') {
@@ -356,9 +364,22 @@ class Auth
             $seed = mb_substr($seed, 0, 40);
             DB::run('UPDATE users SET avatar=?, avatar_type=?, avatar_style=?, avatar_seed=? WHERE id=?',
                 ['', 'generated', $style, $seed, $uid]);
+            // 生成式头像在 messages.avatar 里存的同样是**最终 URL**（send 时
+            // 从 actor['avatar'] 取的），所以这里也算出来写进去，保持同一口径。
+            self::syncMessageAvatar($uid, self::avatarGeneratedUrl($style, $seed));
             return [true, '头像已更新'];
         }
         return [false, '未知头像类型'];
+    }
+
+    /**
+     * 同步本人历史消息里的头像快照（v1.3.20）。
+     * 只改 avatar 一列，不动 nickname —— 昵称那条在 updateProfile 里已经做了。
+     */
+    private static function syncMessageAvatar(int $uid, string $avatarUrl): void
+    {
+        if ($uid <= 0) return;
+        DB::run('UPDATE messages SET avatar=? WHERE user_id=?', [$avatarUrl, $uid]);
     }
 
     /** 角色权重（数值越大权限越高） */

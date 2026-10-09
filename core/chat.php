@@ -662,11 +662,16 @@ class Chat
     {
         $admin = $actor['role'] === 'admin';
         $deleted = (int)($m['deleted'] ?? 0) === 1;
-        // v1.3.12：快照为空（早期版本没存头像、或存的是空串）时按发送者**当前**头像回填。
-        // 否则消息里是一个内置几何头像、用户设置里却是另一个样，两边对不上。
-        // avatarMap 走批量查询（avatarMap），不产生 N+1。
+        // v1.3.20：**始终**按发送者**当前**头像下发，不再只补空快照。
+        //
+        // 为什么改成「有映射就用映射」：v1.3.12 只在快照为空时回填，于是存量那些
+        // 非空但已过期的快照（比如用户换过头像、或早期版本把相对路径存进去的）
+        // 会一直显示老头像 —— 表现就是「改了头像，历史消息不跟着变」。
+        // 快照的保留意义只剩一种场景：**用户已注销**，avatarMap 查不到人时才回落到它，
+        // 这正是下面 isset 判断的意义（有映射用映射，没映射用快照）。
+        // avatarMap 是批量查询（见 avatarMap），不产生 N+1。
         $av = (string)($m['avatar'] ?? '');
-        if ($av === '' && !empty($m['user_id']) && isset($avatarMap[(int)$m['user_id']])) {
+        if (!empty($m['user_id']) && isset($avatarMap[(int)$m['user_id']])) {
             $av = $avatarMap[(int)$m['user_id']];
         }
         return [
@@ -708,7 +713,7 @@ class Chat
         $sql .= ' ORDER BY id DESC LIMIT ' . max(1, min(100, $limit));
         $rows = DB::all($sql, $args);
         $hidden = self::hiddenIds($actor);
-        $avMap = self::avatarMap($rows);   // v1.3.12：补齐空快照
+        $avMap = self::avatarMap($rows);   // v1.3.20：统一按当前头像下发（见 pack）
         $out = [];
         foreach (array_reverse($rows) as $m) {
             if (isset($hidden[(int)$m['id']])) continue;   // v1.1.14：仅自己隐藏的，不下发
@@ -782,7 +787,7 @@ class Chat
         while (time() < $deadline) {
             $rows = DB::all('SELECT * FROM messages WHERE room_id=? AND id>? ORDER BY id LIMIT 200', [$roomId, $sinceId]);
             if ($rows) {
-                $avMap = self::avatarMap($rows);   // v1.3.12：与 history 同一口径补齐空快照
+                $avMap = self::avatarMap($rows);   // v1.3.20：与 history 同一口径（见 pack）
                 foreach ($rows as $m) {
                     // v1.1.14：隐藏的消息不下发，但仍要推进 sinceId，
                     // 否则这条会被下一次轮询重新捞出来反复判断。
