@@ -1064,7 +1064,7 @@ Plugin::page('level', '等级', function (array $actor, $user = null) {
         }
         $h .= '<div class="ow-lv-task-sum">'
             . '保底任务完成 <b>' . $done . ' / ' . count($stage['base']) . '</b>，'
-            . '全部完成今天升 1 级' . ((int)$row['settled'] === 1 ? '（<b style="color:#237804">今日已结算</b>）' : '')
+            . '全部完成今天升 1 级' . ((int)$row['settled'] === 1 ? '（<b style="color:var(--ow-green)">今日已结算</b>）' : '')
             . '。加权每天最多结算 ' . owLTFloat('w_daily_cap') . ' 天，配合加权当天最多升 2 级。'
             . '</div>';
         if (!empty($stage['ch'])) {
@@ -1333,7 +1333,7 @@ Plugin::adminPage('level-trust', '等级信任', function () {
     $f = function (string $k, string $label, string $hint = '') {
         return '<div class="ow-form-item"><label>' . Sec::e($label) . '</label>'
             . '<input class="ow-input" id="owCfg_' . $k . '" value="' . Sec::e(owLTCfg($k)) . '">'
-            . ($hint !== '' ? '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">' . Sec::e($hint) . '</p>' : '')
+            . ($hint !== '' ? '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">' . Sec::e($hint) . '</p>' : '')
             . '</div>';
     };
     $head = '<h2>等级信任</h2>'
@@ -1369,12 +1369,12 @@ Plugin::adminPage('level-trust', '等级信任', function () {
         . '<div class="ow-form-item" style="flex:1;min-width:220px"><label>免费名额档位</label>'
         . '<textarea class="ow-input" id="owCfg_room_tiers" rows="3" style="font-family:Menlo,Consolas,monospace">'
         . Sec::e(owLTCfg('room_tiers')) . '</textarea>'
-        . '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">每行一条「等级:名额」，取最高命中档。默认 10:3 / 20:5 / 50:8</p>'
+        . '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">每行一条「等级:名额」，取最高命中档。默认 10:3 / 20:5 / 50:8</p>'
         . '</div>'
         . '<div class="ow-form-item" style="flex:1;min-width:220px"><label>贴纸收藏上限档位</label>'
         . '<textarea class="ow-input" id="owCfg_sticker_tiers" rows="3" style="font-family:Menlo,Consolas,monospace">'
         . Sec::e(owLTCfg('sticker_tiers')) . '</textarea>'
-        . '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">每行一条「等级:张数」，取最高命中档；未达首档 = 未解锁。'
+        . '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">每行一条「等级:张数」，取最高命中档；未达首档 = 未解锁。'
         . '默认 3:3 / 6:10 / 10:30 / 20:100 / 30:200 / 40:400 / 50:700 / 60:999</p>'
         . '</div></div>';
 

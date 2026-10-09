@@ -11,7 +11,7 @@
     font-size: 11px;
     line-height: 16px;
     font-weight: 600;
-    color: #FFFFFF;
+    color: var(--ow-on-accent);
     background: #8E8EA0;                 /* 兜底（未知阶段） */
     vertical-align: 1px;                 /* 与右侧「阶段名」文字基线对齐 */
 }
@@ -39,7 +39,7 @@
 }
 .ow-lt-task-k { min-width: 132px; color: var(--ow-text-sub); }
 .ow-lt-task-v { font-weight: 600; }
-.ow-lt-task-v.done { color: #237804; }
+.ow-lt-task-v.done { color: var(--ow-green); }
 
 /* ---------- 前台等级页 ?page=level（v1.2.44） ----------
    作用域全部用 ow-lv- 前缀：这是独立页面，挂在 body 下，没有容器 id 可依赖。 */
@@ -53,39 +53,39 @@
 .ow-lv-hero-stage { font-size: 14px; color: var(--ow-text-sub); }
 .ow-lv-hero-meta {
     display: flex; flex-wrap: wrap; gap: 6px 20px;
-    margin-top: 10px; font-size: 13px; color: #5C5C5C;
+    margin-top: 10px; font-size: 13px; color: var(--ow-text-sub);
 }
 .ow-lv-hero-meta b { color: var(--ow-text-title); }
 .ow-lv-bar {
     margin-top: 10px; height: 8px; border-radius: 4px;
-    background: #EDF0F4; overflow: hidden;
+    background: var(--ow-bg-sub); overflow: hidden;
 }
 .ow-lv-bar > i { display: block; height: 100%; background: var(--ow-primary-strong); border-radius: 4px; }
 
 .ow-lv-h3 { margin: 0 0 10px; font-size: 15px; color: var(--ow-text-title); }
 .ow-lv-task { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
 .ow-lv-task-k { width: 132px; flex-shrink: 0; color: var(--ow-text-sub); }
-.ow-lv-task-bar { flex: 1; height: 6px; border-radius: 3px; background: #EDF0F4; overflow: hidden; }
+.ow-lv-task-bar { flex: 1; height: 6px; border-radius: 3px; background: var(--ow-bg-sub); overflow: hidden; }
 .ow-lv-task-bar > i { display: block; height: 100%; background: #9AA5B1; }
 .ow-lv-task-v { width: 56px; text-align: right; font-weight: 600; }
-.ow-lv-task-v.done { color: #237804; }
+.ow-lv-task-v.done { color: var(--ow-green); }
 .ow-lv-task-alt {
     font-size: 11px; color: #B06000; background: #FFF6E5;
     border: 1px solid #FFE1B0; border-radius: 2px; padding: 0 4px;
 }
-.ow-lv-task-sum { margin-top: 10px; font-size: 13px; color: #5C5C5C; }
+.ow-lv-task-sum { margin-top: 10px; font-size: 13px; color: var(--ow-text-sub); }
 .ow-lv-ch { margin-top: 6px; font-size: 12px; color: var(--ow-text-sub); }
 
 .ow-lv-formula {
     font-family: Menlo, Consolas, monospace; font-size: 13px;
-    background: #F5F5F5; border: 1px solid var(--ow-border);
+    background: var(--ow-bg-sub); border: 1px solid var(--ow-border);
     border-radius: 4px; padding: 10px 12px; margin-bottom: 10px;
     overflow-x: auto; -webkit-overflow-scrolling: touch;
 }
-.ow-lv-ul { margin: 0; padding-left: 20px; font-size: 13px; color: #5C5C5C; line-height: 1.9; }
+.ow-lv-ul { margin: 0; padding-left: 20px; font-size: 13px; color: var(--ow-text-sub); line-height: 1.9; }
 .ow-lv-tip {
     margin-top: 10px; font-size: 12px; color: var(--ow-text-sub);
-    background: #F5F5F5; border-radius: 4px; padding: 8px 10px; line-height: 1.8;
+    background: var(--ow-bg-sub); border-radius: 4px; padding: 8px 10px; line-height: 1.8;
 }
 
 .ow-lv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -93,11 +93,14 @@
     border: 1px solid var(--ow-border); padding: 7px 8px;
     text-align: left; vertical-align: top; line-height: 1.6;
 }
-.ow-lv-table th { background: #F5F5F5; font-weight: 600; color: var(--ow-text-sub); white-space: nowrap; }
-.ow-lv-table tr.is-cur { background: #F0F8FF; }
+.ow-lv-table th { background: var(--ow-bg-sub); font-weight: 600; color: var(--ow-text-sub); white-space: nowrap; }
+/* v1.3.36：当前阶段行高亮。原为 #F0F8FF 浅蓝写死 —— 深色模式下底色不变而
+   文字已变浅，成了「浅蓝底 + 浅灰字」完全看不清（用户截图正是这一行）。
+   改用核心 --ow-blue-light（浅色 #E6F7FF / 深色 #14323F），与全站主题联动。 */
+.ow-lv-table tr.is-cur { background: var(--ow-blue-light); }
 .ow-lv-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-.ow-lv-yes { color: #237804; font-weight: 700; }
-.ow-lv-no { color: #C4C8CE; }
+.ow-lv-yes { color: var(--ow-green); font-weight: 700; }
+.ow-lv-no { color: var(--ow-border-control); }
 
 /* ---------- 阶段总览（v1.2.59）---------- */
 .ow-lv-stages {
@@ -126,15 +129,17 @@
 .ow-lv-stage-dot {
     width: 12px; height: 12px; border-radius: 50%;
     background: var(--stage-color, #9AA5B1);
-    box-shadow: 0 0 0 2px #FFFFFF;
+    /* v1.3.36：描边色 = 页面底色，用来在连线与圆点之间「掏」出一圈缝隙。
+       原先写死 #FFFFFF —— 深色模式下变成一圈刺眼白边，必须跟着主题走。 */
+    box-shadow: 0 0 0 2px var(--ow-bg);
 }
 .ow-lv-stage-item.is-cur .ow-lv-stage-dot {
     width: 18px; height: 18px;
-    box-shadow: 0 0 0 3px #FFFFFF, 0 0 0 5px var(--stage-color, #9AA5B1);
+    box-shadow: 0 0 0 3px var(--ow-bg), 0 0 0 5px var(--stage-color, #9AA5B1);
 }
 .ow-lv-stage-item.is-future .ow-lv-stage-dot {
-    background: #FFFFFF;
-    box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 3px var(--stage-color, #9AA5B1);
+    background: var(--ow-bg);
+    box-shadow: 0 0 0 2px var(--ow-bg), 0 0 0 3px var(--stage-color, #9AA5B1);
 }
 .ow-lv-stage-name { font-size: 13px; color: var(--ow-text-title); line-height: 1.4; }
 .ow-lv-stage-item.is-future .ow-lv-stage-name,
@@ -173,7 +178,7 @@
 
 /* ---------- 后台：参数分组标题 + 活跃趋势柱状图（v1.2.44） ---------- */
 .ow-lt-cap {
-    margin: 16px 0 8px; font-size: 13px; color: #5C5C5C; font-weight: 600;
+    margin: 16px 0 8px; font-size: 13px; color: var(--ow-text-sub); font-weight: 600;
     padding-left: 8px; border-left: 3px solid var(--ow-primary-strong);
 }
 .ow-lt-cap:first-child { margin-top: 0; }
@@ -183,7 +188,7 @@
 .ow-lt-tname { width: 76px; flex-shrink: 0; font-size: 12px; color: var(--ow-text-sub); }
 .ow-lt-tbars {
     flex: 1; height: 46px; display: flex; align-items: flex-end; gap: 2px;
-    background: #F5F5F5; border-radius: 3px; padding: 3px 4px;
+    background: var(--ow-bg-sub); border-radius: 3px; padding: 3px 4px;
 }
 .ow-lt-tbars > i {
     flex: 1; min-width: 2px; border-radius: 1px 1px 0 0; display: block;
@@ -205,4 +210,12 @@
     font-size: 10px; line-height: 14px; padding: 0 4px; border-radius: 3px;
     margin-left: 0; flex-shrink: 0; -webkit-flex-shrink: 0;
     vertical-align: middle; cursor: default;
+}
+
+/* ---------- 深色适配（v1.3.36） ----------
+   以下几处是**按浅底设计的固定浅色块**，换成变量反而表达不出原意
+   （黄色小标签要「暖底暖字」），故在深色下单独压暗。
+   ⚠️ 插件里新增浅底小块时请一并在此补一条，否则深色下会露出亮斑。 */
+[data-theme="dark"] .ow-lv-task-alt {
+    color: #FFC53D; background: #4A3B10; border-color: #8A6D1A;
 }

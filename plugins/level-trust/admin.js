@@ -185,7 +185,7 @@
                 + '<input class="ow-input" id="owLtSetLv" type="number" min="1" value="' + lv + '"></div>'
                 + '<div class="ow-form-item"><label>累计完成天数（≥0）</label>'
                 + '<input class="ow-input" id="owLtSetDays" type="number" min="0" value="' + days + '">'
-                + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">'
+                + '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">'
                 + '等级一般由公式自动算出；这里只用于迁移或纠错，直接改数值不会同步改加权。</p></div>'
                 + '<div class="ow-modal-actions">'
                 + '<button class="ow-btn ow-btn-ghost" onclick="OwChat.closeModal()">取消</button>'
