@@ -1008,12 +1008,17 @@ Plugin::page('level', '等级', function (array $actor, $user = null) {
         $cur = 1 + (int)floor($days + $wv * $factor);
         $pct = $cur >= $nextAt ? 100 : (int)max(0, min(100, round((($cur - 1) / max(1, $nextAt - $cur)) * 100)));
 
+        // 贴纸上限：未解锁（0 张）不展示 —— 「贴纸上限 0 张」是纯噪音（v1.3.30）
+        $stk = (int)$u['sticker_quota'];
+        $stkSpan = $stk > 0
+            ? '<span>贴纸上限 <b>' . $stk . '</b> 张（已收藏 '
+              . (int)DB::val('SELECT COUNT(*) FROM stickers WHERE owner_key=?', ['user' . $uid]) . '）</span>'
+            : '';
         $h .= '<div class="ow-lv-hero-meta">'
             . '<span>累计完成 <b>' . $days . '</b> 天</span>'
             . '<span>加权 <b>' . $weight . '</b> 天（封顶 ' . round(owLTFloat('w_cap_ratio') * 100) . '% × 天数）</span>'
             . '<span>连续登录 <b>' . (int)$row['login_streak'] . '</b> 天</span>'
-            . '<span>贴纸上限 <b>' . (int)$u['sticker_quota'] . '</b> 张（已收藏 '
-            . (int)DB::val('SELECT COUNT(*) FROM stickers WHERE owner_key=?', ['user' . $uid]) . '）</span>'
+            . $stkSpan
             . '<span>距 Lv.' . ($lv + 1) . ' 还需 <b>' . max(0, $nextAt - $cur) . '</b> 级进度</span>'
             . '</div>'
             . '<div class="ow-lv-bar"><i style="width:' . $pct . '%"></i></div>';

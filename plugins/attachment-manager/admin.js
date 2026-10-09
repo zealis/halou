@@ -169,10 +169,14 @@
                 if (ex) ex.value = c.exts || '';
                 var act = $('owAtActive');
                 if (act) act.textContent = (r.active_exts || []).join('、') || '（无）';
-                // v1.2.0：压缩开关 + imagewebp() 实测支持状态
+                // v1.2.0：压缩开关 + imagewebp() 实测支持状态；v1.3.0：细分复选框
                 var cp = $('owAtCompress'), cq = $('owAtCompressQ'), wp = $('owAtWebp');
                 if (cp) cp.value = c.compress === '1' ? '1' : '0';
                 if (cq) cq.value = c.compress_q || '80';
+                var mk = function (id, v) { var el = $(id); if (el) el.checked = v === '1'; };
+                mk('owAtcAvatar', c.compress_avatar);
+                mk('owAtcImage', c.compress_image);
+                mk('owAtcSticker', c.compress_sticker);
                 if (wp) {
                     OwAT.webpReady = !!r.webp_ready;
                     if (r.webp_ready) { wp.textContent = '✓ 可用'; wp.style.color = '#1a7f37'; }
@@ -194,9 +198,12 @@
                 toast('本机 PHP 不支持 imagewebp()，已保持关闭');
                 cp.value = '0';
             }
+            var ck = function (id) { var el = $(id); return el && el.checked ? '1' : '0'; };
             OwApi.post('plugin_attachment_manager_cfg_save', {
                 enabled: en.value, max_mb: String(mbv), exts: ex.value,
-                compress: cp ? cp.value : '0', compress_q: String(qv)
+                compress: cp ? cp.value : '0', compress_q: String(qv),
+                compress_avatar: ck('owAtcAvatar'), compress_image: ck('owAtcImage'),
+                compress_sticker: ck('owAtcSticker')
             }, function (r) {
                 if (!r.ok) { toast(r.msg || '保存失败'); return; }
                 toast('配置已保存');

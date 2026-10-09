@@ -43,9 +43,13 @@ function owATDefaultConfig(): array
         'max_mb'  => '10',  // 单文件大小上限（MB）
         // v1.3.13：默认白名单补上一般图片格式 —— 头像上传也走这张表
         'exts'    => 'jpg,jpeg,png,gif,webp,bmp,zip,rar,7z,pdf,txt,md,doc,docx,xls,xlsx,ppt,pptx,mp3,mp4',
-        // v1.2.0：图片压缩（WebP 有损转换）。默认关闭 = 原图直存，与旧行为一致。
-        'compress'   => '0',
-        'compress_q' => '80',
+        // v1.2.0：图片压缩（WebP 有损转换）。总开关默认关闭 = 原图直存，与旧行为一致。
+        // v1.3.0：细分开关 —— 总开关开启后，各自决定是否压缩（默认全开）。
+        'compress'         => '0',
+        'compress_q'       => '80',
+        'compress_avatar'  => '1',
+        'compress_image'   => '1',
+        'compress_sticker' => '1',
     ];
 }
 
@@ -80,6 +84,9 @@ function owATConfig(): array
     }
     $cfg['max_mb'] = max(1, min(1024, (int)$cfg['max_mb']));   // 夹在 1~1024MB
     $cfg['compress'] = $cfg['compress'] === '1' ? '1' : '0';
+    foreach (['compress_avatar', 'compress_image', 'compress_sticker'] as $ck) {
+        $cfg[$ck] = $cfg[$ck] === '1' ? '1' : '0';
+    }
     $cfg['compress_q'] = max(1, min(100, (int)$cfg['compress_q']));
     return $cfg;
 }
@@ -94,7 +101,7 @@ function owATSaveConfig(array $in): array
         $v = trim((string)$v);
         if ($k === 'max_mb') {
             $v = (string)max(1, min(1024, (int)$v));
-        } elseif ($k === 'compress') {
+        } elseif ($k === 'compress' || $k === 'compress_avatar' || $k === 'compress_image' || $k === 'compress_sticker') {
             $v = $v === '1' ? '1' : '0';
         } elseif ($k === 'compress_q') {
             $v = (string)max(1, min(100, (int)$v));
@@ -264,7 +271,8 @@ function owATApplyExifOrientation(&$im, string $path): void
 }
 
 /**
- * 上传落地前的 WebP 压缩（开关关闭 / 环境不支持 / 任何一步失败 → 原样返回 $f，绝不拦上传）。
+ * 上传落地前的 WebP 压缩（总开关或该 kind 的细分开关关闭 / 环境不支持 / 任何一步失败
+ * → 原样返回 $f，绝不拦上传）。由 upload.image 钩子统一调用（见下）。
  *
  * 四条刻意保留原图的路径：
  *  ① 动图 GIF —— GD 只读第一帧，转了动画就没了；
@@ -272,10 +280,11 @@ function owATApplyExifOrientation(&$im, string $path): void
  *  ③ 转完反而不变小的（小图 / 已高度优化的图）—— 压缩的意义是省，不是越压越大；
  *  ④ 解码失败的 —— 交给核心的 checkImage 去给专业报错。
  */
-function owATCompressImage(array $f): array
+function owATCompressImage(array $f, string $kind): array
 {
     $cfg = owATConfig();
-    if ($cfg['compress'] !== '1' || !owATWebpReady()) return $f;
+    $key = ['avatar' => 'compress_avatar', 'image' => 'compress_image', 'sticker' => 'compress_sticker'][$kind] ?? '';
+    if ($key === '' || $cfg['compress'] !== '1' || $cfg[$key] !== '1' || !owATWebpReady()) return $f;
     $tmp = (string)($f['tmp_name'] ?? '');
     if ($tmp === '' || !is_file($tmp)) return $f;
     $info = @getimagesize($tmp);
@@ -307,6 +316,13 @@ function owATCompressImage(array $f): array
             'error' => UPLOAD_ERR_OK, 'size' => $newSize];
 }
 
+/* 核心 Upload::handle 落盘前触发（v1.3.30 核心钩子）。为什么挂这里而不是插件路由里：
+   贴纸上传走核心 case 'upload'（不经插件），handle 才是 avatar/image/sticker
+   三类共同入口 —— 细分开关必须全覆盖。 */
+Plugin::on('upload.image', function (array &$f, string $kind) {
+    $f = owATCompressImage($f, $kind);
+});
+
 /**
  * 存图片消息：复用核心 Upload（头像/贴纸同一条本地存储通道），
  * 这里额外先卡一次体积上限（配置项在插件里，不能指望核心再读）。
@@ -321,8 +337,8 @@ function owATStoreImage(array $f, ?array $actor = null): array
     if ($tmp !== '' && is_file($tmp) && (int)@filesize($tmp) > $max) {
         return [false, '图片超过 ' . round($max / 1048576, 1) . ' MB 限制'];
     }
-    // v1.2.0：先按原图体积卡上限，再压缩（压缩不放宽闸门，只是让落盘更省）
-    return Upload::handle(owATCompressImage($f), 'image');   // 核心内部还会做「仅 jpg/png/gif/webp」校验
+    // 压缩由 upload.image 钩子在 Upload::handle 内统一做（细分开关见后台「图片压缩」）
+    return Upload::handle($f, 'image');   // 核心内部还会做「仅 jpg/png/gif/webp」校验
 }
 
 /**
@@ -483,12 +499,19 @@ function owATStoreAvatar(array $f, array $actor): array
     // 白名单（管理员删掉 bmp，头像也就传不了 bmp）。核心 checkImage 还会再兜一层
     // 「真实图片类型 + 支持格式」，两处都过才落盘。
     $ext = strtolower((string)pathinfo((string)($f['name'] ?? ''), PATHINFO_EXTENSION));
+    if ($ext === '') {
+        // v1.3.30 修 bug：头像裁剪弹窗导出的是 canvas Blob，multipart 文件名恒为
+        // "blob"（无扩展名）—— 不是伪造上传，是前端裁剪流程的正常产物。
+        // 文件名取不到扩展时按**真实内容**推断（头像必为图片），推断不出再拒。
+        $mimeExt = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif',
+                    'image/webp' => 'webp', 'image/bmp' => 'bmp'];
+        $ext = $mimeExt[owATRealMime($tmp)] ?? '';
+    }
     if ($ext === '' || !in_array($ext, owATExts(), true)) {
         return [false, '头像格式不在允许列表内（' . implode(' / ', owATExts()) . '）'];
     }
-    // v1.2.0：头像同样先压（转 WebP 后核心 squareAvatar 仍会裁成 100px 方图，
-    // 压缩主要省在上传体积与 GD 输入；动图/超大图自动跳过）
-    return Upload::handle(owATCompressImage($f), 'avatar');
+    // 压缩由 upload.image 钩子在 Upload::handle 内统一做
+    return Upload::handle($f, 'avatar');
 }
 
 Plugin::route('plugin_attachment_manager_upload_avatar', function (array $ctx) use ($atGuard) {
@@ -540,6 +563,10 @@ Plugin::route('plugin_attachment_manager_cfg_save', function (array $ctx) use ($
         'exts'    => $post['exts'] ?? '',
         'compress'   => $post['compress'] ?? '',
         'compress_q' => $post['compress_q'] ?? '',
+        // 复选框未勾选时浏览器不提交 → 缺省即 0
+        'compress_avatar'  => $post['compress_avatar'] ?? '0',
+        'compress_image'   => $post['compress_image'] ?? '0',
+        'compress_sticker' => $post['compress_sticker'] ?? '0',
     ]);
     Api::json(['ok' => true, 'config' => $cfg, 'active_exts' => owATExts(), 'webp_ready' => owATWebpReady()]);
 });
@@ -627,6 +654,12 @@ Plugin::adminPage('attachment-manager', '附件上传', function () {
         . '<input class="ow-input" id="owAtCompressQ" type="number" min="1" max="100" value="80"></div>'
         . '<div class="ow-form-item" style="min-width:150px"><label>imagewebp() 支持</label>'
         . '<span id="owAtWebp" style="display:inline-block;padding-top:8px;font-size:13px">检测中…</span></div>'
+        . '</div>'
+        // v1.3.0：细分开关 —— 总开关开启后按类别生效（复选框，unchecked 不提交=0）
+        . '<div class="ow-form-item" style="margin-bottom:8px"><label>压缩范围（总开关开启后生效）</label>'
+        . '<label class="ow-chk-inline"><input type="checkbox" id="owAtcAvatar"> 头像</label>'
+        . '<label class="ow-chk-inline"><input type="checkbox" id="owAtcImage"> 消息图片</label>'
+        . '<label class="ow-chk-inline"><input type="checkbox" id="owAtcSticker"> 贴纸上传</label>'
         . '</div>'
         . '<p style="font-size:12px;color:#5C5C5C;margin:2px 0 8px">开启后新头像与聊天图片转 WebP：<b>省流量省磁盘、加载更快</b>；'
         . '代价是有损，截图与文字图会轻微发虚。</p>'

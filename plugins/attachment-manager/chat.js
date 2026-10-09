@@ -21,6 +21,13 @@
        没启用插件时用户仍可用「浏览插图」（生成式头像），功能不会变成死路。 */
     if (OwChat.registerAvatarUploader && !OwChat._avatarUploader) {
         OwChat.registerAvatarUploader(function (file, filename, onOk) {
+            // v1.3.30 修 bug：裁剪弹窗导出的是 canvas **Blob**（没有文件名），
+            // FormData 会把 multipart 文件名写成 "blob" → 服务端扩展名校验全拒。
+            // 有 filename 时包一层 File 补上名字；老浏览器没有 File 构造器就交给
+            // 服务端的「按真实 MIME 推断扩展名」兜底。
+            if (filename && w.File && !(file instanceof w.File)) {
+                try { file = new w.File([file], filename, { type: (file && file.type) || 'image/jpeg' }); } catch (e) {}
+            }
             OwApi.upload('plugin_attachment_manager_upload_avatar', file, {}, function (r) {
                 if (!r || !r.ok) { toast(r && r.msg ? r.msg : '头像上传失败'); return; }
                 onOk(r.url);

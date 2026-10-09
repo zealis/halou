@@ -240,9 +240,15 @@ class Upload
     /**
      * 统一上传入口：全部走本地原样存储（不压缩、不转码、不转发图床）
      * 例外：头像会居中裁剪缩放为正方形（见 squareAvatar）
+     *
+     * v1.3.31：落盘前给插件一次改写机会（upload.image 钩子）——
+     * 附件上传插件在这里做 WebP 压缩。为什么钩子必须在核心而不是插件路由里：
+     * 贴纸上传走核心 case 'upload'（不经插件），只有 handle 是
+     * avatar/image/sticker 三类共同的入口，细分开关才能全覆盖。
      */
     public static function handle(array $f, string $kind): array
     {
+        if (class_exists('Plugin')) Plugin::fire('upload.image', [&$f, $kind]);
         return self::local($f, $kind);
     }
 
