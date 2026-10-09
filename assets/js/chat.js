@@ -3161,8 +3161,7 @@
                   + '<input class="ow-input ow-msr-input" id="owMsrInput" type="text"'
                   + ' placeholder="输入关键词" maxlength="50" autocomplete="off">'
                   + '</div>'
-                  + '<div class="ow-msr-results" id="owMsrResults"></div>'
-                  + '<div class="ow-av-hint">仅显示本站注册用户。</div>';
+                  + '<div class="ow-msr-results" id="owMsrResults"></div>';
             this.openModal(h, 420);
 
             var input = $('owMsrInput'), box = $('owMsrResults');
