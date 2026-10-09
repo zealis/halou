@@ -42,6 +42,34 @@
 - 用最小 DOM 模拟（stub MutationObserver + uiBatchBar 写 DOM）实测：修复前 300ms 内 init 已执行
   22 次且持续增长，修复后稳定 1 次、列表请求 1 次。
 
+## v1.3.11（2026-10-09）：头像改为生成式（风格 + 种子）+ 上传迁入附件插件
+
+- **重构**：头像是「风格 + 种子」的生成结果（数据模型参考 参考文献/bbs1org-main），
+  不再由前端现画色块，也不再有游客固定米色头像。
+  - 新增字段：`users.avatar_type/avatar_style/avatar_seed`、`rooms.` 同名字段（幂等加列）
+  - `Auth::avatarStyles()`：31 种 DiceBear 10.x 风格（含用户指定的官方推荐参数），默认 `open-peeps` + 五色背景
+  - `Auth::avatarUrlFor()`：统一产出**最终 URL**（上传图 / DiceBear API / 内置 identicon），
+    所有接口（会话、成员、好友、私聊、搜索、资料卡、群列表）改为下发 URL，前端不再拼路径
+  - `Auth::avatarIdenticon()`：**纯 PHP** 生成 5×5 对称网格 SVG（data URI），
+    既作 `avatar_source=identicon` 的 provider，也是远程加载失败时的前端兜底（永不破相）
+  - `avatar_source` 设置：`api`（默认，官方 API）/ `identicon`（零请求，内网与离线部署用）
+  - 游客头像种子取 `client_key` → 同一浏览器每次进来一致；未建立身份也给一个匿名头像
+  - `Plugin::on('avatar.url', function (&$url, $ctx) {})` 引用式钩子，给插件改写地址（将来本地化接这里）
+- **群头像**：删除固定剪影 `assets/img/room-default.svg`；改为
+  「自定义 → **创建者头像** → 群 id 派生」（`Chat::roomAvatarUrl()`），与用户要求一致。
+- **上传迁入附件插件**：核心 `?action=upload` 白名单收窄为只剩表情贴纸；
+  新增 `plugin_attachment_manager_upload_avatar` 路由（落库 users 后回传 URL）；
+  前端 `OwChat.registerAvatarUploader(fn)` 由插件注入上传实现，
+  头像设置弹窗只在注册后才显示「上传头像」——插件未启用时仍可用「浏览插图」，功能不会变死路。
+- **交互**：点击头像不再直接开文件选择，改为「头像设置」弹窗：
+  当前头像预览 + 上传头像（插件启用时）+ 浏览插图（31 风格网格，点一下即生效）+ 群聊额外有「恢复默认」。
+- **顺带修一个旧坑**：`profile_save` 原先无条件覆盖 `avatar`，而表单恒传空串 → 每保存一次昵称就清空头像。
+  现在头像独立走 `avatar_save`，资料保存只在显式传了 uploads 路径时才动它。
+- 验证：PHP/JS 语法全过；临时 sqlite 单元测试 10 项通过（新增列、生成式/上传/存量兼容、
+  identicon 合法、群头像回落与自定义、风格表 31 种）；内置服务器端到端——
+  游客与登录用户均拿到 DiceBear URL、`avatar_styles` 返回 31 项、
+  `avatar_save` 保存 dylan 后回传正确 URL、群列表头像等于创建者头像。测完已还原 config 与 data。
+
 ## v1.3.10（2026-10-09）：好友改为双向可见（「别人加我，列表不显示」修复）
 
 - **修复**：`friends` 表每行只表示「user_id 单方面把 friend_id 加进联系人」，

@@ -146,6 +146,37 @@ ow_abs_url('uploads/a.jpg');    // 拼接绝对地址；第二个参数默认 tr
 - 自动识别顺序：`X-Forwarded-Proto` / `HTTPS` → `X-Forwarded-Host` / `Host` / `SERVER_NAME`（仅兜底时补非标准端口）→ 子目录部署路径。容器反代下不会误拼服务器内部端口（如 `:80`）。
 - 后台设置项 `site_url`：留空自动识别；填写时后端校验必须以 `http://` 或 `https://` 开头。
 
+## 头像相关（v1.3.11 起）
+
+头像是「风格 + 种子」的生成结果（DiceBear 10.x），核心字段 `users.avatar_type` / `avatar_style` /
+`avatar_seed`。插件有两个接入点：
+
+**1. 改写头像地址（引用传参，`fire()` 没有返回值）**
+
+```php
+Plugin::on('avatar.url', function (&$url, $ctx) {
+    // $ctx = ['style' => 'dylan', 'seed' => '...', 'source' => 'api' | 'identicon']
+    // 例：改指到自己的 CDN 或本地预生成的 SVG
+    $url = str_replace('https://api.dicebear.com/10.x/', 'https://cdn.example.com/avatar/', $url);
+});
+```
+
+**2. 提供头像上传实现**
+
+核心已移除 `kind=avatar` 上传入口，附件上传插件通过注入前端函数接管：
+
+```js
+OwChat.registerAvatarUploader(function (file, filename, onOk) {
+    OwApi.upload('my_plugin_upload_avatar', file, {}, function (r) {
+        if (r && r.ok) onOk(r.url);
+    });
+});
+```
+
+注册后，核心的头像设置弹窗才会显示「上传头像」选项；未注册时用户仍可选生成式头像。
+
+---
+
 ## 钩子（Plugin::on / fire）
 
 当前核心提供的钩子（以源码 `Plugin::fire()` 调用点为准，不臆造）：

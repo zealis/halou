@@ -764,42 +764,76 @@
     /* 头像：有图用图；无图时游客固定米金底（#E5D5A0，深字保证可读），
        用户按昵称长度从色盘取色，群聊用固定的双人剪影图（见 roomAvatarHtml） */
     function avatarHtml(url, name, sm, role) {
-        // 尺寸档：'xs'=20px、true/sm=28px（列表）、'md'=32px、'lg'=64px（资料卡/个人设置）、false=40px
-        // v1.1.9：新增 'lg'。原来资料卡与个人设置都用 'md'(32px)，在 380px 弹窗里偏小。
+        /* v1.3.11：删除「首字色块」兜底（游客固定米色、用户按昵称长度取色）。
+           服务端 avatarUrlFor() 保证 url 非空（上传图 / DiceBear / 内置 identicon），
+           前端只负责渲染并挂 onerror 兜底 —— 远程挂了也不破相。 */
         var sizeCls = sm === 'xs' ? ' ow-avatar-xs'
             : (sm === 'lg' ? ' ow-avatar-lg'
             : (sm === 'md' ? ' ow-avatar-md' : (sm ? ' ow-avatar-sm' : '')));
         var cls = 'ow-avatar' + sizeCls;
-        if (url) return '<span class="' + cls + '"><img src="' + esc(url) + '" alt=""></span>';
-        var ch = esc((name || '?').charAt(0));
-        if (role === 'guest') {
-            return '<span class="' + cls + '" style="background:#E5D5A0;color:#5C4500">' + ch + '</span>';
-        }
-        var colors = ['#0099FF', '#00558F', '#A05000', '#237804', '#5B21B6'];
-        var ci = (name || '').length % colors.length;
-        return '<span class="' + cls + '" style="background:' + colors[ci] + '">' + ch + '</span>';
+        var src = url || OwAvatar.identicon(name || role || 'owl');
+        return '<span class="' + cls + '"><img src="' + esc(src) + '" alt="' + esc(name || '') + '" loading="lazy" onerror="OwAvatar.fallback(this)"></span>';
     }
 
-    /* ---------- 群聊默认头像（v1.1.19） ----------
-       需求：所有**未设置自定义头像**的群聊统一用这张双人剪影图，
-       不再用「群名首字 + 随机色块」——首字方案在侧栏里花花绿绿一片，
-       且不同群颜色由昵称长度决定（`ci = name.length % 5`），看着像乱码。
-
-       图源：设计文档/图标/svg/qunliao.svg，裁剪后落到 assets/img/room-default.svg。
-       裁剪依据（浏览器实测内容包围盒，非估算）：
-         原始画布 1024×1024，内容只有 538×388，**空白占横向 47% / 纵向 62%**
-         —— 直接用原图在 40px 头像里会小到几乎看不见。
-         内容中心 (512,512)，正方形 viewBox 取 `180 180 664 664`（边长 664）：
-         边长 = 内容半对角线 331.8 × 2，圆容器（border-radius:50%）内刚好不裁角。
-       图形已居中，容器与 <img> 的 CSS 尺寸锁由 .ow-avatar / .ow-cl-icon 负责。
-
-       带 ?v= 版本号：与 CSS/JS 的缓存参数同一套做法（index.php 用 OWLSGO_VERSION），
-       换图后不必手改文件名。 */
-    var ROOM_DEFAULT_AVATAR = 'assets/img/room-default.svg';
+    /* v1.3.11：群聊默认头像（room-default.svg 双人剪影）已移除 ——
+       群没有自定义头像时，改用**创建者的头像**（服务端 Chat::roomAvatarUrl 负责回落），
+       群 id 派生仅作创建者已删除时的兜底。原先 assets/img/room-default.svg 一并删除。 */
 
     /**
-     * 群头像 HTML。有自定义头像用图，无则回落到默认剪影图。
-     * @param {string} url   rooms.avatar，空串表示未设置
+     * 头像加载失败的兜底（v1.3.11）。
+     *
+     * 服务端已经保证 avatar 字段是非空 URL（上传图 / DiceBear / 内置 identicon），
+     * 但远程 DiceBear 在国内可能加载失败 —— `<img>` 碎了就是一片占位图，
+     * 比没有头像更糟。所以统一挂 onerror：失败时换成本地现算的几何头像。
+     * data-owfb 标记保证只兜底一次（兜底自身失败就不再重试，避免死循环）。
+     */
+    var OwAvatar = {
+        /** 标准 CRC32（与 PHP 侧 crc32 一致），用来把昵称映射成稳定的图案与色相 */
+        crc32: function (str) {
+            var c, crc = 0xFFFFFFFF;
+            str = String(str || '');
+            for (var n = 0; n < str.length; n++) {
+                c = (crc ^ str.charCodeAt(n)) & 0xFF;
+                for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+                crc = (crc >>> 8) ^ c;
+            }
+            return (crc ^ 0xFFFFFFFF) >>> 0;
+        },
+        /** 5×5 对称网格，与 core/auth.php 的 Auth::avatarIdenticon 同一套算法 */
+        identicon: function (seed) {
+            var h = this.crc32(seed || 'owl');
+            var hue = h % 360, fg = 'hsl(' + hue + ',62%,48%)', bg = 'hsl(' + ((hue + 200) % 360) + ',42%,90%)';
+            var bits = (h >>> 5) & 0x7FF, rects = '', y, x, b;
+            for (y = 0; y < 5; y++) {
+                for (x = 0; x < 3; x++) {
+                    b = bits & (1 << (y * 3 + x));
+                    if (!b) continue;
+                    rects += '<rect x="' + x + '" y="' + y + '" width="1" height="1"/>'
+                           + '<rect x="' + (4 - x) + '" y="' + y + '" width="1" height="1"/>';
+                }
+            }
+            var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 5" shape-rendering="crispEdges">'
+                    + '<rect width="5" height="5" fill="' + bg + '"/>'
+                    + '<g fill="' + fg + '">' + rects + '</g></svg>';
+            // 中文昵称不能直接进 URI，中文场景统一用 base64（btoa 对非 Latin1 会抛错，故先转义）
+            try {
+                return 'data:image/svg+xml;base64,' + w.btoa(unescape(encodeURIComponent(svg)));
+            } catch (e) {
+                return 'data:image/svg+xml,' + encodeURIComponent(svg);
+            }
+        },
+        fallback: function (el) {
+            if (!el || el.getAttribute('data-owfb')) return;
+            el.setAttribute('data-owfb', '1');
+            el.src = this.identicon(el.getAttribute('alt') || 'owl');
+        }
+    };
+    w.OwAvatar = OwAvatar;
+
+    /**
+     * 群头像 HTML。v1.3.11 起服务端已把「自定义 → 创建者头像 → 群 id 派生」算好，
+     * 这里不再有默认剪影图分支，url 恒为非空；仍保留 onerror 兜底。
+     * @param {string} url   服务端算好的头像 URL
      * @param {string} sm    尺寸档，同 avatarHtml
      * @param {string} extra 额外的 class（会话列表要用 .ow-cl-icon 而非 .ow-avatar）
      */
@@ -808,9 +842,8 @@
             : (sm === 'lg' ? ' ow-avatar-lg'
             : (sm === 'md' ? ' ow-avatar-md' : (sm ? ' ow-avatar-sm' : '')));
         var cls = extra || ('ow-avatar' + sizeCls);
-        var ver = (OwChat.cfg && OwChat.cfg.version) || '';
-        var src = url || (ROOM_DEFAULT_AVATAR + (ver ? '?v=' + ver : ''));
-        return '<span class="' + cls + '"><img src="' + esc(src) + '" alt=""></span>';
+        var src = url || (OwAvatar.identicon('room'));
+        return '<span class="' + cls + '"><img src="' + esc(src) + '" alt="" loading="lazy" onerror="OwAvatar.fallback(this)"></span>';
     }
 
     /* ---------- 侧栏入口行（v1.1.10） ----------
@@ -829,6 +862,18 @@
         userX: '<circle cx="10" cy="8" r="3.4"/><path d="M3.8 20.2c0-3.4 2.8-5.7 6.2-5.7 1 0 1.9.2 2.7.5"/><path d="M16.2 16.6l4.6 4.6M20.8 16.6l-4.6 4.6"/>',
         flag: '<path d="M5.5 21.2V3.6"/><path d="M5.5 4.6h11.8l-2.2 3.9 2.2 3.9H5.5z"/>'
     };
+
+    /** 通用线性图标（与 PHP 侧 ow_icon 的路径表保持一致；禁 Emoji 作功能图标） */
+    var OW_ICONS = {
+        image: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M4 17l4.5-4.5 3.5 3.5 3-3 5 5"/>',
+        smile: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.5 2.2 2.2 3.5 2.2s2.5-.7 3.5-2.2"/><line x1="9" y1="9.5" x2="9" y2="10.5"/><line x1="15" y1="9.5" x2="15" y2="10.5"/>',
+        upload: '<path d="M12 16V4"/><path d="M7.5 8.5L12 4l4.5 4.5"/><path d="M4.5 19.5h15"/>'
+    };
+    function owIco(name, size) {
+        var d = OW_ICONS[name] || '';
+        if (!d) return '';
+        return '<svg class="ow-ico" width="' + (size || 16) + '" height="' + (size || 16) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+    }
 
     /** 生成一行侧栏入口（整行可点）。onclick 缺省时渲染为不可点的静态行 */
     function entryRow(label, icon, onclick) {
@@ -4087,7 +4132,7 @@
                 '<h3>个人设置</h3>'
                 // 头像置顶：点击当前头像即触发上传（不另设上传按钮）
                 + '<div class="ow-set-avatar">'
-                + '<span id="owSetAvatarPreview" class="ow-set-avatar-btn" title="点击更换头像" onclick="document.getElementById(\'owSetAvatarFile\').click()">'
+                + '<span id="owSetAvatarPreview" class="ow-set-avatar-btn" title="点击设置头像" onclick="OwChat.openAvatarDialog(\'me\')">'
                 + avatarHtml(me.avatar, me.nickname, 'lg', me.role) + '</span>'
                 + '<input type="file" id="owSetAvatarFile" accept="image/*" style="display:none">'
                 + '</div>'
@@ -4322,7 +4367,148 @@
         /**
          * 触发群头像文件选择（群聊设置弹窗内的隐藏 input，v1.1.10）
          */
-        roomAvatarPick: function () { var f = $('owRoomAvatarFile'); if (f) f.click(); },
+        /** 群头像点击：v1.3.11 起不再直接选文件，改走头像设置弹窗（上传 / 浏览插图 / 恢复默认） */
+        roomAvatarPick: function () { this.openAvatarDialog({ room: this.room, name: this.roomName }); },
+
+        /* ================= 头像设置（v1.3.11） =================
+           点击头像不再是「直接打开文件选择」，而是先弹这个对话框：
+             ① 上传头像 —— 仅当附件上传插件注册了 uploader 时出现（核心零上传入口）
+             ② 浏览插图 —— 31 种 DiceBear 风格，点一下即保存
+           target：'me'（本人）或 { room: roomId, name: 群名 }（群头像）。
+        */
+        _avatarUploader: null,   // 由附件上传插件经 registerAvatarUploader 注入
+
+        /** 插件注册上传实现：fn(file, filename, onOk) —— 成功后回调 onOk(url) */
+        registerAvatarUploader: function (fn) {
+            if (typeof fn === 'function') this._avatarUploader = fn;
+        },
+
+        openAvatarDialog: function (target) {
+            var self = this;
+            var isRoom = (target && typeof target === 'object' && target.room);
+            var rid = isRoom ? parseInt(target.room, 10) : 0;
+            var cur = isRoom
+                ? roomAvatarHtml(this._roomAvatar, 'lg')
+                : avatarHtml(this.cfg.me ? this.cfg.me.avatar : '', this.cfg.me ? this.cfg.me.nickname : '', 'lg');
+
+            var canUpload = !!this._avatarUploader;
+            var h = '<div class="ow-av-dialog">'
+                + '<div class="ow-av-current">' + cur + '<div class="ow-av-current-tip">当前头像</div></div>'
+                + '<div class="ow-av-actions">'
+                + (canUpload
+                    ? '<button class="ow-btn ow-btn-block" type="button" id="owAvUpload">' + owIco('image', 16) + '上传头像</button>'
+                    : '')
+                + '<button class="ow-btn ow-btn-block" type="button" id="owAvGallery">' + owIco('smile', 16) + '浏览插图</button>'
+                + (isRoom ? '<button class="ow-btn ow-btn-block ow-btn-ghost" type="button" id="owAvReset">恢复默认（用创建者头像）</button>' : '')
+                + '</div>'
+                + '<div class="ow-av-styles" id="owAvStyles" style="display:none"></div>'
+                + '</div>';
+            this.openModal(h, 420);
+
+            var applyUpload = function () {
+                var f = document.createElement('input');
+                f.type = 'file'; f.accept = 'image/*';
+                f.onchange = function () {
+                    if (!f.files || !f.files[0]) return;
+                    self.avatarCrop(f.files[0]);
+                };
+                f.click();
+            };
+            var up = $('owAvUpload'); if (up) up.onclick = applyUpload;
+            var rs = $('owAvReset');
+            if (rs) rs.onclick = function () {
+                var room = self.cfg.rooms || [];
+                for (var i = 0; i < room.length; i++) {
+                    if (parseInt(room[i].id, 10) !== rid) continue;
+                    OwApi.post('room_update', {
+                        id: rid, name: room[i].name, description: room[i].description || '',
+                        avatar: '', avatar_type: 'default'
+                    }, function (r) {
+                        toast(r.msg);
+                        if (!r.ok) return;
+                        if (r.url) room[i].avatar = r.url;
+                        self.closeModal();
+                        self.renderConversations();
+                        self.renderRoomPanel();
+                    });
+                    return;
+                }
+            };
+            var gal = $('owAvGallery');
+            if (gal) gal.onclick = function () { self.openAvatarGallery(isRoom ? rid : 0); };
+        },
+
+        /** 「浏览插图」：拉风格清单渲染网格，点一下即保存 */
+        openAvatarGallery: function (rid) {
+            var self = this;
+            var box = $('owAvStyles');
+            if (!box) return;
+            box.style.display = '';
+            box.innerHTML = '<div class="ow-av-loading">风格加载中…</div>';
+            OwApi.post('avatar_styles', {}, function (r) {
+                if (!box) return;
+                if (!r.ok || !r.data || !r.data.length) {
+                    box.innerHTML = '<div class="ow-av-loading">风格加载失败，请稍后再试</div>';
+                    return;
+                }
+                var h = '<div class="ow-av-grid">';
+                for (var i = 0; i < r.data.length; i++) {
+                    var o = r.data[i];
+                    h += '<button class="ow-av-cell" type="button" data-slug="' + esc(o.slug) + '" title="' + esc(o.label) + '">'
+                       + '<img src="' + esc(o.url) + '" alt="' + esc(o.label) + '" loading="lazy">'
+                       + '<span>' + esc(o.label) + '</span></button>';
+                }
+                h += '</div><div class="ow-av-hint">点击任一插图即刻生效；想换一张就再点另一张。</div>';
+                box.innerHTML = h;
+                var cells = box.getElementsByTagName('button');
+                for (var j = 0; j < cells.length; j++) {
+                    cells[j].onclick = function () {
+                        var slug = this.getAttribute('data-slug');
+                        self.saveAvatarStyle(slug, rid);
+                    };
+                }
+            });
+        },
+
+        /** 保存生成式头像。rid>0 表示群头像，0 表示本人 */
+        saveAvatarStyle: function (slug, rid) {
+            var self = this;
+            var seed = String(Date.now()) + '-' + Math.floor(Math.random() * 100000);
+            if (parseInt(rid || '0', 10) > 0) {
+                var room = this.cfg.rooms || [];
+                for (var i = 0; i < room.length; i++) {
+                    if (parseInt(room[i].id, 10) !== parseInt(rid, 10)) continue;
+                    OwApi.post('room_update', {
+                        id: rid, name: room[i].name, description: room[i].description || '',
+                        avatar: '', avatar_type: 'generated', avatar_style: slug, avatar_seed: seed
+                    }, function (r) {
+                        toast(r.msg);
+                        if (!r.ok) return;
+                        if (r.url) room[i].avatar = r.url;   // 就地更新，避免重拉整份列表
+                        self.closeModal();
+                        self.renderConversations();
+                        self.renderRoomPanel();
+                    });
+                    return;
+                }
+                toast('群聊信息已变化，请重新打开');
+                return;
+            }
+            OwApi.post('avatar_save', {
+                avatar_type: 'generated', avatar_style: slug, avatar_seed: seed
+            }, function (r) {
+                toast(r.msg);
+                if (!r.ok) return;
+                if (self.cfg.me) self.cfg.me.avatar = r.url;
+                var pv = $('owSetAvatarPreview');
+                if (pv) pv.innerHTML = avatarHtml(r.url, self.cfg.me ? self.cfg.me.nickname : '', 'lg', 'user');
+                var cv = $('owCardAvatarPreview');
+                if (cv) cv.innerHTML = avatarHtml(r.url, self.cfg.me ? self.cfg.me.nickname : '', 'lg', 'user');
+                self.renderMe();
+                self.closeModal();
+            });
+        },
+
 
         /**
          * 保存群聊设置（群聊设置弹窗内的表单，v1.1.10）
@@ -4432,27 +4618,6 @@
          * 通用头像上传（复用用户头像上传 API：kind=avatar，服务端统一裁 100x100）。
          * 上传成功后调用 onOk(url)；UI 行为由调用方决定（个人头像 / 群聊头像）。
          */
-        uploadAvatarBlob: function (file, filename, onOk) {
-            var fd = new FormData();
-            var s = OwApi.sign('upload');
-            fd.append('ts', s.ts);
-            fd.append('sign', s.sign);
-            fd.append('kind', 'avatar');
-            fd.append('file', file, filename || (file.name || 'avatar.jpg'));
-            var x = new XMLHttpRequest();
-            x.open('POST', '?action=upload', true);
-            x.onreadystatechange = function () {
-                if (x.readyState !== 4) return;
-                var r = null;
-                try { r = JSON.parse(x.responseText); } catch (e) {}
-                r = r || { ok: false, msg: '网络错误' };
-                if (!r.ok) { toast(r.msg); return; }
-                if (onOk) onOk(r.url);
-            };
-            x.onerror = function () { toast('上传失败，请重试'); };
-            x.send(fd);
-        },
-
         /**
          * 上传个人头像（file 可为 File 或 canvas 导出的 Blob），成功后刷新全部预览。
          *
@@ -4461,21 +4626,25 @@
          * 原先只回填前者，于是从资料卡上传后，卡片里的头像还是旧图
          * （必须关掉再打开才刷新），而资料卡恰恰是最新的入口。
          * 裁剪 → 导出 → 上传 → 回填这一整条链路由 cropForTarget / avatarCropSave
-         * 与本方法共享，群聊头像另走 roomAvatarUpload 但复用 uploadAvatarBlob。
+         * 与本方法共享，群聊头像另走 roomAvatarUpload，两者都经插件注入的 uploader。
          */
         avatarUpload: function (file, filename) {
             var self = this;
+            // v1.3.11：核心不再有上传实现 —— 由附件上传插件经 registerAvatarUploader 注入。
+            // 插件未启用时头像并非不可换：设置弹窗里还有「浏览插图」（生成式头像）。
+            if (!this._avatarUploader) {
+                toast('上传头像需要启用「附件上传」插件；也可以在头像设置里选「浏览插图」');
+                return;
+            }
             try {
-                self.uploadAvatarBlob(file, filename, function (url) {
-                    self.cfg.me.avatar = url;
-                    // 设置弹窗预览
+                this._avatarUploader(file, filename, function (url) {
+                    if (self.cfg.me) self.cfg.me.avatar = url;
                     var pv = $('owSetAvatarPreview');
-                    if (pv) pv.innerHTML = avatarHtml(url, self.cfg.me.nickname, 'lg', self.cfg.me.role);
-                    // 自己的资料卡预览
+                    if (pv) pv.innerHTML = avatarHtml(url, self.cfg.me ? self.cfg.me.nickname : '', 'lg', 'user');
                     var cv = $('owCardAvatarPreview');
-                    if (cv) cv.innerHTML = avatarHtml(url, self.cfg.me.nickname, 'lg', self.cfg.me.role);
+                    if (cv) cv.innerHTML = avatarHtml(url, self.cfg.me ? self.cfg.me.nickname : '', 'lg', 'user');
                     self.renderMe();
-                    toast('头像已上传，点击保存生效');
+                    toast('头像已上传');
                 });
             } catch (e) {
                 toast('上传失败，请重试');
@@ -4485,7 +4654,8 @@
         /** 上传群聊头像：右侧栏内回显（保存时随 room_update 提交） */
         roomAvatarUpload: function (file, filename) {
             var self = this;
-            self.uploadAvatarBlob(file, filename, function (url) {
+            if (!this._avatarUploader) { toast('上传群头像需要启用「附件上传」插件；也可以选「浏览插图」'); return; }
+            this._avatarUploader(file, filename, function (url) {
                 self._roomAvatar = url;
                 var pv = $('owRoomAvatarPreview');
                 if (pv) {
@@ -4503,9 +4673,10 @@
 
         saveSettings: function () {
             var self = this;
+            // v1.3.11：头像独立保存（上传/生成式），资料保存只提交昵称 ——
+            // 否则这里回传的已算好的 URL 会被服务端当成「头像路径非法」。
             OwApi.post('profile_save', {
-                nickname: $('owSetNick').value,
-                avatar: this.cfg.me.avatar || ''
+                nickname: $('owSetNick').value
             }, function (r) {
                 toast(r.msg);
                 if (r.ok) { self.cfg.me.nickname = $('owSetNick').value; self.renderMe(); self.closeModal(); }

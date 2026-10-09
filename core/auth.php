@@ -307,11 +307,51 @@ class Auth
         if (!$ok) return [false, $nick];
         Chat::filterText($nick, 'nickname');   // 敏感词过滤（sensitive-words 插件经 text.filter 钩子处理）
         $uid = (int)$user['id'];
-        DB::run('UPDATE users SET nickname=?, avatar=? WHERE id=?', [$nick, $avatar, $uid]);
-        // 同步本人发出的历史消息（含私信里的「对我」显示名）
-        DB::run('UPDATE messages SET nickname=?, avatar=? WHERE user_id=?', [$nick, $avatar, $uid]);
+        $avatar = trim($avatar);
+        // v1.3.11：头像已独立成 setAvatar()（上传/生成式两条路），资料保存只在**显式传了路径**时才动它。
+        // 以前是无条件覆盖，前端表单里恒传空串 → 每保存一次昵称就把头像清空。
+        if ($avatar !== '') {
+            if (strpos($avatar, 'uploads/') !== 0) return [false, '头像路径非法'];
+            DB::run('UPDATE users SET nickname=?, avatar=?, avatar_type=? WHERE id=?', [$nick, $avatar, 'upload', $uid]);
+            DB::run('UPDATE messages SET nickname=?, avatar=? WHERE user_id=?', [$nick, $avatar, $uid]);
+        } else {
+            DB::run('UPDATE users SET nickname=? WHERE id=?', [$nick, $uid]);
+            DB::run('UPDATE messages SET nickname=? WHERE user_id=?', [$nick, $uid]);
+        }
         DB::run('UPDATE messages SET to_nickname=? WHERE to_user_id=?', [$nick, $uid]);
         return [true, '资料已更新'];
+    }
+
+    /**
+     * 设置头像（v1.3.11）。两种来源：
+     *   upload    —— $path 为上传后的相对路径（由附件上传插件调用落库）
+     *   generated —— $style/$seed 指定生成式头像，path 置空以免与类型冲突
+     *
+     * 选生成式时**清空 avatar 字段**：否则 avatarUrlFor 会因「有路径优先」继续显示旧图。
+     * 换头像不改 nickname，因此不碰 messages 快照 —— 历史消息里的头像保持发送时的样子。
+     */
+    public static function setAvatar(array $user, string $type, string $path = '', string $style = '', string $seed = ''): array
+    {
+        $uid = (int)$user['id'];
+        if ($type === 'upload') {
+            $path = ltrim(trim($path), '/');
+            if ($path === '') return [false, '缺少头像文件'];
+            // 只接受 uploads/ 下的路径，防目录穿越 / 外链
+            if (strpos($path, 'uploads/') !== 0) return [false, '头像路径非法'];
+            DB::run('UPDATE users SET avatar=?, avatar_type=?, avatar_style=?, avatar_seed=? WHERE id=?',
+                [$path, 'upload', '', '', $uid]);
+            return [true, '头像已更新'];
+        }
+        if ($type === 'generated') {
+            $style = self::avatarStyle($style);
+            $seed  = trim($seed);
+            if ($seed === '') $seed = (string)$uid;
+            $seed = mb_substr($seed, 0, 40);
+            DB::run('UPDATE users SET avatar=?, avatar_type=?, avatar_style=?, avatar_seed=? WHERE id=?',
+                ['', 'generated', $style, $seed, $uid]);
+            return [true, '头像已更新'];
+        }
+        return [false, '未知头像类型'];
     }
 
     /** 角色权重（数值越大权限越高） */
@@ -333,7 +373,9 @@ class Auth
                 'kind' => 'user', 'id' => (int)$user['id'],
                 'nickname' => $user['nickname'],
                 'role' => $user['role'], 'title' => $user['title'] ?? '',
-                'avatar' => $user['avatar'] ?? '', 'key' => $user['client_key'],
+                // v1.3.11：直接下发**最终 URL**（上传图或生成式），前端不再拼路径
+                'avatar' => self::avatarUrlFor($user, (string)$user['id']),
+                'key' => $user['client_key'],
                 'birthdate' => (string)($user['birthdate'] ?? ''),
             ];
         }
@@ -341,10 +383,189 @@ class Auth
             return [
                 'kind' => 'guest', 'id' => (int)$guest['id'],
                 'nickname' => $guest['nickname'],
-                'role' => 'guest', 'title' => '', 'avatar' => '',
+                'role' => 'guest', 'title' => '',
+                // 游客没有用户行，种子取 client_key —— 同一浏览器每次进来头像一致
+                'avatar' => self::avatarGeneratedUrl('', (string)($guest['client_key'] ?? 'guest')),
                 'key' => $guest['client_key'],
             ];
         }
-        return ['kind' => 'none', 'key' => ''];
+        // 未建立身份（连游客都没生成）：也给一个匿名头像，别留空白
+        return ['kind' => 'none', 'key' => '', 'avatar' => self::avatarGeneratedUrl('', 'anonymous')];
+    }
+
+    // ================= 生成式头像（v1.3.11） =================
+    //
+    // 定位：头像是「风格 + 种子」的生成结果（模型参考 参考文献/bbs1org-main），
+    // 而不是一张存路径的图片。好处是换风格只要改两个字段，不用重新上传。
+    //
+    // 三种来源，按优先级：
+    //   1. upload    —— avatar_type='upload' 且 avatar 有路径（上传图，插件写入）
+    //   2. generated —— DiceBear 官方 API（设置 avatar_source=api）
+    //   3. identicon —— 内置纯 PHP 几何头像（设置 avatar_source=identicon，或远程 onerror 兜底）
+    //
+    // ⚠️ 存量兼容：老记录 avatar_type 为空但 avatar 有值 → 按「有上传路径就用上传」处理。
+
+    /** 生成式头像的默认风格（用户指定：open-peeps + 五色背景） */
+    public const AVATAR_DEFAULT_STYLE = 'open-peeps';
+
+    /**
+     * 可选风格表。结构：slug => [中文名, 官方推荐参数（不含 seed）]。
+     *
+     * 参数来自 DiceBear 10.x 各风格的官方示例：它们决定了该风格的「性格」
+     * （如 adventurer 关掉配饰、fun-emoji 指定眼睛与嘴型），
+     * **换 seed 时这些参数保持不变** —— 用户看到的差异只来自种子。
+     * 全部取自用户指定清单，去掉了 identicon（那是内置几何头像的同源名，不走 API）。
+     */
+    public static function avatarStyles(): array
+    {
+        static $s = null;
+        if ($s !== null) return $s;
+        $s = [
+            'adventurer'       => ['冒险者', 'backgroundColor=&detailsProbability=0&earringsProbability=0&glassesProbability=0'],
+            'avataaars'        => ['阿凡达', 'backgroundColor=ffd5a8,ff9db4&backgroundColorFill=linear&backgroundColorAngle=45'],
+            'big-ears'         => ['大耳朵', 'detailsProbability=0'],
+            'big-smile'        => ['大笑', 'backgroundColor=ffe3ea,e3edff,e2f5e9,fdf1d4,efe6ff'],
+            'bottts'           => ['机器人', 'backgroundColor=&textureProbability=0'],
+            'clay'             => ['黏土', 'mouthVariant=teeth,smile,o,frown,line,wavy,toothy,pout,grin,smirk,zigzag,dot,cat,smileBig,uu,openSmall&bodyColor=83b0a4,86a5c3,9793bd,8ba06b,6f9fb8&accentColor=5d8b80,63819e,70689c,6b7d4f'],
+            'critters'         => ['小动物', 'topProbability=0&patternProbability=0&cheeksProbability=0'],
+            'croodles-neutral' => ['中性涂鸦', 'backgroundColor=ffffff'],
+            'cutouts'          => ['剪纸', 'browsProbability=0&cheeksProbability=0'],
+            'disco'            => ['迪斯科', 'scale=1.4'],
+            'dylan'            => ['迪伦', 'facialHairProbability=0'],
+            'fun-emoji'        => ['表情', 'eyesVariant=closed,closed2,cute,glasses,plain,sad,shades,sleepClose,wink,wink2&mouthVariant=cute,faceMask,lilSmile,plain,sad,shy,smileTeeth,wideSmile'],
+            'gaze'             => ['凝视', 'shapeVariant=circle,square,triangle,pentagon,hexagon,octagon,diamond'],
+            'glass'            => ['玻璃', 'backgroundColor=ff2e88,00e5ff,ffe600,7cff00,ff6a00,b400ff'],
+            'glyphs'           => ['字形', 'glyphColor=2f6fb5,2f8f8a,4a5fb8,6b4bd6,2f9ec4'],
+            'initial-face'     => ['首字母', 'backgroundColor=ffe3ea,e3edff,e2f5e9,fdf1d4,efe6ff'],
+            'lorelei'          => ['洛丽', 'backgroundColor=&beardProbability=0&earringsProbability=0&frecklesProbability=0&glassesProbability=0&hairAccessoriesProbability=0'],
+            'micah'            => ['米卡', 'backgroundColor=&earringsProbability=0&glassesProbability=0&facialHairProbability=0'],
+            'miniavs'          => ['迷你人', 'backgroundColor=ffe3ea,e3edff,e2f5e9,fdf1d4,efe6ff'],
+            'notionists'       => ['概念派', 'backgroundColor=&beardProbability=0&gestureProbability=0&glassesProbability=0&clothesGraphicProbability=0'],
+            'open-peeps'       => ['小可爱', 'backgroundColor=ff8fab,ffb703,4cc9a7,4d96ff,b57bff'],
+            'pixel-art-neutral' => ['像素', ''],
+            'shape-grid'       => ['网格', ''],
+            'shapes'           => ['几何', ''],
+            'sprouts'          => ['豆苗', 'patternProbability=0&cheeksProbability=0'],
+            'thumbs'           => ['大拇指', ''],
+            'toon-head'        => ['卡通头', 'beardProbability=0&rearHairProbability=0'],
+            'voxel-art'        => ['体素', 'beardProbability=0&glassesProbability=0&cheeksProbability=0'],
+            'voxel-bot'        => ['体素机器人', 'topProbability=0&chestProbability=0'],
+            'waves'            => ['波浪', ''],
+            'weave'            => ['编织', ''],
+        ];
+        return $s;
+    }
+
+    /** 校验风格名，非法回落默认风格 */
+    public static function avatarStyle(string $style): string
+    {
+        $styles = self::avatarStyles();
+        return ($style !== '' && isset($styles[$style])) ? $style : self::AVATAR_DEFAULT_STYLE;
+    }
+
+    /**
+     * 头像 URL（provider 分流）。
+     *
+     * @param array  $row   users / rooms 的一行（需含 avatar/avatar_type/avatar_style/avatar_seed）
+     * @param string $seedFallback 派生种子用的稳定值（uid 或 client_key）
+     */
+    public static function avatarUrlFor(array $row, string $seedFallback = ''): string
+    {
+        $type = (string)($row['avatar_type'] ?? '');
+        $path = (string)($row['avatar'] ?? '');
+        // 上传优先：avatar_type 缺省（存量）但有路径时，也按上传处理
+        if ($path !== '' && ($type === '' || $type === 'upload')) {
+            return self::avatarFileUrl($path);
+        }
+        $seed = (string)($row['avatar_seed'] ?? '');
+        if ($seed === '') $seed = $seedFallback;
+        return self::avatarGeneratedUrl((string)($row['avatar_style'] ?? ''), $seed);
+    }
+
+    /**
+     * 上传文件的可访问 URL（头像、群头像走这里）。
+     * 站点根拿不到时（CLI / host 缺失）退回相对路径 —— 前端按相对当前页解析。
+     */
+    public static function avatarFileUrl(string $rel): string
+    {
+        $rel = ltrim($rel, '/');
+        if ($rel === '') return '';
+        $base = function_exists('ow_site_url') ? ow_site_url() : '';
+        return $base !== '' ? $base . '/' . $rel : $rel;
+    }
+
+    /**
+     * 生成式头像 URL：设置 avatar_source 决定走 API 还是内置 identicon。
+     * 插件可用 `avatar.url` 钩子改写最终地址（将来的本地化资源接这个口子）。
+     */
+    public static function avatarGeneratedUrl(string $style, string $seed): string
+    {
+        $style = self::avatarStyle($style);
+        $seed  = $seed !== '' ? $seed : (string)random_int(1, 100000);
+        $source = self::avatarSource();
+        $url = ($source === 'identicon')
+            ? self::avatarIdenticon($seed)
+            : 'https://api.dicebear.com/10.x/' . rawurlencode($style) . '/svg?'
+                . self::avatarStyles()[$style][1] . (self::avatarStyles()[$style][1] !== '' ? '&' : '') . 'seed=' . rawurlencode($seed);
+        if (class_exists('Plugin')) {
+            // ⚠️ fire() 没有返回值，插件改写靠**引用传参**：
+            //    Plugin::on('avatar.url', function (&$url, $ctx) { $url = '...'; });
+            Plugin::fire('avatar.url', [&$url, ['style' => $style, 'seed' => $seed, 'source' => $source]]);
+        }
+        return $url;
+    }
+
+    /** 头像来源：api（官方 API，默认）| identicon（内置几何，零请求） */
+    public static function avatarSource(): string
+    {
+        try { $s = (string)DB::setting('avatar_source', 'api'); } catch (Throwable $e) { $s = 'api'; }
+        return $s === 'identicon' ? 'identicon' : 'api';
+    }
+
+    /**
+     * 内置 identicon：5×5 对称网格 + 色相哈希，纯 PHP 生成 SVG（data URI）。
+     *
+     * 为什么要有它：官方 API 在国内访问不稳定，`<img>` 加载失败就是一片碎图；
+     * 前端 onerror 兜底到这个（见 chat.js 的 owAvatarImg），保证永不破相，
+     * 同时也是「内网 / 离线部署」与 avatar_source=identicon 时的唯一依赖。
+     * 算法：crc32(seed) → 色相；取 11 位二进制 → 左三列决定图案，右两列镜像。
+     */
+    public static function avatarIdenticon(string $seed): string
+    {
+        $hash = (int)(sprintf('%u', crc32($seed !== '' ? $seed : 'owl')));
+        $hue  = $hash % 360;
+        $fg   = 'hsl(' . $hue . ',62%,48%)';
+        $bg   = 'hsl(' . (($hue + 200) % 360) . ',42%,90%)';
+        $bits = ($hash >> 5) & 0x7FF;      // 11 位够画 3×5
+        $rects = '';
+        for ($y = 0; $y < 5; $y++) {
+            for ($x = 0; $x < 3; $x++) {
+                if (!($bits & (1 << ($y * 3 + $x)))) continue;
+                $rects .= '<rect x="' . $x . '" y="' . $y . '" width="1" height="1"/>'
+                        . '<rect x="' . (4 - $x) . '" y="' . $y . '" width="1" height="1"/>';
+            }
+        }
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 5" shape-rendering="crispEdges">'
+             . '<rect width="5" height="5" fill="' . $bg . '"/>'
+             . '<g fill="' . $fg . '">' . $rects . '</g></svg>';
+        return 'data:image/svg+xml;base64,' . base64_encode($svg);
+    }
+
+    /**
+     * 风格选择面板用的清单（给前端渲染网格）：slug + 中文名 + 预览 URL。
+     * 预览图用随机种子，只用于选样式，不影响最终头像。
+     */
+    public static function avatarStyleOptions(int $previewSeed = 0): array
+    {
+        $out = [];
+        $seed = $previewSeed > 0 ? (string)$previewSeed : (string)random_int(1, 100000);
+        foreach (self::avatarStyles() as $slug => $meta) {
+            $out[] = [
+                'slug'  => $slug,
+                'label' => $meta[0],
+                'url'   => self::avatarGeneratedUrl($slug, $slug . '-' . $seed),
+            ];
+        }
+        return $out;
     }
 }

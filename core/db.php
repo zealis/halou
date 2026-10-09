@@ -288,6 +288,25 @@ class DB
         // 与 recalled（撤回）区分：撤回是用户自己的动作且不涉及合规留痕。
         self::addColumn('messages', 'deleted', 'int', '0');
         self::addColumn('messages', 'deleted_at', 'int', '0');
+
+        // ---------- 生成式头像（v1.3.11） ----------
+        // 字段模型参考 参考文献/bbs1org-main：`风格 + 种子` 而不是图片路径。
+        //   avatar_type  'upload' = 用 avatar 里的上传路径；'generated'/'空' = 用风格生成
+        //   avatar_style 风格 slug（见 Auth::avatarStyles()，对应 DiceBear 10.x 风格名）
+        //   avatar_seed  生成种子；为空时由服务端按 client_key / uid 稳定派生，
+        //                同一账号每次进站拿到同一个头像
+        // ⚠️ 存量数据不迁移：老记录 avatar_type 默认**空**，渲染时按
+        //    「avatar 有上传路径就用上传」兼容（见 Auth::avatarUrlFor）。
+        //    正是为了这个，avatar_type 的默认值必须是空串而不是 'generated' ——
+        //    ALTER TABLE ADD COLUMN 的默认值会回填到所有既有行。
+        self::addColumn('users', 'avatar_type', 'str', "''");
+        self::addColumn('users', 'avatar_style', 'str', "''");
+        self::addColumn('users', 'avatar_seed', 'str', "''");
+        // 群聊同一套字段；**默认为空 = 回落创建者头像**（用户明确要求：
+        // 群没有自定义头像就用创建者的头像）。原来的固定剪影图一并去掉。
+        self::addColumn('rooms', 'avatar_type', 'str', "''");
+        self::addColumn('rooms', 'avatar_style', 'str', "''");
+        self::addColumn('rooms', 'avatar_seed', 'str', "''");
         self::addColumn('messages', 'deleted_by', 'varchar(64)', "''");
         // ⚠️ v1.2.4：keep_forever（免清理标记）已随「撤回=立即物理删除」下线。
         // 撤回的消息根本不进库，不存在「被保留期清理」的问题，该标记失去意义。

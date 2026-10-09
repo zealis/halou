@@ -37,11 +37,12 @@ class Chat
         // MIN(created_at) 取最早一次建立时间，列表仍按昵称排序，结果稳定。
         // ⚠️ 三个占位符必须分开写：PDO 原生预处理不允许同一命名占位重复绑定。
         $rows = DB::all(
-            'SELECT u.id, u.nickname, u.avatar, u.role, u.title, MIN(f.created_at) AS created_at
+            'SELECT u.id, u.nickname, u.avatar, u.avatar_type, u.avatar_style, u.avatar_seed,
+                    u.role, u.title, MIN(f.created_at) AS created_at
              FROM friends f
              JOIN users u ON u.id = CASE WHEN f.user_id = ? THEN f.friend_id ELSE f.user_id END
              WHERE f.user_id = ? OR f.friend_id = ?
-             GROUP BY u.id, u.nickname, u.avatar, u.role, u.title
+             GROUP BY u.id, u.nickname, u.avatar, u.avatar_type, u.avatar_style, u.avatar_seed, u.role, u.title
              ORDER BY u.nickname COLLATE NOCASE ASC',
             [$me, $me, $me]);
         $out = [];
@@ -49,7 +50,7 @@ class Chat
             $out[] = [
                 'user_id' => (int)$r['id'],
                 'nickname' => (string)$r['nickname'],
-                'avatar'   => (string)($r['avatar'] ?? ''),
+                'avatar'   => Auth::avatarUrlFor($r, (string)$r['id']),
                 'role'     => (string)($r['role'] ?? 'member'),
                 'title'    => (string)($r['title'] ?? ''),
                 'added_at' => (int)$r['created_at'],
@@ -98,6 +99,29 @@ class Chat
     }
 
     // ---------- 房间 ----------
+    /**
+     * 群头像：自定义优先，否则**回落创建者头像**（v1.3.11 用户要求）。
+     * 顺序：上传图 → 群自己的生成式风格 → 创建者头像 → 用群 id 派生一个（不空）。
+     */
+    public static function roomAvatarUrl(array $room): string
+    {
+        $type = (string)($room['avatar_type'] ?? '');
+        $path = (string)($room['avatar'] ?? '');
+        if ($path !== '' && ($type === '' || $type === 'upload')) return Auth::avatarFileUrl($path);
+        $rid  = (int)($room['id'] ?? 0);
+        if ($type === 'generated') {
+            $seed = (string)($room['avatar_seed'] ?? '');
+            return Auth::avatarGeneratedUrl((string)($room['avatar_style'] ?? ''), $seed !== '' ? $seed : 'room-' . $rid);
+        }
+        $ownerId = (int)($room['owner_id'] ?? 0);
+        if ($ownerId > 0) {
+            $u = DB::one('SELECT id, avatar, avatar_type, avatar_style, avatar_seed FROM users WHERE id=?', [$ownerId]);
+            if ($u) return Auth::avatarUrlFor($u, (string)$ownerId);
+        }
+        // 创建者已被删除 → 用群 id 派生一个，保证列表里不留空白
+        return Auth::avatarGeneratedUrl('', 'room-' . $rid);
+    }
+
     public static function rooms(array $actor): array
     {
         $list = DB::all('SELECT * FROM rooms WHERE status=1 ORDER BY id');
@@ -116,7 +140,8 @@ class Chat
                     || (isset($mineSet[(int)$r['id']]) && $actor['kind'] === 'user'),
                 'description' => $r['description'] ?? '',
                 'owner_id' => (int)($r['owner_id'] ?? 0),
-                'avatar' => (string)($r['avatar'] ?? ''),
+                // v1.3.11：群头像 = 自定义 → 创建者头像 → 群 id 派生（不再用固定剪影图）
+                'avatar' => self::roomAvatarUrl($r),
                 'mine' => (int)($r['owner_id'] ?? 0) === (int)($actor['id'] ?? 0) && $actor['kind'] === 'user',
             ];
             // 前台可编辑（群聊设置弹窗 / 右侧栏入口）：群主 + 超级管理员。
@@ -218,7 +243,7 @@ class Chat
     {
         $rows = DB::all(
             'SELECT rm.id, rm.user_id, rm.invited_by, rm.created_at,
-                    u.nickname, u.role, u.avatar
+                    u.nickname, u.role, u.avatar, u.avatar_type, u.avatar_style, u.avatar_seed
              FROM room_members rm LEFT JOIN users u ON u.id = rm.user_id
              WHERE rm.room_id=? ORDER BY rm.created_at DESC', [(int)$room['id']]);
         $out = [];
@@ -227,7 +252,8 @@ class Chat
                 'user_id' => (int)$r['user_id'],
                 'nickname' => (string)($r['nickname'] ?? ''),
                 'role' => (string)($r['role'] ?? 'member'),
-                'avatar' => (string)($r['avatar'] ?? ''),
+                // v1.3.11：下发最终 URL（上传图或生成式）
+                'avatar' => Auth::avatarUrlFor($r, (string)($r['user_id'] ?? '')),
                 'invited_by' => (int)($r['invited_by'] ?? 0),
                 'created_at' => (int)$r['created_at'],
             ];
@@ -305,13 +331,13 @@ class Chat
         }
         // 群主补位：建群时不一定给自己插 room_members 行，但群主恒为成员
         if ($ownerId > 0 && !isset($seen[$ownerId])) {
-            $u = DB::one('SELECT nickname, role, avatar FROM users WHERE id=?', [$ownerId]);
+            $u = DB::one('SELECT nickname, role, avatar, avatar_type, avatar_style, avatar_seed FROM users WHERE id=?', [$ownerId]);
             if ($u) {
                 $out[] = [
                     'uid' => $ownerId, 'gid' => null, 'kind' => 'user',
                     'nickname' => (string)$u['nickname'],
                     'role' => (string)($u['role'] ?: 'member'),
-                    'avatar' => (string)($u['avatar'] ?? ''),
+                    'avatar' => Auth::avatarUrlFor($u, (string)$ownerId),
                     'online' => isset($onlineSet[$ownerId]),
                     'is_owner' => true,
                 ];
@@ -824,11 +850,14 @@ class Chat
     public static function dmPeerInfo(string $kind, int $id): array
     {
         if ($kind === 'user') {
-            $u = DB::one('SELECT id, nickname, avatar FROM users WHERE id=?', [$id]);
-            return $u ? ['kind' => 'user', 'id' => (int)$u['id'], 'name' => (string)$u['nickname'], 'avatar' => (string)($u['avatar'] ?? '')] : [];
+            $u = DB::one('SELECT id, nickname, avatar, avatar_type, avatar_style, avatar_seed FROM users WHERE id=?', [$id]);
+            return $u ? ['kind' => 'user', 'id' => (int)$u['id'], 'name' => (string)$u['nickname'],
+                'avatar' => Auth::avatarUrlFor($u, (string)$id)] : [];
         }
-        $g = DB::one('SELECT id, nickname FROM guests WHERE id=?', [$id]);
-        return $g ? ['kind' => 'guest', 'id' => (int)$g['id'], 'name' => '游客' . substr((string)$g['nickname'], 2), 'avatar' => ''] : [];
+        $g = DB::one('SELECT id, nickname, client_key FROM guests WHERE id=?', [$id]);
+        // 游客头像：种子取 client_key（同一浏览器每次一致）
+        return $g ? ['kind' => 'guest', 'id' => (int)$g['id'], 'name' => '游客' . substr((string)$g['nickname'], 2),
+            'avatar' => Auth::avatarGeneratedUrl('', (string)($g['client_key'] ?? 'guest'))] : [];
     }
 
     // ---------- 会话置顶（v1.2.28，**按用户**生效） ----------
@@ -1027,13 +1056,13 @@ class Chat
             case 'people':
                 $out = [];
                 // 找人：昵称模糊 **或** ID 精确（v1.2.32 支持直接输 ID 找人）；排除自己
-                $sql = 'SELECT id, nickname, avatar, role FROM users
+                $sql = 'SELECT id, nickname, avatar, avatar_type, avatar_style, avatar_seed, role FROM users
                         WHERE status=1 AND (nickname LIKE ?' . ($idNum > 0 ? ' OR id=?' : '') . ')
                           AND id<>? ORDER BY nickname LIMIT 20';
                 $args = $idNum > 0 ? [$like, $idNum, (int)($actor['id'] ?? 0)] : [$like, (int)($actor['id'] ?? 0)];
                 foreach (DB::all($sql, $args) as $u) {
                     $out[] = ['type' => 'user', 'user_id' => (int)$u['id'], 'nickname' => (string)$u['nickname'],
-                        'avatar' => (string)($u['avatar'] ?? ''), 'role' => (string)$u['role']];
+                        'avatar' => Auth::avatarUrlFor($u, (string)$u['id']), 'role' => (string)$u['role']];
                 }
                 // 找群：名称模糊 **或** ID 精确；仍走 rooms() 过 canEnter（游客看不到的不给）
                 foreach (self::rooms($actor) as $r) {
@@ -1050,14 +1079,17 @@ class Chat
                 if (($actor['kind'] ?? '') !== 'user') return [];
                 $out = [];
                 // 好友：昵称模糊 **或** ID 精确（v1.2.32）
-                $sql = 'SELECT u.id, u.nickname, u.avatar, u.role FROM friends f
-                        JOIN users u ON u.id = f.friend_id
-                        WHERE f.user_id=? AND u.status=1 AND (u.nickname LIKE ?' . ($idNum > 0 ? ' OR u.id=?' : '') . ')
+                $sql = 'SELECT u.id, u.nickname, u.avatar, u.avatar_type, u.avatar_style, u.avatar_seed, u.role FROM friends f
+                        JOIN users u ON u.id = CASE WHEN f.user_id = ? THEN f.friend_id ELSE f.user_id END
+                        WHERE (f.user_id=? OR f.friend_id=?) AND u.status=1 AND (u.nickname LIKE ?' . ($idNum > 0 ? ' OR u.id=?' : '') . ')
+                        GROUP BY u.id, u.nickname, u.avatar, u.avatar_type, u.avatar_style, u.avatar_seed, u.role
                         ORDER BY u.nickname LIMIT 30';
-                $args = $idNum > 0 ? [(int)$actor['id'], $like, $idNum] : [(int)$actor['id'], $like];
+                $args = $idNum > 0
+                    ? [(int)$actor['id'], (int)$actor['id'], (int)$actor['id'], $like, $idNum]
+                    : [(int)$actor['id'], (int)$actor['id'], (int)$actor['id'], $like];
                 foreach (DB::all($sql, $args) as $u) {
                     $out[] = ['type' => 'user', 'user_id' => (int)$u['id'], 'nickname' => (string)$u['nickname'],
-                        'avatar' => (string)($u['avatar'] ?? ''), 'role' => (string)$u['role'], 'is_friend' => true];
+                        'avatar' => Auth::avatarUrlFor($u, (string)$u['id']), 'role' => (string)$u['role'], 'is_friend' => true];
                 }
                 // 好友补签名（插件）：signature 未启用时不阻断，与联系人列表同一口径
                 if ($out) {
@@ -1162,7 +1194,7 @@ class Chat
             'from' => (string)($m['nickname'] ?? ''),
             // v1.2.37：带发送者头像（一次性批量查表传入，避免每行一次查询）。
             // 游客消息没有用户身份，$avatars 里查不到 → 前端回退字母头像。
-            'avatar' => $uid > 0 ? (string)($avatars[$uid] ?? '') : '',
+            'avatar' => $uid > 0 ? (string)($avatars[$uid] ?? '') : Auth::avatarGeneratedUrl('', 'guest'),
             'user_id' => $uid,
             'text' => $snippet,
             'created_at' => (int)($m['created_at'] ?? 0),
@@ -1170,8 +1202,8 @@ class Chat
     }
 
     /**
-     * 批量取一组用户 id 的头像（user_id => avatar 相对路径）。
-     * 供搜索结果的消息行显示真实头像；查不到的不进数组。
+     * 批量取一组用户 id 的头像（user_id => **最终 URL**）。
+     * 供搜索结果的消息行显示真实头像；游客没有用户 id，前端按游客头像口径回退。
      */
     private static function avatarMap(array $rows): array
     {
@@ -1185,10 +1217,10 @@ class Chat
         $q = implode(',', array_fill(0, count($ids), '?'));
         $out = [];
         try {
-            foreach (DB::all("SELECT id, avatar FROM users WHERE id IN ($q)", $ids) as $u) {
-                if ((string)($u['avatar'] ?? '') !== '') $out[(int)$u['id']] = (string)$u['avatar'];
-            }
-        } catch (Throwable $e) { /* 查询失败就退回字母头像 */ }
+            // v1.3.11：带上生成式字段，批量换成最终 URL（避免每行一次查询）
+            $rs = DB::all("SELECT id, avatar, avatar_type, avatar_style, avatar_seed FROM users WHERE id IN ($q)", $ids);
+            foreach ($rs as $u) $out[(int)$u['id']] = Auth::avatarUrlFor($u, (string)$u['id']);
+        } catch (Throwable $e) { /* 查询失败就退回内置几何头像 */ }
         return $out;
     }
 
@@ -1527,7 +1559,7 @@ class Chat
      *
      * @return array [bool, string]
      */
-    public static function updateRoom(array $actor, int $roomId, string $name, string $description, string $avatar = '', ?int $isPublic = null): array
+    public static function updateRoom(array $actor, int $roomId, string $name, string $description, string $avatar = '', ?int $isPublic = null, array $opt = []): array
     {
         $room = self::room($roomId);
         if (!$room) return [false, '群聊不存在'];
@@ -1548,6 +1580,21 @@ class Chat
 
         $sets = ['name' => $name, 'description' => $description];
         if ($avatar !== '') $sets['avatar'] = $avatar;
+        // v1.3.11：生成式头像。传 avatarType=generated 时清空 avatar 路径并写风格/种子；
+        //   传 restore=1 表示「回到默认」= 清空自定义 → 渲染时回落创建者头像。
+        $avatarType = (string)($opt['avatar_type'] ?? '');
+        if ($avatarType === 'generated') {
+            $sets['avatar'] = '';
+            $sets['avatar_type'] = 'generated';
+            $sets['avatar_style'] = Auth::avatarStyle((string)($opt['avatar_style'] ?? ''));
+            $seed = trim((string)($opt['avatar_seed'] ?? ''));
+            $sets['avatar_seed'] = mb_substr($seed !== '' ? $seed : 'room-' . $roomId, 0, 40);
+        } elseif ($avatarType === 'default') {
+            $sets['avatar'] = '';
+            $sets['avatar_type'] = '';
+            $sets['avatar_style'] = '';
+            $sets['avatar_seed'] = '';
+        }
         // v1.1.11 公开性开关；null = 不改（兼容旧调用方，如后台）。
         // 切到「不公开」时若无邀请码，顺手生成一个，省得群主再点一次。
         if ($isPublic !== null) {

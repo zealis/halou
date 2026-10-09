@@ -342,6 +342,44 @@ Plugin::route('plugin_attachment_manager_upload_file', function (array $ctx) use
     Api::json(['ok' => true, 'file' => $res]);
 });
 
+/* ---------- 头像上传（v1.3.11 从核心迁入） ----------
+   为什么迁走：头像是「可换可不换」的可选功能，核心零上传入口更干净；
+   插件停用时用户仍可在头像设置里选**生成式头像**，不会出现「换不了头像」的功能空洞。
+   存储能力仍复用核心的 Upload::handle(kind=avatar)（内容哈希去重 + 真实 MIME 校验）。 */
+function owATStoreAvatar(array $f, array $actor): array
+{
+    if (($actor['kind'] ?? '') !== 'user') return [false, '游客没有账号头像'];
+    $err = (int)($f['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($err !== UPLOAD_ERR_OK) return [false, '上传失败（错误码 ' . $err . '）'];
+    $tmp = (string)($f['tmp_name'] ?? '');
+    $max = owATMaxBytes($actor);
+    if ($tmp !== '' && is_file($tmp) && (int)@filesize($tmp) > $max) {
+        return [false, '头像超过 ' . round($max / 1048576, 1) . ' MB 限制'];
+    }
+    return Upload::handle($f, 'avatar');   // 核心内部做 jpg/png/gif/webp 白名单校验
+}
+
+Plugin::route('plugin_attachment_manager_upload_avatar', function (array $ctx) use ($atGuard) {
+    if (!$atGuard($ctx)) Api::json(['ok' => false, 'msg' => '请先登录'], 403);
+    if (empty($ctx['files']['file'])) Api::json(['ok' => false, 'msg' => '未接收到文件'], 400);
+    if (($ctx['actor']['kind'] ?? '') !== 'user') Api::json(['ok' => false, 'msg' => '游客没有账号头像'], 403);
+
+    // 复用上传闸门（等级信任插件等按等级限制），kind 传 'avatar' 与历史口径一致
+    $allow = true; $reason = '';
+    Plugin::fire('upload.guard', [&$allow, &$reason, 'avatar', $ctx['actor']]);
+    if (!$allow) Api::json(['ok' => false, 'msg' => $reason !== '' ? $reason : '当前等级无法上传头像'], 403);
+
+    [$ok, $urlOrMsg] = owATStoreAvatar($ctx['files']['file'], $ctx['actor']);
+    if (!$ok) Api::json(['ok' => false, 'msg' => $urlOrMsg], 400);
+
+    // 落库：上传成功即写入 users（核心只保留 avatar_save 接口给「生成式」用）
+    [$ok2, $msg] = Auth::setAvatar($ctx['actor'], 'upload', $urlOrMsg);
+    if (!$ok2) Api::json(['ok' => false, 'msg' => $msg], 400);
+
+    Sec::log('upload_avatar', $ctx['actor']['nickname'], ['url' => $urlOrMsg]);
+    Api::json(['ok' => true, 'url' => Auth::avatarFileUrl($urlOrMsg), 'msg' => '头像已更新']);
+});
+
 /* ============================ 后台配置路由 ============================ */
 /** 管理员鉴权：插件路由的公共守卫。
  *  ⚠️ 必须定义在**所有 use($amGuard) 之前** —— use() 捕获的是变量**值**，

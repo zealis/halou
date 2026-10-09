@@ -1922,3 +1922,31 @@ input[type=range] {
 /* v1.2.47：气泡宽度上限再钳一道视口 —— 窄屏（手机）下 260px 会超出屏幕。
    min() 在老内核不生效时忽略整条，退回 owlsgo.css 上方的 max-width:260px，不会更糟。 */
 .ow-tip-box { max-width: min(260px, calc(100vw - 32px)); }
+
+/* ---------- 头像设置弹窗（v1.3.11） ----------
+   点击头像不再直接开文件选择，而是先弹这个框：
+   当前头像预览 + 「上传头像（插件启用时才有）」/「浏览插图」+ 群聊额外有「恢复默认」。 */
+.ow-av-dialog { padding: 4px 2px 2px; }
+.ow-av-current { text-align: center; margin-bottom: 14px; }
+.ow-av-current .ow-avatar { margin: 0 auto; display: -webkit-flex; display: flex; }
+.ow-av-current-tip { font-size: 12px; color: var(--ow-text-sub); margin-top: 6px; }
+.ow-av-actions { display: flex; flex-direction: column; gap: 8px; }
+.ow-av-actions .ow-btn { justify-content: center; display: -webkit-flex; display: flex; align-items: center; gap: 6px; }
+.ow-av-styles { margin-top: 14px; border-top: 1px solid var(--ow-border); padding-top: 12px; }
+.ow-av-loading { text-align: center; font-size: 13px; color: var(--ow-text-sub); padding: 18px 0; }
+.ow-av-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+    max-height: 320px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+.ow-av-cell {
+    border: 1px solid var(--ow-border); background: none; border-radius: 8px;
+    padding: 4px; cursor: pointer; display: block; width: 100%;
+}
+.ow-av-cell:hover { border-color: var(--ow-primary-strong); background: var(--ow-bg-chat-hover); }
+.ow-av-cell img { width: 100%; height: auto; aspect-ratio: 1 / 1; border-radius: 6px; display: block; background: var(--ow-bg-sub); }
+.ow-av-cell span {
+    display: block; font-size: 11px; color: var(--ow-text-sub); margin-top: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ow-av-hint { font-size: 12px; color: var(--ow-text-sub); margin-top: 10px; text-align: center; }
+@media (max-width: 720px) { .ow-av-grid { grid-template-columns: repeat(4, 1fr); } }

@@ -15,6 +15,19 @@
 
     var toast = w.toast || function (s) { w.alert(s); };
 
+    /* ---------- 头像上传（v1.3.11 从核心迁入） ----------
+       核心不再有 kind=avatar 的上传入口。插件在此注册实现：
+       核心的头像设置弹窗检测到注册后才显示「上传头像」选项，
+       没启用插件时用户仍可用「浏览插图」（生成式头像），功能不会变成死路。 */
+    if (OwChat.registerAvatarUploader && !OwChat._avatarUploader) {
+        OwChat.registerAvatarUploader(function (file, filename, onOk) {
+            OwApi.upload('plugin_attachment_manager_upload_avatar', file, {}, function (r) {
+                if (!r || !r.ok) { toast(r && r.msg ? r.msg : '头像上传失败'); return; }
+                onOk(r.url);
+            });
+        });
+    }
+
     /** 注入按钮（核心给的是空锚点；插不进去就安静退出，不报错） */
     function mount() {
         var box = d.getElementById('owAttachTools');

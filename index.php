@@ -629,8 +629,15 @@ if ($action !== '') {
             // 避免旧客户端保存群资料时把公开性意外改回默认值。
             $pubRaw = $_POST['is_public'] ?? null;
             $pub = ($pubRaw === null || $pubRaw === '') ? null : (($pubRaw === '0') ? 0 : 1);
-            [$ok, $msg] = Chat::updateRoom($actor, (int)$p('id'), (string)($_POST['name'] ?? ''), (string)($_POST['description'] ?? ''), (string)($_POST['avatar'] ?? ''), $pub);
-            Api::json(['ok' => $ok, 'msg' => $msg]);
+            [$ok, $msg] = Chat::updateRoom($actor, (int)$p('id'), (string)($_POST['name'] ?? ''), (string)($_POST['description'] ?? ''), (string)($_POST['avatar'] ?? ''), $pub, [
+                // v1.3.11：群头像支持生成式（generated）与「回到默认」（default → 回落创建者头像）
+                'avatar_type'  => (string)($_POST['avatar_type'] ?? ''),
+                'avatar_style' => (string)($_POST['avatar_style'] ?? ''),
+                'avatar_seed'  => (string)($_POST['avatar_seed'] ?? ''),
+            ]);
+            // v1.3.11：回传算好的头像 URL，前端就地更新 cfg.rooms，不必重拉列表
+            Api::json(['ok' => $ok, 'msg' => $msg,
+                'url' => $ok ? Chat::roomAvatarUrl(Chat::room((int)$p('id'))) : '']);
 
         // ---------- 删除消息（内容右键「删除」） ----------
         // v1.2.4：删除 = **一律只在本机隐藏**（写 message_hides），任何身份都是、
@@ -647,14 +654,14 @@ if ($action !== '') {
             Api::json(['ok' => $ok, 'msg' => $msg]);
 
         // ---------- 上传（v1.2.41 收窄） ----------
-        // ⚠️ 这里**只剩头像与表情贴纸**：聊天里的图片/文件附件上传已移入附件上传插件
-        //   （路由 plugin_attachment_manager_upload / _upload_file）。
-        //   之所以不把头像/贴纸也移走：它们是账号与表情功能，插件停用后换不了头像
-        //   会被用户当成「网站坏了」。
+        // v1.3.11：这里**只剩表情贴纸**。头像上传已移入附件上传插件
+        //   （路由 plugin_attachment_manager_upload_avatar）——
+        //   头像是最典型的「可换可不换」功能，插件停用后仍能选生成式头像，
+        //   不会被用户当成「网站坏了」。
         case 'upload':
-            $kind = $p('kind', 'avatar');
-            if (!in_array($kind, ['avatar', 'sticker'], true)) {
-                Api::json(['ok' => false, 'msg' => '图片与文件附件请使用附件上传功能'], 400);
+            $kind = $p('kind', 'sticker');
+            if (!in_array($kind, ['sticker'], true)) {
+                Api::json(['ok' => false, 'msg' => '头像与附件请使用附件上传功能'], 400);
             }
             if ($actor['kind'] !== 'user') Api::json(['ok' => false, 'msg' => '请先登录']);
             if (empty($_FILES['file'])) Api::json(['ok' => false, 'msg' => '未接收到文件']);
@@ -833,6 +840,21 @@ if ($action !== '') {
             if (!$user) Api::json(['ok' => false, 'msg' => '请先登录']);
             [$ok, $msg] = Auth::updateProfile($user, $p('nickname'), $p('avatar'));
             Api::json(['ok' => $ok, 'msg' => $msg]);
+
+        // ---------- 头像（v1.3.11：生成式 + 上传落库） ----------
+        // 上传本身走附件插件，这里只负责把「最终选择」写进 users 表。
+        case 'avatar_save':
+            if (!$user) Api::json(['ok' => false, 'msg' => '请先登录']);
+            $t = $p('avatar_type', 'generated');
+            [$ok, $msg] = Auth::setAvatar($user, $t, $p('avatar'), $p('avatar_style'), $p('avatar_seed'));
+            if (!$ok) Api::json(['ok' => false, 'msg' => $msg], 400);
+            // 回传算好的 URL，前端就地替换，不刷新页面
+            $row = DB::one('SELECT id, avatar, avatar_type, avatar_style, avatar_seed FROM users WHERE id=?', [(int)$user['id']]);
+            Api::json(['ok' => true, 'msg' => $msg, 'url' => Auth::avatarUrlFor($row, (string)$user['id'])]);
+
+        // 风格清单（头像设置弹窗的「浏览插图」网格）
+        case 'avatar_styles':
+            Api::json(['ok' => true, 'data' => Auth::avatarStyleOptions((int)$p('seed'))]);
 
         case 'user_card':
             $u = DB::one('SELECT id,nickname,role,title,avatar,points,created_at,last_login FROM users WHERE id=?', [(int)$p('id')]);
@@ -1339,7 +1361,7 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
         'me' => $user ? [
             'nickname' => $user['nickname'], 'id' => (int)$user['id'],
             'role' => $user['role'], 'title' => $user['title'] ?? '',
-            'avatar' => $user['avatar'] ?? '', 'points' => (int)($user['points'] ?? 0),
+            'avatar' => Auth::avatarUrlFor($user, (string)$user['id']), 'points' => (int)($user['points'] ?? 0),
         ] : null,
         'ts' => time(),
         'version' => OWLSGO_VERSION,
