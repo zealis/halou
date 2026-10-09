@@ -147,7 +147,9 @@ class Admin
             if ($act === 'reset_avatar') {
                 $old = (string)$room['avatar'];
                 $trash('reset_avatar', ['avatar' => $old]);
-                DB::run("UPDATE rooms SET avatar='' WHERE id=?", [$id]);
+                // v1.3.13：连带清 avatar_type/style/seed —— 只清路径的话，
+                // 生成式头像仍生效，「重置头像」等于没重置。
+                DB::run("UPDATE rooms SET avatar='', avatar_type='', avatar_style='', avatar_seed='' WHERE id=?", [$id]);
                 // 违规头像文件移入回收目录（不删除，撤销时移回）
                 if ($old !== '' && strpos($old, 'uploads/avatar/') === 0) {
                     $src = dirname(__DIR__) . '/' . $old;
@@ -214,8 +216,14 @@ class Admin
                 if ($ridR > 0) { $where[] = 'id=?'; $args[] = $ridR; }
                 $wR = $where ? ' WHERE ' . implode(' AND ', $where) : '';
                 $totalR = (int)DB::val('SELECT COUNT(*) FROM rooms' . $wR, $args);
-                $listR = DB::all('SELECT id, name, avatar, type, min_role, owner_id, status, created_at FROM rooms'
+                // v1.3.13：SELECT * —— 群头像要交给 Chat::roomAvatarUrl 算，
+                // 它需要 avatar_type/avatar_style/avatar_seed 三列（自定义 → 创建者 → 群 id 派生）。
+                $listR = DB::all('SELECT * FROM rooms'
                     . $wR . ' ORDER BY id LIMIT ' . $sizeR . ' OFFSET ' . (($pageR - 1) * $sizeR), $args);
+                // 与前台同口径：后台审核里看到的头像 = 前台显示的头像（原先直接给路径，
+                // 未自定义时是空串 → 后台列表一片空白，与前台的「创建者头像」对不上）
+                foreach ($listR as &$rr) { $rr['avatar'] = Chat::roomAvatarUrl($rr); }
+                unset($rr);
                 Api::json(['ok' => true, 'data' => ['list' => $listR, 'total' => $totalR, 'page' => $pageR, 'size' => $sizeR]]);
 
             case 'admin_room_review':

@@ -108,8 +108,13 @@ class Upload
         if ($f['size'] > self::$cfg['max_size']) return [false, '文件超过大小限制'];
         $info = @getimagesize($f['tmp_name']);
         if (!$info) return [false, '仅支持图片文件'];
-        $ext = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_GIF => 'gif', IMAGETYPE_WEBP => 'webp'][$info[2]] ?? null;
-        if (!$ext) return [false, '仅支持 jpg/png/gif/webp'];
+        // v1.3.13：补齐一般图片格式（用户要求）。SVG/ICO/TIFF 不在其中：
+        //   SVG 可内嵌脚本（XSS 面），ICO/TIFF 浏览器不能直接当 <img> 显示。
+        $ext = [
+            IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_GIF => 'gif',
+            IMAGETYPE_WEBP => 'webp', IMAGETYPE_BMP => 'bmp',
+        ][$info[2]] ?? null;
+        if (!$ext) return [false, '仅支持 jpg/jpeg/png/gif/webp/bmp'];
         return [true, $ext];
     }
 
@@ -256,7 +261,7 @@ class Upload
         $base = rtrim(ow_site_url(true), '/');
         $rel = ltrim($url);
         if ($base !== '' && stripos($rel, $base . '/') === 0) $rel = ltrim(substr($rel, strlen($base) + 1));
-        if (!preg_match('#^uploads/(avatar|sticker|image)/[A-Za-z0-9_\-]+(/[A-Za-z0-9_\-]+)?\.(jpg|jpeg|png|gif|webp)$#i', $rel)) {
+        if (!preg_match('#^uploads/(avatar|sticker|image)/[A-Za-z0-9_\-]+(/[A-Za-z0-9_\-]+)?\.(jpg|jpeg|png|gif|webp|bmp)$#i', $rel)) {
             return [false, '仅支持收藏本站上传的图片'];
         }
         $owner = $actor['kind'] . $actor['id'];

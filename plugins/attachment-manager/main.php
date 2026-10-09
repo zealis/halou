@@ -41,7 +41,8 @@ function owATDefaultConfig(): array
     return [
         'enabled' => '1',   // 是否允许上传附件（0=关闭）
         'max_mb'  => '10',  // 单文件大小上限（MB）
-        'exts'    => 'zip,rar,7z,pdf,txt,md,doc,docx,xls,xlsx,ppt,pptx,mp3,mp4',
+        // v1.3.13：默认白名单补上一般图片格式 —— 头像上传也走这张表
+        'exts'    => 'jpg,jpeg,png,gif,webp,bmp,zip,rar,7z,pdf,txt,md,doc,docx,xls,xlsx,ppt,pptx,mp3,mp4',
     ];
 }
 
@@ -116,6 +117,13 @@ function owATSaveConfig(array $in): array
 function owATExtMime(): array
 {
     return [
+        // 图片（头像 / 图片附件共用，v1.3.13 起进白名单表）
+        'jpg'  => ['image/jpeg'],
+        'jpeg' => ['image/jpeg'],
+        'png'  => ['image/png'],
+        'gif'  => ['image/gif'],
+        'webp' => ['image/webp'],
+        'bmp'  => ['image/bmp', 'image/x-ms-bmp'],
         'zip'  => ['application/zip', 'application/x-zip-compressed'],
         'rar'  => ['application/x-rar-compressed', 'application/vnd.rar', 'application/x-rar'],
         '7z'   => ['application/x-7z-compressed'],
@@ -349,6 +357,7 @@ Plugin::route('plugin_attachment_manager_upload_file', function (array $ctx) use
 function owATStoreAvatar(array $f, array $actor): array
 {
     if (($actor['kind'] ?? '') !== 'user') return [false, '游客没有账号头像'];
+    if (!owATEnabled()) return [false, '站点已关闭附件上传'];
     $err = (int)($f['error'] ?? UPLOAD_ERR_NO_FILE);
     if ($err !== UPLOAD_ERR_OK) return [false, '上传失败（错误码 ' . $err . '）'];
     $tmp = (string)($f['tmp_name'] ?? '');
@@ -356,7 +365,14 @@ function owATStoreAvatar(array $f, array $actor): array
     if ($tmp !== '' && is_file($tmp) && (int)@filesize($tmp) > $max) {
         return [false, '头像超过 ' . round($max / 1048576, 1) . ' MB 限制'];
     }
-    return Upload::handle($f, 'avatar');   // 核心内部做 jpg/png/gif/webp 白名单校验
+    // v1.3.13：**扩展名规则同样作用于头像** —— 与图片/文件附件共用后台配置的
+    // 白名单（管理员删掉 bmp，头像也就传不了 bmp）。核心 checkImage 还会再兜一层
+    // 「真实图片类型 + 支持格式」，两处都过才落盘。
+    $ext = strtolower((string)pathinfo((string)($f['name'] ?? ''), PATHINFO_EXTENSION));
+    if ($ext === '' || !in_array($ext, owATExts(), true)) {
+        return [false, '头像格式不在允许列表内（' . implode(' / ', owATExts()) . '）'];
+    }
+    return Upload::handle($f, 'avatar');
 }
 
 Plugin::route('plugin_attachment_manager_upload_avatar', function (array $ctx) use ($atGuard) {
