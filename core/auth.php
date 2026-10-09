@@ -534,8 +534,8 @@ class Auth
     {
         $hash = (int)(sprintf('%u', crc32($seed !== '' ? $seed : 'owl')));
         $hue  = $hash % 360;
-        $fg   = 'hsl(' . $hue . ',62%,48%)';
-        $bg   = 'hsl(' . (($hue + 200) % 360) . ',42%,90%)';
+        $fg   = self::hslHex($hue, 62, 48);
+        $bg   = self::hslHex(($hue + 200) % 360, 42, 90);
         $bits = ($hash >> 5) & 0x7FF;      // 11 位够画 3×5
         $rects = '';
         for ($y = 0; $y < 5; $y++) {
@@ -545,10 +545,38 @@ class Auth
                         . '<rect x="' . (4 - $x) . '" y="' . $y . '" width="1" height="1"/>';
             }
         }
-        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 5" shape-rendering="crispEdges">'
+        // ⚠️ width/height 必须写死：只有 viewBox 的 SVG 没有固有尺寸，
+        // 放进 <img> + CSS width:100%/height:100% 时部分浏览器会按 0 宽渲染成一条竖线。
+        // 颜色一律用十六进制：SVG 1.1 的 fill 属性不认 hsl()（CSS Color 4 才有），
+        // 用 hsl 会让整张图填不上色，只剩默认黑块。
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="5" height="5" viewBox="0 0 5 5"'
+             . ' preserveAspectRatio="xMidYMid meet" shape-rendering="crispEdges">'
              . '<rect width="5" height="5" fill="' . $bg . '"/>'
              . '<g fill="' . $fg . '">' . $rects . '</g></svg>';
         return 'data:image/svg+xml;base64,' . base64_encode($svg);
+    }
+
+    /** HSL → #RRGGBB（供 SVG 属性用；S/L 为 0-100） */
+    private static function hslHex(int $h, int $s, int $l): string
+    {
+        $s /= 100; $l /= 100;
+        $c = (1 - abs(2 * $l - 1)) * $s;
+        $x = $c * (1 - abs(fmod($h / 60, 2) - 1));
+        $m = $l - $c / 2;
+        $rgb = [0.0, 0.0, 0.0];
+        if ($h < 60)       $rgb = [$c, $x, 0];
+        elseif ($h < 120)  $rgb = [$x, $c, 0];
+        elseif ($h < 180)  $rgb = [0, $c, $x];
+        elseif ($h < 240)  $rgb = [0, $x, $c];
+        elseif ($h < 300)  $rgb = [$x, 0, $c];
+        else               $rgb = [$c, 0, $x];
+        $out = '#';
+        foreach ($rgb as $v) {
+            $n = (int)round(($v + $m) * 255);
+            $n = max(0, min(255, $n));
+            $out .= str_pad(dechex($n), 2, '0', STR_PAD_LEFT);
+        }
+        return $out;
     }
 
     /**

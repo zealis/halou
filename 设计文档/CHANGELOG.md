@@ -42,6 +42,23 @@
 - 用最小 DOM 模拟（stub MutationObserver + uiBatchBar 写 DOM）实测：修复前 300ms 内 init 已执行
   22 次且持续增长，修复后稳定 1 次、列表请求 1 次。
 
+## v1.3.12（2026-10-09）：修复消息头像与设置头像不一致 + identicon 竖条
+
+- **修复**：消息里的头像被压成一条竖线，且与「用户设置」里看到的不是同一个。
+  - 根因一：内置 identicon 的 SVG 只写了 `viewBox`，**没有 width/height**。
+    没有固有尺寸的 SVG 放进 `<img>` + CSS `width:100%/height:100%` 时，
+    浏览器按 0 宽渲染 → 变成贯穿整行的竖条。现在固定写死 `width="5" height="5"`
+    并加 `preserveAspectRatio`。
+  - 根因二：identicon 的颜色用了 `hsl(...)`。**SVG 1.1 的 `fill` 属性不认 hsl()**
+    （CSS Color 4 才支持），色块填不上色。改为统一输出十六进制
+    （PHP 侧新增 `Auth::hslHex()`，前端 `OwAvatar.hslHex()` 与其同一算法）。
+  - 根因三：`messages.avatar` 是**发送时的快照**，而存量消息快照为空串 →
+    消息里走了内置几何头像，设置里走的是生成式头像，于是「两边不一样」。
+    现在 `Chat::pack()` 接受 `avatarMap`，快照为空时按发送者**当前**头像回填
+    （history / poll 都批量取一次，不产生 N+1）。
+- 排查手法记录：头像显示异常时先查库（`users.avatar_type/style/seed` 与
+  `messages.avatar` 快照值），一眼就能分清是「数据问题」还是「渲染问题」。
+
 ## v1.3.11（2026-10-09）：头像改为生成式（风格 + 种子）+ 上传迁入附件插件
 
 - **重构**：头像是「风格 + 种子」的生成结果（数据模型参考 参考文献/bbs1org-main），

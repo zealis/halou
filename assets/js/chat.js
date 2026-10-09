@@ -802,7 +802,10 @@
         /** 5×5 对称网格，与 core/auth.php 的 Auth::avatarIdenticon 同一套算法 */
         identicon: function (seed) {
             var h = this.crc32(seed || 'owl');
-            var hue = h % 360, fg = 'hsl(' + hue + ',62%,48%)', bg = 'hsl(' + ((hue + 200) % 360) + ',42%,90%)';
+            // ⚠️ 颜色必须用十六进制：SVG 1.1 的 fill 属性不认 hsl()，用 hsl 会整张填不上色；
+            // width/height 必须写死：只有 viewBox 的 SVG 放进 <img> 会被按 0 宽渲染成一条竖线。
+            var hue = h % 360;
+            var fg = this.hslHex(hue, 62, 48), bg = this.hslHex((hue + 200) % 360, 42, 90);
             var bits = (h >>> 5) & 0x7FF, rects = '', y, x, b;
             for (y = 0; y < 5; y++) {
                 for (x = 0; x < 3; x++) {
@@ -812,7 +815,8 @@
                            + '<rect x="' + (4 - x) + '" y="' + y + '" width="1" height="1"/>';
                 }
             }
-            var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 5" shape-rendering="crispEdges">'
+            var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="5" height="5" viewBox="0 0 5 5"'
+                    + ' preserveAspectRatio="xMidYMid meet" shape-rendering="crispEdges">'
                     + '<rect width="5" height="5" fill="' + bg + '"/>'
                     + '<g fill="' + fg + '">' + rects + '</g></svg>';
             // 中文昵称不能直接进 URI，中文场景统一用 base64（btoa 对非 Latin1 会抛错，故先转义）
@@ -821,6 +825,25 @@
             } catch (e) {
                 return 'data:image/svg+xml,' + encodeURIComponent(svg);
             }
+        },
+        /** HSL → #RRGGBB（与 core/auth.php 的 hslHex 同一算法） */
+        hslHex: function (h, sat, lig) {
+            var s = sat / 100, l = lig / 100;
+            var c = (1 - Math.abs(2 * l - 1)) * s;
+            var x = c * (1 - Math.abs((h % 360) / 60 % 2 - 1));
+            var m = l - c / 2, r, g, b;
+            var hp = h % 360;
+            if (hp < 60)       { r = c; g = x; b = 0; }
+            else if (hp < 120) { r = x; g = c; b = 0; }
+            else if (hp < 180) { r = 0; g = c; b = x; }
+            else if (hp < 240) { r = 0; g = x; b = c; }
+            else if (hp < 300) { r = x; g = 0; b = c; }
+            else               { r = c; g = 0; b = x; }
+            function hx(v) {
+                var n = Math.max(0, Math.min(255, Math.round((v + m) * 255)));
+                return (n < 16 ? '0' : '') + n.toString(16);
+            }
+            return '#' + hx(r) + hx(g) + hx(b);
         },
         fallback: function (el) {
             if (!el || el.getAttribute('data-owfb')) return;

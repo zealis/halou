@@ -658,16 +658,23 @@ class Chat
         return self::visible($m, $actor);
     }
 
-    public static function pack(array $m, array $actor): array
+    public static function pack(array $m, array $actor, array $avatarMap = []): array
     {
         $admin = $actor['role'] === 'admin';
         $deleted = (int)($m['deleted'] ?? 0) === 1;
+        // v1.3.12：快照为空（早期版本没存头像、或存的是空串）时按发送者**当前**头像回填。
+        // 否则消息里是一个内置几何头像、用户设置里却是另一个样，两边对不上。
+        // avatarMap 走批量查询（avatarMap），不产生 N+1。
+        $av = (string)($m['avatar'] ?? '');
+        if ($av === '' && !empty($m['user_id']) && isset($avatarMap[(int)$m['user_id']])) {
+            $av = $avatarMap[(int)$m['user_id']];
+        }
         return [
             'id' => (int)$m['id'], 'room' => (int)$m['room_id'],
             'uid' => $m['user_id'] ? (int)$m['user_id'] : null,
             'gid' => $m['guest_id'] ? (int)$m['guest_id'] : null,
             'nickname' => $m['nickname'], 'role' => $m['role'],
-            'title' => $m['title'] ?? '', 'avatar' => $m['avatar'] ?? '',
+            'title' => $m['title'] ?? '', 'avatar' => $av,
             'type' => $m['type'],
             // 软删除与撤回都清空正文：deleted 额外带 deleted 标记，
             // 前台据此显示「该消息已删除」而非「已撤回」，语义不同。
@@ -701,10 +708,11 @@ class Chat
         $sql .= ' ORDER BY id DESC LIMIT ' . max(1, min(100, $limit));
         $rows = DB::all($sql, $args);
         $hidden = self::hiddenIds($actor);
+        $avMap = self::avatarMap($rows);   // v1.3.12：补齐空快照
         $out = [];
         foreach (array_reverse($rows) as $m) {
             if (isset($hidden[(int)$m['id']])) continue;   // v1.1.14：仅自己隐藏的，不下发
-            if (self::visible($m, $actor)) $out[] = self::pack($m, $actor);
+            if (self::visible($m, $actor)) $out[] = self::pack($m, $actor, $avMap);
         }
         return $out;
     }
@@ -774,10 +782,11 @@ class Chat
         while (time() < $deadline) {
             $rows = DB::all('SELECT * FROM messages WHERE room_id=? AND id>? ORDER BY id LIMIT 200', [$roomId, $sinceId]);
             if ($rows) {
+                $avMap = self::avatarMap($rows);   // v1.3.12：与 history 同一口径补齐空快照
                 foreach ($rows as $m) {
                     // v1.1.14：隐藏的消息不下发，但仍要推进 sinceId，
                     // 否则这条会被下一次轮询重新捞出来反复判断。
-                    if (!isset($hidden[(int)$m['id']]) && self::visible($m, $actor)) $new[] = self::pack($m, $actor);
+                    if (!isset($hidden[(int)$m['id']]) && self::visible($m, $actor)) $new[] = self::pack($m, $actor, $avMap);
                     $sinceId = max($sinceId, (int)$m['id']);
                 }
                 break;
@@ -1372,7 +1381,7 @@ class Chat
             $rows = DB::all($sql, $args);
             if ($rows) {
                 foreach ($rows as $m) {
-                    if (!isset($hidden[(int)$m['id']]) && self::visible($m, $actor)) $new[] = self::pack($m, $actor);
+                    if (!isset($hidden[(int)$m['id']]) && self::visible($m, $actor)) $new[] = self::pack($m, $actor, $avMap);
                     $sinceId = max($sinceId, (int)$m['id']);
                 }
                 break;
