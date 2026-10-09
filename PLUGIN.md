@@ -222,6 +222,7 @@ OwChat.registerAvatarUploader(function (file, filename, onOk) {
 - `OwChat.onMsgContent(fn)`：右键**消息内容**（针对「消息」）时追加菜单项——内置复制 / 引用 / 删除，插件可追加翻译、举报等。
 - `OwChat.onQuote(fn)`：构造引用内容时改写（`[quote, msg]`，可改 `quote.nick` / `quote.text`）；服务端另有 `message.quote` 做最终校验。
 - `OwChat.onUserAction(fn)`：**按人**发起时的操作菜单（v1.3.24）——「所有成员」区搜索出某个用户后点他，弹出的就是它。与 `onMsgCtx` 的区别是没有消息上下文，参数是 `u = {uid, gid, nickname, kind, role}`。禁言 / 举报都挂在这里。
+- `OwChat.onUserAction(fn)`：**按人**发起时的操作菜单（v1.3.24）——「所有成员」区搜索出某个用户后点他，弹出的就是它。与 `onMsgCtx` 的区别是没有消息上下文，参数是 `u = {uid, gid, nickname, kind, role}`。禁言 / 举报都挂在这里。
 
 | `mail.send` | 注册/找回密码发验证码时（`Mailer::send`） | `[&$sent, $to, $subject, $body]` —— 核心 v1.0.81 起不再内置 SMTP；插件完成发送后把 `$sent` 置 true，无人响应时验证码仍入库但接口提示未启用邮件 |
 | `room.restored` | 群聊从审核回收站撤销「删除」后 | `[$roomId, $row, $actor]` —— `$row` 为恢复的整行数据 |
@@ -265,6 +266,35 @@ OwChat.onMsgCtx(function (items, msg, env) {
 - 回调在菜单渲染前同步执行，`try/catch` 包裹（插件异常不影响基础菜单）。
 - 显示判定只做用户体验过滤，**权限必须在服务端路由内重新校验**（参考 `plugin_ban_manager_quick`：管理员 / 房主守卫、不能禁言自己与管理员、房间归属校验）。
 - 弹窗复用 `OwChat.openModal()` / `OwChat.closeModal()`，与全站确认框同一样式。参考实现：`plugins/ban-manager/chat.js`。
+
+### 成员搜索的用户操作菜单（OwChat.onUserAction）
+
+右侧「所有成员」区标题右侧有个搜索按钮（v1.3.24），点开可按昵称或用户 ID
+搜本群成员；点某个搜索结果的人，弹出的操作菜单由本钩子汇总：
+
+```js
+OwChat.onUserAction(function (items, u, env) {
+    // items.push({ t: '菜单文案', run: function () { ... } });
+    // u：  { uid, gid, nickname, kind: 'user'|'guest', role }
+    // env：{ roomId, actor }（与 onMsgCtx 同构）
+});
+```
+
+核心已经给了「查看个人资料」与「发私信」，插件只需追加自己的动作。
+
+**与 `onMsgCtx` 的区别（选哪个）**：
+
+| 场景 | 用哪个 |
+|---|---|
+| 右键某条消息的头像（有消息上下文，能拿到 msg_id / ts） | `onMsgCtx` |
+| 从成员搜索、成员列表等**按人**发起（没有消息上下文） | `onUserAction` |
+
+**⚠️ `u.role` 必须用上**：禁言判定「房主不能禁言管理员」靠的就是它
+（`plugins/ban-manager/chat.js` 的 `BM.canBan`）。若你在自己的场景里把它丢了，
+前端会显示禁言项而服务端再拒 —— 用户白点一次。
+
+实现可参照 `plugins/ban-manager/chat.js`：它同时挂在两个钩子上，
+`canBan` 只依赖 `{uid, gid, nickname, role}`，所以两个钩子共用同一份实现。
 
 ### 成员搜索的用户操作菜单（OwChat.onUserAction）
 
