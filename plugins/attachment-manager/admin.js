@@ -169,6 +169,15 @@
                 if (ex) ex.value = c.exts || '';
                 var act = $('owAtActive');
                 if (act) act.textContent = (r.active_exts || []).join('、') || '（无）';
+                // v1.2.0：压缩开关 + imagewebp() 实测支持状态
+                var cp = $('owAtCompress'), cq = $('owAtCompressQ'), wp = $('owAtWebp');
+                if (cp) cp.value = c.compress === '1' ? '1' : '0';
+                if (cq) cq.value = c.compress_q || '80';
+                if (wp) {
+                    OwAT.webpReady = !!r.webp_ready;
+                    if (r.webp_ready) { wp.textContent = '✓ 可用'; wp.style.color = '#1a7f37'; }
+                    else { wp.textContent = '✗ 不可用（GD 未编译 WebP）'; wp.style.color = '#C41D1F'; }
+                }
             });
         },
 
@@ -178,14 +187,25 @@
             if (!en || !mb || !ex) { toast('配置表单不存在'); return; }
             var mbv = parseInt(mb.value, 10);
             if (isNaN(mbv) || mbv < 1 || mbv > 1024) { toast('大小上限请填 1~1024 的整数'); return; }
+            var cp = $('owAtCompress'), cq = $('owAtCompressQ');
+            var qv = cq ? parseInt(cq.value, 10) : 80;
+            if (isNaN(qv) || qv < 1 || qv > 100) { toast('压缩质量请填 1~100 的整数'); return; }
+            if (cp && cp.value === '1' && !OwAT.webpReady) {
+                toast('本机 PHP 不支持 imagewebp()，已保持关闭');
+                cp.value = '0';
+            }
             OwApi.post('plugin_attachment_manager_cfg_save', {
-                enabled: en.value, max_mb: String(mbv), exts: ex.value
+                enabled: en.value, max_mb: String(mbv), exts: ex.value,
+                compress: cp ? cp.value : '0', compress_q: String(qv)
             }, function (r) {
                 if (!r.ok) { toast(r.msg || '保存失败'); return; }
                 toast('配置已保存');
                 OwAT.loadCfg();      // 回读：把被安全表过滤后的结果回显
             });
-        }
+        },
+
+        /** imagewebp() 支持状态缓存（loadCfg 时刷新，saveCfg 校验用） */
+        webpReady: false,
     };
 
 })(window, document);

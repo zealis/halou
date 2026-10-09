@@ -43,6 +43,9 @@ function owATDefaultConfig(): array
         'max_mb'  => '10',  // 单文件大小上限（MB）
         // v1.3.13：默认白名单补上一般图片格式 —— 头像上传也走这张表
         'exts'    => 'jpg,jpeg,png,gif,webp,bmp,zip,rar,7z,pdf,txt,md,doc,docx,xls,xlsx,ppt,pptx,mp3,mp4',
+        // v1.2.0：图片压缩（WebP 有损转换）。默认关闭 = 原图直存，与旧行为一致。
+        'compress'   => '0',
+        'compress_q' => '80',
     ];
 }
 
@@ -76,6 +79,8 @@ function owATConfig(): array
         if (array_key_exists($r['k'], $cfg)) $cfg[$r['k']] = (string)$r['v'];
     }
     $cfg['max_mb'] = max(1, min(1024, (int)$cfg['max_mb']));   // 夹在 1~1024MB
+    $cfg['compress'] = $cfg['compress'] === '1' ? '1' : '0';
+    $cfg['compress_q'] = max(1, min(100, (int)$cfg['compress_q']));
     return $cfg;
 }
 
@@ -89,6 +94,10 @@ function owATSaveConfig(array $in): array
         $v = trim((string)$v);
         if ($k === 'max_mb') {
             $v = (string)max(1, min(1024, (int)$v));
+        } elseif ($k === 'compress') {
+            $v = $v === '1' ? '1' : '0';
+        } elseif ($k === 'compress_q') {
+            $v = (string)max(1, min(100, (int)$v));
         } elseif ($k === 'exts') {
             $clean = [];
             foreach (preg_split('/[\s,，;；]+/u', $v) ?: [] as $p) {
@@ -194,6 +203,110 @@ function owATRealMime(string $path): string
     return 'application/octet-stream';
 }
 
+/* ============================ 图片压缩（v1.2.0：WebP 有损转换） ============================ */
+
+/**
+ * imagewebp() 是否真的可用 —— 「函数存在」不等于「能写」：
+ * 有的 GD 编译了函数但缺 libwebp，调用照样失败。所以实际写一张 2×2 图验证，
+ * 结果按请求缓存（static），一次请求最多测一遍。
+ */
+function owATWebpReady(): bool
+{
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    if (!function_exists('imagewebp') || !function_exists('imagecreatefromstring')) { $ok = false; return $ok; }
+    $im = @imagecreatetruecolor(2, 2);
+    if (!$im) { $ok = false; return $ok; }
+    $t = @tempnam(sys_get_temp_dir(), 'atwchk');
+    $ok = $t !== false && @imagewebp($im, $t, 80) && (int)@filesize($t) > 0;
+    imagedestroy($im);
+    if ($t !== false) @unlink($t);
+    return $ok;
+}
+
+/** GIF 是否带动画（NETSCAPE2.0 = 动画循环扩展的标准标记，一定在前 64KB 内） */
+function owATIsAnimatedGif(string $path): bool
+{
+    $raw = @file_get_contents($path, false, null, 0, 65536);
+    return $raw !== false && strpos($raw, 'NETSCAPE2.0') !== false;
+}
+
+/**
+ * 按 EXIF Orientation 把 GD 图像转正。
+ * 为什么必须做：手机照片是「横向像素 + 旋转标记」，浏览器靠 EXIF 显示成正的，
+ * 但 GD 读入时不应用标记 —— 不转正就存，WebP（无 EXIF）会整体躺倒。
+ * ⚠️ 必须引用传 $im：PHP 8 里 GD 图像是对象，imagerotate 返回**新对象**，
+ *    值传递时函数内替换的只是局部变量，调用方仍拿旧图。
+ */
+function owATApplyExifOrientation(&$im, string $path): void
+{
+    if (!function_exists('exif_read_data') || !function_exists('imagerotate')) return;
+    $ex = @exif_read_data($path);
+    $ori = (int)($ex['Orientation'] ?? 0);
+    if ($ori <= 0 || $ori > 8) return;
+    $bg = (int)imagecolorallocate($im, 0, 0, 0);
+    $rot = function ($img, $deg) use ($bg) {
+        $r = @imagerotate($img, $deg, $bg);   // imagerotate 正值 = 逆时针
+        if ($r !== false) { imagedestroy($img); return $r; }
+        return $img;
+    };
+    switch ($ori) {
+        case 3: $tmp = $rot($im, 180); break;
+        case 4: $tmp = $rot($im, 180); imageflip($tmp, IMG_FLIP_HORIZONTAL); break;
+        case 5: $tmp = $rot($im, -90); imageflip($tmp, IMG_FLIP_HORIZONTAL); break;
+        case 6: $tmp = $rot($im, -90); break;
+        case 7: $tmp = $rot($im, 90);  imageflip($tmp, IMG_FLIP_HORIZONTAL); break;
+        case 8: $tmp = $rot($im, 90);  break;
+        default: $tmp = $im;
+    }
+    // imagerotate 返回的是新资源，调用方拿到的 $im 必须换掉 → 只能引用传回
+    if ($tmp !== $im) { $im = $tmp; }
+}
+
+/**
+ * 上传落地前的 WebP 压缩（开关关闭 / 环境不支持 / 任何一步失败 → 原样返回 $f，绝不拦上传）。
+ *
+ * 四条刻意保留原图的路径：
+ *  ① 动图 GIF —— GD 只读第一帧，转了动画就没了；
+ *  ② 超大图（>3000 万像素）—— GD 内存峰值 ≈ 像素×5 字节，防止打爆 PHP 内存；
+ *  ③ 转完反而不变小的（小图 / 已高度优化的图）—— 压缩的意义是省，不是越压越大；
+ *  ④ 解码失败的 —— 交给核心的 checkImage 去给专业报错。
+ */
+function owATCompressImage(array $f): array
+{
+    $cfg = owATConfig();
+    if ($cfg['compress'] !== '1' || !owATWebpReady()) return $f;
+    $tmp = (string)($f['tmp_name'] ?? '');
+    if ($tmp === '' || !is_file($tmp)) return $f;
+    $info = @getimagesize($tmp);
+    if (!$info) return $f;
+    if ($info[2] === IMAGETYPE_GIF && owATIsAnimatedGif($tmp)) return $f;
+    if ((int)$info[0] * (int)$info[1] > 30000000) return $f;
+
+    $raw = @file_get_contents($tmp);
+    $im = $raw === false ? false : @imagecreatefromstring($raw);
+    unset($raw);
+    if (!$im) return $f;
+    imagealphablending($im, false);   // 保 PNG/WebP 透明通道（否则转码变黑底）
+    imagesavealpha($im, true);
+    if ($info[2] === IMAGETYPE_JPEG) owATApplyExifOrientation($im, $tmp);
+
+    $out = @tempnam(sys_get_temp_dir(), 'atw');
+    $q = max(1, min(100, (int)$cfg['compress_q']));
+    $ok = $out !== false && @imagewebp($im, $out, $q);
+    imagedestroy($im);
+    $newSize = $ok ? (int)@filesize($out) : 0;
+    $origSize = (int)@filesize($tmp);
+    if (!$ok || $newSize <= 0 || $newSize >= $origSize) {
+        if ($out !== false) @unlink($out);
+        return $f;
+    }
+    $name = (string)($f['name'] ?? 'image');
+    $name = (preg_replace('/\.[^.]*$/', '', $name) ?: 'image') . '.webp';
+    return ['name' => $name, 'type' => 'image/webp', 'tmp_name' => $out,
+            'error' => UPLOAD_ERR_OK, 'size' => $newSize];
+}
+
 /**
  * 存图片消息：复用核心 Upload（头像/贴纸同一条本地存储通道），
  * 这里额外先卡一次体积上限（配置项在插件里，不能指望核心再读）。
@@ -208,7 +321,8 @@ function owATStoreImage(array $f, ?array $actor = null): array
     if ($tmp !== '' && is_file($tmp) && (int)@filesize($tmp) > $max) {
         return [false, '图片超过 ' . round($max / 1048576, 1) . ' MB 限制'];
     }
-    return Upload::handle($f, 'image');   // 核心内部还会做「仅 jpg/png/gif/webp」校验
+    // v1.2.0：先按原图体积卡上限，再压缩（压缩不放宽闸门，只是让落盘更省）
+    return Upload::handle(owATCompressImage($f), 'image');   // 核心内部还会做「仅 jpg/png/gif/webp」校验
 }
 
 /**
@@ -372,7 +486,9 @@ function owATStoreAvatar(array $f, array $actor): array
     if ($ext === '' || !in_array($ext, owATExts(), true)) {
         return [false, '头像格式不在允许列表内（' . implode(' / ', owATExts()) . '）'];
     }
-    return Upload::handle($f, 'avatar');
+    // v1.2.0：头像同样先压（转 WebP 后核心 squareAvatar 仍会裁成 100px 方图，
+    // 压缩主要省在上传体积与 GD 输入；动图/超大图自动跳过）
+    return Upload::handle(owATCompressImage($f), 'avatar');
 }
 
 Plugin::route('plugin_attachment_manager_upload_avatar', function (array $ctx) use ($atGuard) {
@@ -411,6 +527,7 @@ Plugin::route('plugin_attachment_manager_cfg_get', function (array $ctx) use ($a
         'config' => owATConfig(),
         'active_exts' => owATExts(),
         'safe_exts' => array_keys(owATExtMime()),
+        'webp_ready' => owATWebpReady(),   // v1.2.0：imagewebp() 实测可用性（后台展示）
     ]);
 });
 
@@ -421,8 +538,10 @@ Plugin::route('plugin_attachment_manager_cfg_save', function (array $ctx) use ($
         'enabled' => $post['enabled'] ?? '',
         'max_mb'  => $post['max_mb'] ?? '',
         'exts'    => $post['exts'] ?? '',
+        'compress'   => $post['compress'] ?? '',
+        'compress_q' => $post['compress_q'] ?? '',
     ]);
-    Api::json(['ok' => true, 'config' => $cfg, 'active_exts' => owATExts()]);
+    Api::json(['ok' => true, 'config' => $cfg, 'active_exts' => owATExts(), 'webp_ready' => owATWebpReady()]);
 });
 
 /**
@@ -497,6 +616,18 @@ Plugin::adminPage('attachment-manager', '附件上传', function () {
         . '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">逗号分隔。只有安全类型表内登记过的扩展名才会生效；'
         . 'svg / php / html 等可执行或可内嵌脚本的类型不予登记（即使填了也不会放行）。'
         . '当前生效：<span id="owAtActive">-</span></p></div>'
+        // v1.2.0：图片压缩（WebP）。头像与聊天图片上传前转码；贴纸收藏的是站内图，源头即已覆盖。
+        . '<div class="ow-form-row">'
+        . '<div class="ow-form-item" style="min-width:160px"><label>图片压缩</label>'
+        . '<select class="ow-input" id="owAtCompress"><option value="0">关闭（原图直存）</option><option value="1">开启（转 WebP）</option></select></div>'
+        . '<div class="ow-form-item" style="min-width:120px"><label>压缩质量(1-100)</label>'
+        . '<input class="ow-input" id="owAtCompressQ" type="number" min="1" max="100" value="80"></div>'
+        . '<div class="ow-form-item" style="min-width:150px"><label>imagewebp() 支持</label>'
+        . '<span id="owAtWebp" style="display:inline-block;padding-top:8px;font-size:13px">检测中…</span></div>'
+        . '</div>'
+        . '<p style="font-size:12px;color:#8a5a00;margin:2px 0 8px">⚠️ WebP 是<b>有损</b>压缩：截图、文字、线条类图片会轻微发虚；'
+        . '开启后影响此后新上传的头像与聊天图片（贴纸收藏站内图片，一并覆盖）。'
+        . '动图 GIF 自动跳过保动画；转换后反而变大或不省的图片保留原图；已有图片不受影响。</p>'
         . '<button class="ow-btn ow-btn-primary" onclick="OwAT.saveCfg()">保存配置</button>'
         . '</div>'
         . '<div class="ow-card">'

@@ -130,7 +130,11 @@ class Upload
         // 对**原图**取哈希会导致「两张不同的原图裁出同一头像却算出不同哈希」。
         if ($kind === 'avatar') return self::storeAvatar($f, $extOrMsg);
 
-        [$ok2, $rel] = self::putByHash($kind, $extOrMsg, (string)$f['tmp_name'], true);
+        // v1.3.29：附件插件的 WebP 压缩产物是**自建临时文件**（tempnam），
+        // move_uploaded_file 只认 HTTP POST 上传的文件、对它会恒失败 ——
+        // 按 is_uploaded_file 分流：HTTP 上传用 move，其余用 copy+unlink
+        // （putByHash 的 $move 参数本来就是这个语义，此前调用方一直硬编码 true）。
+        [$ok2, $rel] = self::putByHash($kind, $extOrMsg, (string)$f['tmp_name'], @is_uploaded_file((string)$f['tmp_name']));
         if (!$ok2) return [false, '保存失败'];
         // 手动配置了「固定网站地址」才返回绝对 URL（自动识别不参与，避免误判）
         return [true, ow_abs_url(self::$cfg['url'] . '/' . $rel, true)];
@@ -146,7 +150,16 @@ class Upload
         // ⚠️ 不在这里对原图取哈希：裁剪后的产物才是最终落盘内容，
         //   对原图取哈希会导致「两张不同原图裁出同一头像却算出不同哈希」，去重就失效了。
         $stg  = self::$cfg['dir'] . '/avatar/.tmp_' . bin2hex(random_bytes(6)) . '.' . $ext;
-        if (!@move_uploaded_file($f['tmp_name'], $stg)) return [false, '保存失败'];
+        // v1.3.29：同 local() —— 压缩产物不是 HTTP 上传的文件，move_uploaded_file 会拒；
+        // 按来源分流（自建临时文件用 copy 后删源）。
+        $src = (string)$f['tmp_name'];
+        if (@is_uploaded_file($src)) {
+            if (!@move_uploaded_file($src, $stg)) return [false, '保存失败'];
+        } elseif (!@copy($src, $stg)) {
+            return [false, '保存失败'];
+        } else {
+            @unlink($src);
+        }
 
         $sq = self::squareAvatar($stg);
         if ($sq === null) {
