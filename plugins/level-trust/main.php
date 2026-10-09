@@ -1008,18 +1008,10 @@ Plugin::page('level', '等级', function (array $actor, $user = null) {
         $cur = 1 + (int)floor($days + $wv * $factor);
         $pct = $cur >= $nextAt ? 100 : (int)max(0, min(100, round((($cur - 1) / max(1, $nextAt - $cur)) * 100)));
 
-        // 贴纸解锁情况恒展示（v1.3.32）：未解锁也要说明「未解锁、Lv.N 解锁」，
-        // 之前留空 = 用户以为功能坏了（这里显示档位，实际拦截在 upload.guard/addSticker）。
-        $stk = (int)$u['sticker_quota'];
-        $stkSpan = $stk > 0
-            ? '<span>贴纸上限 <b>' . $stk . '</b> 张（已收藏 '
-              . (int)DB::val('SELECT COUNT(*) FROM stickers WHERE owner_key=?', ['user' . $uid]) . '）</span>'
-            : '<span>贴纸 <b>未解锁</b>（Lv.' . owLTInt('lv_sticker') . ' 解锁）</span>';
         $h .= '<div class="ow-lv-hero-meta">'
             . '<span>累计完成 <b>' . $days . '</b> 天</span>'
             . '<span>加权 <b>' . $weight . '</b> 天（封顶 ' . round(owLTFloat('w_cap_ratio') * 100) . '% × 天数）</span>'
             . '<span>连续登录 <b>' . (int)$row['login_streak'] . '</b> 天</span>'
-            . $stkSpan
             . '<span>距 Lv.' . ($lv + 1) . ' 还需 <b>' . max(0, $nextAt - $cur) . '</b> 级进度</span>'
             . '</div>'
             . '<div class="ow-lv-bar"><i style="width:' . $pct . '%"></i></div>';

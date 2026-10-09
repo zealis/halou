@@ -667,12 +667,9 @@ Plugin::adminPage('attachment-manager', '附件上传', function () {
         . '<input class="ow-input" id="owAtCompressQ" type="number" min="1" max="100" value="80"></div>'
         . '</div>'
         . '<div id="owAtcSwitches">'
-        . owATSwitchHtml('owAtcAvatar', '压缩头像', owATConfig()['compress_avatar'] === '1',
-            '转 WebP 后核心仍会把头像裁成 100px 方图，压缩主要省在上传体积')
-        . owATSwitchHtml('owAtcImage', '压缩消息图片', owATConfig()['compress_image'] === '1',
-            '动图 GIF 自动跳过保动画；超过 3000 万像素不转；转完不变小的保留原图；存量图片不受影响')
-        . owATSwitchHtml('owAtcSticker', '压缩贴纸上传', owATConfig()['compress_sticker'] === '1',
-            '贴纸面板直接上传的图；收藏站内已有图片不受影响')
+        . owATSwitchHtml('owAtcAvatar', '压缩头像', owATConfig()['compress_avatar'] === '1')
+        . owATSwitchHtml('owAtcImage', '压缩消息图片', owATConfig()['compress_image'] === '1')
+        . owATSwitchHtml('owAtcSticker', '压缩贴纸上传', owATConfig()['compress_sticker'] === '1')
         . '</div>'
         . '<button class="ow-btn ow-btn-primary" onclick="OwAT.saveCfg()">保存配置</button>'
         . '</div>'
