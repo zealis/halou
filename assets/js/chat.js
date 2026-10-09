@@ -1303,10 +1303,22 @@
                贴着 0 才触发会出现「已经到底了却没反应」的错觉。
                loadingHistory 是并发闸门 —— 一次请求未回前不再发第二次。 */
             $('owMessages').onscroll = function () {
+                // v1.3.21：先判「是否已滚到底」—— 滚到底意味着未读看完，
+                // 要清未读并隐藏右下角跳转按钮。放在最前面是因为下面那两行
+                // 在 scrollTop>120 时会 return，若放在其后永远轮不到。
+                self.onMsgScroll();
                 if (this.scrollTop > 120) return;
                 if (self.historyDone || self.loadingHistory) return;
                 self.loadHistory();
             };
+            // v1.3.21：右下角「N 条未读 ↓」按钮 —— 点击直达最新消息。
+            // 用 addEventListener 而非 onclick：该元素由服务端静态输出、只此一个，
+            // 两种都行；addEventListener 不会被后续可能的 innerHTML 重写抹掉。
+            var jumpBtn = $('owUnreadJump');
+            if (jumpBtn && !jumpBtn._jumpBound) {
+                jumpBtn._jumpBound = true;
+                jumpBtn.addEventListener('click', function () { self.unreadJumpGo(); });
+            }
             /* v1.2.18：窗口尺寸变化后重算文件名中间省略。
                卡片是固定宽度，但 .ow-file-card 仍有 max-width:100% ——
                视口窄于卡片时会被压缩，可用宽度随之变化，必须重排。
@@ -1557,6 +1569,104 @@
                 }
             });
             this._focusReadBound = true;
+        },
+
+        /* ---------- 未读定位与跳转（v1.3.21） ---------- */
+
+        /**
+         * 查询当前会话的「第一条未读消息 id」与未读条数（v1.3.21）。
+         * 服务端口径与列表徽标完全一致（不数自己发的、排除已删除/撤回）。
+         * @param {function} fn fn(anchorId, count)；anchorId=0 表示无未读 / 无位点
+         */
+        unreadAnchor: function (fn) {
+            var key = this.curConvKey();
+            if (!key) { if (fn) fn(0, 0); return; }
+            var self = this;
+            OwApi.post('conv_unread_at', { peer_key: key }, function (r) {
+                if (!r || !r.ok) { if (fn) fn(0, 0); return; }
+                // 请求返回时会话可能已切走 —— 丢弃过期结果，否则会把上一个会话的
+                // 定位点画到当前会话上（表现为「一进去就跳到奇怪的位置」）
+                if (self.curConvKey() !== key) return;
+                if (fn) fn(parseInt(r.first_unread_id, 10) || 0, parseInt(r.count, 10) || 0);
+            });
+        },
+
+        /**
+         * 进会话后定位到「上次已读位置」（v1.3.21）。
+         *
+         * 为什么不是直接滚到底：几十条未读时一进会话就跳到最新，
+         * 中间那一片未读等于没看见，用户会漏消息。
+         *
+         * 流程：问出第一条未读 id → 若存在，用 history(from_id) 把定位点附近的消息
+         * 补齐 → 渲染完把该消息滚到**视口顶部偏上**（不是顶部，正好留一点上下文）
+         * → 右下角浮出「N 条未读 ↓」。没有未读则照旧滚到底部。
+         */
+        jumpToUnread: function (done) {
+            var self = this;
+            var finish = function () { if (typeof done === 'function') done(); };
+            this.unreadAnchor(function (anchorId, count) {
+                if (!anchorId) { self.scrollBottom(); finish(); return; }
+                self._unreadAnchor = anchorId;
+                self._unreadCount = count;
+                // 定位点可能很靠后（未读很多），先把「定位点及其之后」这一段拉出来
+                self.loadFromAnchor(anchorId, function (ok) {
+                    // 等 DOM 布局稳定（图片/引用可能还在撑高度）
+                    setTimeout(function () {
+                        var box = $('owMessages');
+                        var el = $('owMsg' + anchorId);
+                        if (box && el) {
+                            // offsetTop 是相对 offsetParent；用差值算更稳（不依赖父级定位方式）
+                            box.scrollTop = el.offsetTop - box.offsetTop - 8;
+                            self.showUnreadJump(count);
+                        } else {
+                            // 定位点没渲染出来（消息已过期/被清理）→ 退回滚到底
+                            self.scrollBottom();
+                        }
+                        finish();
+                    }, 60);
+                }, anchorId);
+            });
+        },
+
+        /** 显示/隐藏右下角跳转按钮。count<=0 即隐藏（已读完了） */
+        showUnreadJump: function (count) {
+            var btn = $('owUnreadJump'), txt = $('owUnreadJumpText');
+            this._unreadCount = count || 0;
+            if (!btn || !txt) return;
+            if (!(count > 0)) { btn.style.display = 'none'; return; }
+            txt.innerHTML = (count > 99 ? 99 : count) + ' 条未读';
+            btn.style.display = '';
+        },
+
+        /** 点击按钮：直达最新消息，并清掉按钮（等于「我已看完这些」） */
+        unreadJumpGo: function () {
+            this.scrollBottom();
+            this.showUnreadJump(0);
+            this._unreadAnchor = 0;
+            this.markRead(this.since);
+        },
+
+        /**
+         * 消息区滚动监听（v1.3.21）：手动滚到底部同样算「看完了」。
+         *
+         * 为什么必须有：jumpToUnread **故意不**在进会话时 markRead
+         * （否则列表徽标与按钮条数会立刻消失），所以「已读」这件事被推迟到
+         * 「用户真的滚到最后」。若只靠点击按钮清，未读会一直挂着 ——
+         * 用户手动往下一拉看完，徽标却还在，下次进会话又定位一次。
+         *
+         * 只在按钮可见时才做事：平时滚动不该产生额外请求。
+         */
+        onMsgScroll: function () {
+            var btn = $('owUnreadJump');
+            if (!btn || btn.style.display === 'none' || btn.style.display === '') return;
+            var box = $('owMessages');
+            if (!box) return;
+            // 距底部 24px 内即视为到达（各浏览器 scrollHeight 取整有 1~2px 误差）
+            if (box.scrollHeight - box.scrollTop - box.clientHeight <= 24) {
+                this.showUnreadJump(0);
+                this._unreadAnchor = 0;
+                this.markRead(this.since);
+            }
         },
 
         loadConversations: function () {            var self = this;
@@ -2074,9 +2184,8 @@
                 if (!r.data.length) self.historyDone = true;
                 // v1.2.6 懒加载：消息太少填不满屏幕时自动往前补，
                 // 否则去掉「加载更早消息…」入口后，这类会话上方会一直留白。
-                self.fillIfShort();
-                // v1.3.19：私聊同样「点开即已读」（与群聊 switchRoom 的 markRead 对称）
-                self.markRead(self.since);
+                // v1.3.21：与群聊一致 —— 有未读就定位到上次已读位置并显示跳转按钮
+                self.jumpToUnread();
             });
             this.dmPollLoop();
             this.renderRoomPanel();   // v1.2.28：私聊下侧栏渲染四个会话操作入口（并隐藏「所有成员」）
@@ -2254,6 +2363,9 @@
                 this.pollGen = (this.pollGen || 0) + 1;   // 旧循环醒来即自杀
             }
             this.room = id; this.roomName = name; this.since = 0; this.historyDone = false;
+            // v1.3.21：切会话必须复位未读状态，否则上一个会话的跳转按钮会跟着过来
+            // （按钮文案是「N 条未读」，带着走就完全对不上当前会话）
+            this._unreadAnchor = 0; this._unreadCount = 0; this.showUnreadJump(0);
             // v1.3.1：游客点选群聊本身就算「已进入」，立即解锁输入区。
             // 游客没有成员关系（applyJoinGate 对它恒放行），这里先解一次闸门，
             // 免得等 room_members 异步回来才解锁、点完还发不出去。
@@ -2289,9 +2401,11 @@
                         // 从私聊切回群聊时群聊长轮询是停的，需在此重新拉起
                         if (!self._roomPollRunning) { self._roomPollRunning = true; self.startPoll(); }
                         // v1.2.6 懒加载：填不满屏幕就自动往前补
-                        self.fillIfShort();
-                        // v1.3.19：历史读到哪儿就标到哪儿（点开会话即清零未读）
-                        self.markRead(self.since);
+                        // v1.3.21：**有未读时定位到上次已读位置**而不是直接到底部，
+                        // 右下角浮出「N 条未读 ↓」；没有未读才照旧滚到底。
+                        // 注意此时**不能** markRead —— 一标记未读就清了，
+                        // 按钮上的条数与列表徽标会凭空消失。
+                        self.jumpToUnread();
                     } else if (r.need_password) {
                         // 通行授权已过期 → 重新验证，验证成功后自动重试
                         self.passForget(id);
@@ -2801,6 +2915,16 @@
             $('owCfmNo').onclick = function () { self.closeModal(); };
         },
 
+        /** 自己发消息后收尾（v1.3.21）：若跳转按钮还挂着，说明用户停在定位点没看完，
+         *  但既然自己发言了就是参与了，清掉按钮比留着更符合直觉。 */
+        afterSendClearJump: function () {
+            var btn = $('owUnreadJump');
+            if (btn && btn.style.display !== 'none' && btn.style.display !== '') {
+                this.showUnreadJump(0);
+                this._unreadAnchor = 0;
+            }
+        },
+
         scrollBottom: function () {
             var box = $('owMessages');
             box.scrollTop = box.scrollHeight;
@@ -2851,6 +2975,37 @@
                 var short = box.scrollHeight <= box.clientHeight + 4;
                 if (short && r.data.length >= 30) { self.loadHistory(finish); return; }
                 if (r.data.length < 30) self.historyDone = true;   // 不足一页 = 没有更早的了
+                finish();
+            });
+        },
+
+        /**
+         * 从「定位点」往后拉一段消息（v1.3.21：未读定位用）。
+         *
+         * 与 loadHistory 是**两个方向**的事，不合并：
+         *  loadHistory 取 first 之前的消息、插到 first 上方、还要按 scrollHeight 差值回推；
+         *  这里取 anchorId 及其之后的消息、**追加到末尾**、不动滚动位置 ——
+         *  两者混在一起会把「保持视口」这个最关键的逻辑搅乱。
+         *
+         * 用完后把 since 设为末条 id，这样首轮长轮询从它往后接，不会重复渲染。
+         */
+        loadFromAnchor: function (anchorId, done) {
+            var self = this, box = $('owMessages');
+            var finish = function () { if (typeof done === 'function') done(); };
+            var isDm = !!this.dm, peer = isDm ? this.dm.peer : '';
+            var action = isDm ? 'dm_history' : 'history';
+            var payload = isDm
+                ? { peer: peer, from_id: anchorId }
+                : { room_id: this.room, from_id: anchorId };
+            this.loadingAnchor = true;
+            OwApi.post(action, payload, function (r) {
+                self.loadingAnchor = false;
+                // 与 loadHistory 同一道防线：会话已切走就丢弃（理由见该处注释）
+                var nowIsDm = !!self.dm;
+                if (nowIsDm !== isDm || (isDm && self.dm.peer !== peer)) { finish(); return; }
+                if (!r || !r.ok || !r.data.length) { finish(); return; }
+                for (var i = 0; i < r.data.length; i++) self.addMessage(r.data[i]);
+                self.since = r.data[r.data.length - 1].id;
                 finish();
             });
         },
@@ -3016,6 +3171,7 @@
                 if (!opt.type || opt.type === 'text') input.value = '';
                 self.clearQuote();   // 发送成功后清掉引用条
                 self.autoGrow();   // 发送后回到单行（若手动拉高过则保持用户高度）
+                self.afterSendClearJump();   // v1.3.21：自己发言即视为已参与，清掉跳转按钮
                 if (wasDm && self.dm) self.loadConversations();   // 刷新会话排序（自己发的排最前）
             });
         },

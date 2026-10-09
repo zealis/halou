@@ -440,6 +440,16 @@ if ($action !== '') {
             Api::json(['ok' => $r[0], 'msg' => $r[1]]);
 
         // ---------- 私聊会话（v1.1.0） ----------
+        // v1.3.21：未读定位 —— 「上次已读位置之后的第一条未读」消息 id。
+        // 前端进会话时据此定位滚动位置，并在右下角显示「N 条未读 ↓」按钮。
+        case 'conv_unread_at':
+            $pk = (string)$p('peer_key');
+            Api::json([
+                'ok' => true,
+                'first_unread_id' => Chat::firstUnreadId($actor, $pk),
+                'count' => Chat::unreadCountOf($actor, $pk),
+            ]);
+
         // v1.3.19：标记会话已读（前端进入会话 / 窗口聚焦时调用）
         case 'conv_read':
             [$ok, $msg] = Chat::markRead($actor, (string)$p('peer_key'), (int)$p('last_id'));
@@ -500,7 +510,8 @@ if ($action !== '') {
                 'ok' => true,
                 'peer' => ['kind' => $info['kind'], 'id' => $info['id'],
                            'name' => $info['name'], 'avatar' => $info['avatar']],
-                'data' => Chat::dmHistory($actor, $peer, (int)$p('before_id', '0')),
+                // v1.3.21：from_id 表示「>= 该 id 往后取」（未读定位用），与 before_id 二选一
+                'data' => Chat::dmHistory($actor, $peer, (int)$p('before_id', '0'), 30, (int)$p('from_id', '0')),
             ]);
 
         case 'dm_poll':         // 私聊增量轮询（长挂起）
@@ -621,7 +632,7 @@ if ($action !== '') {
                     'need_password' => $room['type'] === 'password',
                 ]);
             }
-            Api::json(['ok' => true, 'data' => Chat::history($actor, $roomId, (int)$p('before', '0'))]);
+            Api::json(['ok' => true, 'data' => Chat::history($actor, $roomId, (int)$p('before', '0'), 30, (int)$p('from_id', '0'))]);
 
         case 'send':
             [$ok, $msg, $id] = Chat::send($actor, (int)$p('room_id'), $p('type', 'text'), (string)($_POST['content'] ?? ''), [
@@ -1305,6 +1316,15 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
        . '</header>'
        // v1.2.6：消息区初始为空，更早的消息靠向上滚动懒加载（不再有「加载更早消息…」入口）
        . '<div class="ow-messages" id="owMessages"></div>'
+       // v1.3.21：右下角「N 条未读 ↓」跳转按钮（进会话定位到上次已读位置后出现，
+       // 点击直达最新消息）。默认隐藏，由 OwChat.showUnreadJump() 控制显隐与文案。
+       // 放在消息区**之后、输入栏之前** —— 它是 fixed 定位（相对 .ow-main），
+       // 不占文档流高度；DOM 顺序上属于消息区，读代码时一眼能看出归属。
+       . '<button class="ow-unread-jump" id="owUnreadJump" type="button" style="display:none">'
+       . '<svg class="ow-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+       . ' stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+       . '<polyline points="6 9 12 15 18 9"/></svg>'
+       . '<span id="owUnreadJumpText">条未读</span></button>'
        . '<div class="ow-inputbar">'
        // v1.2.27：未加入群聊时的闸门提示（默认隐藏，由 OwChat.applyJoinGate 控制）。
        // 正常流程下点击公开群聊会先弹「是否加入」，取消则不进入；这里是 URL 直达 /

@@ -703,19 +703,35 @@ class Chat
     }
 
     // ---------- 历史消息（向上翻页） ----------
-    public static function history(array $actor, int $roomId, int $beforeId, int $limit = 30): array
+    /**
+     * 拉一段历史。v1.3.21 起支持第三种起点 $fromId（>= 该 id 起往后取）：
+     * 进会话时若定位到「上次已读位置」，就用它把那一段消息取出来渲染，
+     * 免得定位点落在空白处（只取了更早或更晚的消息）。
+     *
+     * @param int $beforeId >0 取更早的（向上翻页）；<0 取**更晚**的（定位点之后）
+     * @param int $fromId  >0 时改为「>= 该 id 往后取」，忽略 beforeId
+     */
+    public static function history(array $actor, int $roomId, int $beforeId, int $limit = 30, int $fromId = 0): array
     {
         self::purgeExpired();   // v1.2.2：顺带清理过服务器保留期的消息 + 其附件
         self::purgeHides();     // v1.1.14：顺带清理指向已消失消息的隐藏行
         $sql = 'SELECT * FROM messages WHERE room_id=?';
         $args = [$roomId];
-        if ($beforeId > 0) { $sql .= ' AND id<?'; $args[] = $beforeId; }
-        $sql .= ' ORDER BY id DESC LIMIT ' . max(1, min(100, $limit));
+        if ($fromId > 0) {
+            $sql .= ' AND id>=?'; $args[] = $fromId;
+            // 往后取要**包含** fromId 那条，故 ORDER BY ASC（下方统一 DESC 后再翻转）
+        } elseif ($beforeId > 0) { $sql .= ' AND id<?'; $args[] = $beforeId; }
+        $asc = $fromId > 0;      // 往后取是「从早到晚」，与前面的 DESC 相反
+        $sql .= ' ORDER BY id ' . ($asc ? 'ASC' : 'DESC') . ' LIMIT ' . max(1, min(100, $limit));
         $rows = DB::all($sql, $args);
+        // ⚠️ 只有 DESC 那条路需要翻转（原本是为「取最新 N 条」倒着取再翻正）。
+        //   ASC 已经是升序，再翻一次就变回倒序 —— 前端 appendMessage 会把
+        //   消息按这个顺序**追加到末尾**，结果时间线是反的。
+        if (!$asc) $rows = array_reverse($rows);
         $hidden = self::hiddenIds($actor);
         $avMap = self::avatarMap($rows);   // v1.3.20：统一按当前头像下发（见 pack）
         $out = [];
-        foreach (array_reverse($rows) as $m) {
+        foreach ($rows as $m) {
             if (isset($hidden[(int)$m['id']])) continue;   // v1.1.14：仅自己隐藏的，不下发
             if (self::visible($m, $actor)) $out[] = self::pack($m, $actor, $avMap);
         }
@@ -902,8 +918,13 @@ class Chat
      * 游客没有用户行，无法跨设备保存阅读进度 —— 直接返回空，列表不显示未读徽标
      *（否则游客一刷新就满屏红点，反而干扰）。游客的「已读」由前端按当前会话即时判断。
      */
-    public static function readMarks(array $actor): array
+    /**
+     * @param array|null $marks 已查好的 map，传进来可避免在循环里反复查同一张表
+     *                           （unreadCounts 按会话循环时用得上）
+     */
+    public static function readMarks(array $actor, ?array $marks = null): array
     {
+        if (is_array($marks)) return $marks;
         if (($actor['kind'] ?? '') !== 'user') return [];
         $uid = (int)($actor['id'] ?? 0);
         if ($uid <= 0) return [];
@@ -942,6 +963,39 @@ class Chat
     }
 
     /**
+     * 单个会话的未读条数（v1.3.21：给右下角「N 条未读 ↓」按钮用）。
+     * 口径与 unreadCounts 完全一致，抽出来是为了让两处共用一套判定，避免各自漂移。
+     */
+    public static function unreadCountOf(array $actor, string $peerKey, ?array $marks = null): int
+    {
+        if (($actor['kind'] ?? '') !== 'user') return 0;
+        $uid = (int)($actor['id'] ?? 0);
+        if ($uid <= 0) return 0;
+        $mark = (int)(self::readMarks($actor, $marks)[$peerKey] ?? 0);
+        if ($mark <= 0) return 0;
+        if (strpos($peerKey, 'room:') === 0) {
+            $rid = (int)substr($peerKey, 5);
+            if ($rid <= 0) return 0;
+            return (int)DB::val(
+                'SELECT COUNT(*) FROM messages
+                 WHERE room_id=? AND id>? AND deleted=0 AND recalled=0
+                   AND (user_id IS NULL OR user_id<>?) AND (guest_id IS NULL OR guest_id=0)',
+                [$rid, $mark, $uid]
+            );
+        }
+        if (strpos($peerKey, 'dm:') === 0) {
+            $pid = (int)substr($peerKey, strrpos($peerKey, ':') + 1);
+            if ($pid <= 0) return 0;
+            return (int)DB::val(
+                'SELECT COUNT(*) FROM messages
+                 WHERE room_id=0 AND to_user_id=? AND user_id=? AND id>? AND deleted=0 AND recalled=0',
+                [$uid, $pid, $mark]
+            );
+        }
+        return 0;
+    }
+
+    /**
      * 计算每个会话的未读数（peer_key => 数量）。返回的 key 只含「有未读」的会话。
      *
      * 口径（与微信 / QQ 一致）：
@@ -963,35 +1017,53 @@ class Chat
 
         $out = [];
         foreach ($readMarks as $key => $mark) {
-            $mark = (int)$mark;
-            if ($mark <= 0) continue;                       // 没建立过有效位点 → 不算未读
+            if ((int)$mark <= 0) continue;                 // 没建立过有效位点 → 不算未读
             $lastId = (int)($lastMsgId[$key] ?? 0);
-            if ($lastId <= $mark) continue;                 // 之后没有新消息
-            $n = 0;
-            if (strpos($key, 'room:') === 0) {
-                $rid = (int)substr($key, 5);
-                if ($rid > 0) {
-                    $n = (int)DB::val(
-                        'SELECT COUNT(*) FROM messages
-                         WHERE room_id=? AND id>? AND deleted=0 AND recalled=0
-                           AND (user_id IS NULL OR user_id<>?) AND (guest_id IS NULL OR guest_id=0)',
-                        [$rid, $mark, $uid]
-                    );
-                }
-            } elseif (strpos($key, 'dm:') === 0) {
-                // 私聊只算「对方发给我」的：room_id=0 且 to_user_id=我
-                $pid = (int)substr($key, strrpos($key, ':') + 1);
-                if ($pid > 0) {
-                    $n = (int)DB::val(
-                        'SELECT COUNT(*) FROM messages
-                         WHERE room_id=0 AND to_user_id=? AND user_id=? AND id>? AND deleted=0 AND recalled=0',
-                        [$uid, $pid, $mark]
-                    );
-                }
-            }
+            if ($lastId <= (int)$mark) continue;            // 之后没有新消息，短路掉这次 COUNT
+            // v1.3.21：计数口径统一走 unreadCountOf，避免同一套判定散在两处日后漂移。
+            // 第二个参数把已查好的 $readMarks 传下去 —— 否则每个会话都会重查一次同一张表。
+            $n = self::unreadCountOf($actor, (string)$key, $readMarks);
             if ($n > 0) $out[$key] = $n;
         }
         return $out;
+    }
+
+    /**
+     * 「第一条未读消息」的 id —— 用于进会话时**定位到上次已读位置**（v1.3.21）。
+     *
+     * 口径与 unreadCounts 完全一致（不数自己发的、排除 deleted/recalled、
+     * 只看位点之后），所以返回的这条一定真的没读过，定位不会落空。
+     *
+     * 返回 0 表示「没有未读」或「没有位点」—— 两种情况前端都该直接滚到底部。
+     */
+    public static function firstUnreadId(array $actor, string $peerKey): int
+    {
+        if (($actor['kind'] ?? '') !== 'user') return 0;
+        $uid = (int)($actor['id'] ?? 0);
+        if ($uid <= 0) return 0;
+        $mark = (int)(self::readMarks($actor)[$peerKey] ?? 0);
+        if ($mark <= 0) return 0;
+
+        if (strpos($peerKey, 'room:') === 0) {
+            $rid = (int)substr($peerKey, 5);
+            if ($rid <= 0) return 0;
+            return (int)DB::val(
+                'SELECT MIN(id) FROM messages
+                 WHERE room_id=? AND id>? AND deleted=0 AND recalled=0
+                   AND (user_id IS NULL OR user_id<>?) AND (guest_id IS NULL OR guest_id=0)',
+                [$rid, $mark, $uid]
+            );
+        }
+        if (strpos($peerKey, 'dm:') === 0) {
+            $pid = (int)substr($peerKey, strrpos($peerKey, ':') + 1);
+            if ($pid <= 0) return 0;
+            return (int)DB::val(
+                'SELECT MIN(id) FROM messages
+                 WHERE room_id=0 AND to_user_id=? AND user_id=? AND id>? AND deleted=0 AND recalled=0',
+                [$uid, $pid, $mark]
+            );
+        }
+        return 0;
     }
 
     /**
@@ -1381,19 +1453,31 @@ class Chat
     }
 
     /** 私聊历史：仅双方可见；按 id 升序返回（向上翻页用 before_id） */
-    public static function dmHistory(array $actor, array $peer, int $beforeId = 0, int $limit = 30): array
+    /**
+     * 私聊历史。v1.3.21 起 $fromId>0 表示「>= 该 id 往后取」（定位点之后），
+     * 语义与 Chat::history 的同名参数一致。
+     */
+    public static function dmHistory(array $actor, array $peer, int $beforeId = 0, int $limit = 30, int $fromId = 0): array
     {
         [$pk, $pid] = $peer;
-        [$cond, $args] = self::dmPairSql($actor, $pk, $pid, $beforeId > 0 ? 'id<?' : '', $beforeId > 0 ? [$beforeId] : []);
-        $sql = "SELECT * FROM messages WHERE room_id=0 AND to_user_id > 0 AND $cond"
-             . ' ORDER BY id DESC LIMIT ' . max(1, min(50, $limit));
-        $rows = DB::all($sql, $args);
-        $rows = array_reverse($rows);           // 升序返回给前端直接追加
+        if ($fromId > 0) {
+            [$cond, $args] = self::dmPairSql($actor, $pk, $pid, 'id>=?', [$fromId]);
+            $sql = "SELECT * FROM messages WHERE room_id=0 AND to_user_id > 0 AND $cond"
+                 . ' ORDER BY id ASC LIMIT ' . max(1, min(50, $limit));
+            $rows = DB::all($sql, $args);
+        } else {
+            [$cond, $args] = self::dmPairSql($actor, $pk, $pid, $beforeId > 0 ? 'id<?' : '', $beforeId > 0 ? [$beforeId] : []);
+            $sql = "SELECT * FROM messages WHERE room_id=0 AND to_user_id > 0 AND $cond"
+                 . ' ORDER BY id DESC LIMIT ' . max(1, min(50, $limit));
+            $rows = DB::all($sql, $args);
+            $rows = array_reverse($rows);           // 升序返回给前端直接追加
+        }
         $hidden = self::hiddenIds($actor);      // v1.1.14：扣掉「仅自己隐藏」的
+        $avMap  = self::avatarMap($rows);       // v1.3.20：与 history 同一口径（私聊此前漏了）
         $out = [];
         foreach ($rows as $m) {
             if (isset($hidden[(int)$m['id']])) continue;
-            $out[] = self::pack($m, $actor);
+            $out[] = self::pack($m, $actor, $avMap);
         }
         return $out;
     }
