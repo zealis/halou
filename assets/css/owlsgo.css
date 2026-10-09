@@ -111,6 +111,10 @@ button { font-family: inherit; cursor: pointer; }
    中间的弹性占位把右半组推到右边，避免给按钮加 margin-left:auto（移动端会挤）。 */
 .ow-modal-actions-split { justify-content: space-between; -webkit-justify-content: space-between; }
 .ow-modal-actions-split .ow-modal-actions-sp { flex: 1; -webkit-flex: 1; min-width: 0; }
+/* v1.3.17：分列按钮行里**不允许**出现「占满整行」的按钮（.ow-btn-block 的 width:100%）。
+   它会架空下面媒体查询里的 flex:0 0 auto —— 桌面端表现为「关闭」独占大半宽度、
+   把左侧「成员管理」挤成两行竖排。这里在全局把宽度打回 auto，按钮回归内容宽度。 */
+.ow-modal-actions-split .ow-btn-block { width: auto; }
 .ow-btn-danger { background: var(--ow-red); color: #fff; }
 .ow-btn-danger:hover { background: #cf1322; }
 .ow-btn[disabled] { opacity: .5; cursor: not-allowed; }
