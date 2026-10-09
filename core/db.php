@@ -307,6 +307,12 @@ class DB
         self::addColumn('rooms', 'avatar_type', 'str', "''");
         self::addColumn('rooms', 'avatar_style', 'str', "''");
         self::addColumn('rooms', 'avatar_seed', 'str', "''");
+        // v1.3.14：游客也有自己的头像（默认「豆苗」sprouts + 随机档位），存到表里才能
+        // 「同一个游客每次进来头像一致、不同游客长得不一样」。此前只能由 client_key 派生，
+        // 等于每个游客都长一个样，且换不了。
+        self::addColumn('guests', 'avatar_type', 'str', "'generated'");
+        self::addColumn('guests', 'avatar_style', 'str', "'sprouts'");
+        self::addColumn('guests', 'avatar_seed', 'str', "''");
         self::addColumn('messages', 'deleted_by', 'varchar(64)', "''");
         // ⚠️ v1.2.4：keep_forever（免清理标记）已随「撤回=立即物理删除」下线。
         // 撤回的消息根本不进库，不存在「被保留期清理」的问题，该标记失去意义。

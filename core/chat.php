@@ -863,10 +863,10 @@ class Chat
             return $u ? ['kind' => 'user', 'id' => (int)$u['id'], 'name' => (string)$u['nickname'],
                 'avatar' => Auth::avatarUrlFor($u, (string)$id)] : [];
         }
-        $g = DB::one('SELECT id, nickname, client_key FROM guests WHERE id=?', [$id]);
-        // 游客头像：种子取 client_key（同一浏览器每次一致）
+        // v1.3.14：与 actor() 同口径 —— 游客头像取 guests 表的风格与档位
+        $g = DB::one('SELECT id, nickname, client_key, avatar_type, avatar_style, avatar_seed FROM guests WHERE id=?', [$id]);
         return $g ? ['kind' => 'guest', 'id' => (int)$g['id'], 'name' => '游客' . substr((string)$g['nickname'], 2),
-            'avatar' => Auth::avatarGeneratedUrl('', (string)($g['client_key'] ?? 'guest'))] : [];
+            'avatar' => Auth::avatarUrlFor($g, (string)($g['client_key'] ?? 'guest'))] : [];
     }
 
     // ---------- 会话置顶（v1.2.28，**按用户**生效） ----------

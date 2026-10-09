@@ -43,6 +43,9 @@ class Auth
         $id = DB::insert('guests', [
             'token' => $token, 'nickname' => $nickname,
             'client_key' => Sec::clientKey(), 'ip' => Sec::ip(),
+            // v1.3.14：默认「豆苗」+ 随机一档（1..45），同一游客之后一直长这样
+            'avatar_type' => 'generated', 'avatar_style' => self::AVATAR_GUEST_STYLE,
+            'avatar_seed' => (string)random_int(1, self::AVATAR_SEED_COUNT),
             'created_at' => time(),
         ]);
         setcookie('owl_guest', $token, [
@@ -177,7 +180,11 @@ class Auth
         $data = [
             'nickname' => $nick, 'email' => $email,
             'password' => password_hash($password, PASSWORD_DEFAULT),
-            'avatar' => '', 'role' => 'member',
+            // v1.3.14：默认「小可爱」+ 随机一档（1..45），用户进站后可随时换
+            'avatar' => '', 'avatar_type' => 'generated',
+            'avatar_style' => self::AVATAR_DEFAULT_STYLE,
+            'avatar_seed' => (string)random_int(1, self::AVATAR_SEED_COUNT),
+            'role' => 'member',
             'client_key' => Sec::clientKey(), 'status' => 1,
             'email_verified' => DB::setting('reg_email_verify', '1') === '1' ? 1 : 0,
             'birthdate' => $birthdate,
@@ -384,8 +391,9 @@ class Auth
                 'kind' => 'guest', 'id' => (int)$guest['id'],
                 'nickname' => $guest['nickname'],
                 'role' => 'guest', 'title' => '',
-                // 游客没有用户行，种子取 client_key —— 同一浏览器每次进来头像一致
-                'avatar' => self::avatarGeneratedUrl('', (string)($guest['client_key'] ?? 'guest')),
+                // v1.3.14：游客也有自己的风格与档位（默认豆苗 sprouts）；
+                // 存量游客行没有档位 → 仍按 client_key 派生，保证老访客头像不跳变。
+                'avatar' => self::avatarUrlFor($guest, (string)($guest['client_key'] ?? 'guest')),
                 'key' => $guest['client_key'],
             ];
         }
@@ -405,8 +413,17 @@ class Auth
     //
     // ⚠️ 存量兼容：老记录 avatar_type 为空但 avatar 有值 → 按「有上传路径就用上传」处理。
 
-    /** 生成式头像的默认风格（用户指定：open-peeps + 五色背景） */
+    /** 生成式头像的默认风格：注册用户 = 小可爱，游客 = 豆苗 */
     public const AVATAR_DEFAULT_STYLE = 'open-peeps';
+    public const AVATAR_GUEST_STYLE  = 'sprouts';
+
+    /**
+     * 每种风格固定多少个变体（v1.3.14：按用户要求定为 45，对齐参考项目的做法）。
+     * DiceBear 是参数化生成器：同风格下只有 seed 不同，因此「N 个变体」= seed 取 1..N。
+     * 固定档位带来两个好处：① 用户选过一次就是稳定的一张（不会每次刷新变脸）；
+     * ② 选择界面就是 1..45 的网格，所见即所得，与保存的值一一对应。
+     */
+    public const AVATAR_SEED_COUNT = 45;
 
     /**
      * 可选风格表。结构：slug => [中文名, 官方推荐参数（不含 seed）]。
@@ -575,6 +592,21 @@ class Auth
             $n = (int)round(($v + $m) * 255);
             $n = max(0, min(255, $n));
             $out .= str_pad(dechex($n), 2, '0', STR_PAD_LEFT);
+        }
+        return $out;
+    }
+
+    /**
+     * 某风格的 45 个变体（v1.3.14）：点风格 → 二级选择界面直接复用同一套网格样式。
+     * 服务端出 URL 而不是前端拼 —— 参数与保存口径永远一致，不会两边算法漂移。
+     * @return array [{seed:int, url:string}, ...] 共 AVATAR_SEED_COUNT 项
+     */
+    public static function avatarVariants(string $style): array
+    {
+        $style = self::avatarStyle($style);
+        $out = [];
+        for ($i = 1; $i <= self::AVATAR_SEED_COUNT; $i++) {
+            $out[] = ['seed' => $i, 'url' => self::avatarGeneratedUrl($style, (string)$i)];
         }
         return $out;
     }

@@ -3681,7 +3681,8 @@
             } else {
                 el.className = 'ow-me';
                 el.onclick = null;
-                el.innerHTML = avatarHtml('', this.cfg.actor.nickname, false, 'guest')
+                // v1.3.14：游客头像来自服务端下发的 cfg.actor.avatar（默认豆苗 sprouts）
+                el.innerHTML = avatarHtml(this.cfg.actor.avatar, this.cfg.actor.nickname, false, 'guest')
                     + '<div><div class="ow-me-name">' + esc(this.cfg.actor.nickname) + '</div></div>';
             }
         },
@@ -4412,7 +4413,8 @@
             var rid = isRoom ? parseInt(target.room, 10) : 0;
             var cur = isRoom
                 ? roomAvatarHtml(this._roomAvatar, 'lg')
-                : avatarHtml(this.cfg.me ? this.cfg.me.avatar : '', this.cfg.me ? this.cfg.me.nickname : '', 'lg');
+                : avatarHtml(this.cfg.me ? this.cfg.me.avatar : this.cfg.actor.avatar,
+                    this.cfg.me ? this.cfg.me.nickname : this.cfg.actor.nickname, 'lg');
 
             var canUpload = !!this._avatarUploader;
             var h = '<div class="ow-av-dialog">'
@@ -4461,42 +4463,87 @@
             if (gal) gal.onclick = function () { self.openAvatarGallery(isRoom ? rid : 0); };
         },
 
-        /** 「浏览插图」：拉风格清单渲染网格，点一下即保存 */
-        openAvatarGallery: function (rid) {
+        /**
+         * 「浏览插图」—— 两级（v1.3.14）：
+         *   一级：风格网格（31 种）。点一个风格**不再直接随机保存**，
+         *         而是进入该风格的固定 45 个变体（同一套 ow-av-grid 样式）。
+         *   二级：45 变体网格。点哪张就保存哪张（seed = 1..45，所见即所得）。
+         */
+        openAvatarGallery: function (rid, curStyle) {
             var self = this;
             var box = $('owAvStyles');
             if (!box) return;
             box.style.display = '';
-            box.innerHTML = '<div class="ow-av-loading">风格加载中…</div>';
-            OwApi.post('avatar_styles', {}, function (r) {
-                if (!box) return;
-                if (!r.ok || !r.data || !r.data.length) {
-                    box.innerHTML = '<div class="ow-av-loading">风格加载失败，请稍后再试</div>';
-                    return;
-                }
-                var h = '<div class="ow-av-grid">';
-                for (var i = 0; i < r.data.length; i++) {
-                    var o = r.data[i];
-                    h += '<button class="ow-av-cell" type="button" data-slug="' + esc(o.slug) + '" title="' + esc(o.label) + '">'
-                       + '<img src="' + esc(o.url) + '" alt="' + esc(o.label) + '" loading="lazy">'
-                       + '<span>' + esc(o.label) + '</span></button>';
-                }
-                h += '</div><div class="ow-av-hint">点击任一插图即刻生效；想换一张就再点另一张。</div>';
-                box.innerHTML = h;
-                var cells = box.getElementsByTagName('button');
-                for (var j = 0; j < cells.length; j++) {
-                    cells[j].onclick = function () {
-                        var slug = this.getAttribute('data-slug');
-                        self.saveAvatarStyle(slug, rid);
-                    };
-                }
-            });
+            box.innerHTML = '<div class="ow-av-loading">加载中…</div>';
+
+            var renderStyles = function () {
+                OwApi.post('avatar_styles', {}, function (r) {
+                    if (!box) return;
+                    if (!r.ok || !r.data || !r.data.length) {
+                        box.innerHTML = '<div class="ow-av-loading">风格加载失败，请稍后再试</div>';
+                        return;
+                    }
+                    var h = '<div class="ow-av-grid">';
+                    for (var i = 0; i < r.data.length; i++) {
+                        var o = r.data[i];
+                        h += '<button class="ow-av-cell" type="button" data-slug="' + esc(o.slug) + '" title="' + esc(o.label) + '">'
+                           + '<img src="' + esc(o.url) + '" alt="' + esc(o.label) + '" loading="lazy">'
+                           + '<span>' + esc(o.label) + '</span></button>';
+                    }
+                    h += '</div><div class="ow-av-hint">先选一种插图风格，再挑其中一张。</div>';
+                    box.innerHTML = h;
+                    var cells = box.getElementsByTagName('button');
+                    for (var j = 0; j < cells.length; j++) {
+                        cells[j].onclick = function () { renderVariants(this.getAttribute('data-slug')); };
+                    }
+                });
+            };
+
+            var renderVariants = function (slug) {
+                box.innerHTML = '<div class="ow-av-loading">变体加载中…</div>';
+                OwApi.post('avatar_variants', { avatar_style: slug }, function (r) {
+                    if (!box) return;
+                    if (!r.ok || !r.data || !r.data.length) {
+                        box.innerHTML = '<div class="ow-av-loading">变体加载失败</div>';
+                        return;
+                    }
+                    var label = '';
+                    var list = self.cfg.avatarStyles || [];
+                    for (var k = 0; k < list.length; k++) if (list[k].slug === slug) label = list[k].label;
+                    var h = '<button class="ow-btn ow-btn-ghost ow-av-back" type="button" id="owAvBack">'
+                          + '<svg class="ow-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+                          + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg>'
+                          + '全部风格</button>'
+                          + '<div class="ow-av-subtitle">' + esc(label || slug) + '</div>'
+                          + '<div class="ow-av-grid">';
+                    for (var i = 0; i < r.data.length; i++) {
+                        var v = r.data[i];
+                        h += '<button class="ow-av-cell" type="button" data-seed="' + v.seed + '" title="第 ' + v.seed + ' 号">'
+                           + '<img src="' + esc(v.url) + '" alt="" loading="lazy"></button>';
+                    }
+                    h += '</div><div class="ow-av-hint">共 ' + r.data.length + ' 个头像，点一下即刻生效。</div>';
+                    box.innerHTML = h;
+                    var back = $('owAvBack');
+                    if (back) back.onclick = renderStyles;
+                    var cells = box.getElementsByTagName('button');
+                    for (var j = 0; j < cells.length; j++) {
+                        (function (btn) {
+                            btn.onclick = function () {
+                                if (!btn.getAttribute('data-seed')) return;
+                                self.saveAvatarStyle(slug, rid, btn.getAttribute('data-seed'));
+                            };
+                        })(cells[j]);
+                    }
+                });
+            };
+
+            renderStyles();
         },
 
         /** 保存生成式头像。rid>0 表示群头像，0 表示本人 */
-        saveAvatarStyle: function (slug, rid) {
+        saveAvatarStyle: function (slug, rid, seed) {
             var self = this;
-            var seed = String(Date.now()) + '-' + Math.floor(Math.random() * 100000);
+            // v1.3.14：seed 由二级界面给出（1..45 固定档），不再随机 —— 所见即所得
             if (parseInt(rid || '0', 10) > 0) {
                 var room = this.cfg.rooms || [];
                 for (var i = 0; i < room.length; i++) {

@@ -197,7 +197,11 @@ if (!$installed) {
                 'id' => 1,
                 'nickname' => $nickRes, 'email' => $e,
                 'password' => password_hash($pw, PASSWORD_DEFAULT),
-                'avatar' => '', 'role' => 'admin',
+                // v1.3.14：与普通注册一致，默认「小可爱」+ 随机一档
+                'avatar' => '', 'avatar_type' => 'generated',
+                'avatar_style' => Auth::AVATAR_DEFAULT_STYLE,
+                'avatar_seed' => (string)random_int(1, Auth::AVATAR_SEED_COUNT),
+                'role' => 'admin',
                 'client_key' => Sec::clientKey(), 'status' => 1,
                 'email_verified' => 1, 'created_at' => time(),
                 'reg_ip' => Sec::ip(),   // v1.2.56：与 Auth::register 口径一致，记录安装者 IP
@@ -856,6 +860,11 @@ if ($action !== '') {
         case 'avatar_styles':
             Api::json(['ok' => true, 'data' => Auth::avatarStyleOptions((int)$p('seed'))]);
 
+        // v1.3.14：选中风格后的二级界面 —— 该风格固定的 45 个变体
+        case 'avatar_variants':
+            Api::json(['ok' => true, 'style' => Auth::avatarStyle($p('avatar_style')),
+                'data' => Auth::avatarVariants($p('avatar_style'))]);
+
         case 'user_card':
             $u = DB::one('SELECT id,nickname,role,title,avatar,points,created_at,last_login FROM users WHERE id=?', [(int)$p('id')]);
             if (!$u) Api::json(['ok' => false, 'msg' => '用户不存在']);
@@ -1352,6 +1361,9 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
         'actor' => [
             'kind' => $actor['kind'], 'id' => $actor['id'] ?? 0,
             'nickname' => $actor['nickname'] ?? '', 'role' => $actor['role'] ?? 'guest',
+            // v1.3.14：下发最终 URL —— 游客头像此前完全没进 boot，前端只能退回 identicon，
+            // 于是「游客还是之前的头像」。
+            'avatar' => (string)($actor['avatar'] ?? ''),
         ],
         'rooms' => $rooms,
         // v1.3.1：游客未点选任何群时下发 0，前端据此禁用输入区（进入后才解锁）
@@ -1365,6 +1377,12 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
         ] : null,
         'ts' => time(),
         'version' => OWLSGO_VERSION,
+        // v1.3.14：风格 slug + 中文名，供头像二级界面显示标题（前端不认 DiceBear 内部结构）
+        'avatar_styles' => (function () {
+            $out = [];
+            foreach (Auth::avatarStyles() as $slug => $meta) $out[] = ['slug' => $slug, 'label' => $meta[0]];
+            return $out;
+        })(),
     ];
     // 插件资源必须在 OwChat.init 之后引入：插件脚本依赖 OwChat.cfg 判断场景
     // ⚠️ 打标记：插件（如 twofa）会用 page.footer 再补一份合并资源给「登录页」用，
