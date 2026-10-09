@@ -3240,7 +3240,29 @@
                 self.clearQuote();   // 发送成功后清掉引用条
                 self.autoGrow();   // 发送后回到单行（若手动拉高过则保持用户高度）
                 self.afterSendClearJump();   // v1.3.21：自己发言即视为已参与，清掉跳转按钮
+                // v1.3.23：**立即本地回显**自己这条消息。
+                //
+                // 为什么必须立刻渲染：原先这里什么都不做，消息只能靠长轮询带回来 ——
+                // 而长轮询是 20 秒挂起的，**这条 in-flight 请求的 since 是发消息之前
+                // 抓的快照**，服务端要等它超时返回后才发起下一次（此时才看得到新消息）。
+                // 于是「发出去 → 气泡不出现 → 最多等 20 秒才出现」，刷新才看得到
+                // （刷新会重走 history，立刻就有了）。
+                //
+                // 三点要注意：
+                //  ① 用服务端回的 msg_row，**不自己拼** —— 敏感词替换后的正文、
+                //     头像最终 URL、role 等派生字段只有服务端算得准；
+                //  ② addMessage 内部按 id 去重，所以长轮询稍后把同一条带回来时
+                //     不会重复渲染；
+                //  ③ 同步推进 since —— 否则长轮询会把这批「已渲染但 since 未覆盖」
+                //     的消息当新的再走一遍（虽不重复渲染，但会白发一次请求）。
+                if (r.msg_row) {
+                    self.addMessage(r.msg_row);
+                    if (r.msg_row.id > self.since) self.since = r.msg_row.id;
+                    self.scrollBottom();
+                    self.markRead(self.since);
+                }
                 if (wasDm && self.dm) self.loadConversations();   // 刷新会话排序（自己发的排最前）
+                else self.loadConversations();   // 群聊同样刷新：自己发的会让会话置顶
             });
         },
 

@@ -629,7 +629,17 @@ class Chat
         // （长度、纯表情、纯链接、内容去重），只有 id 就得回查一次 messages，
         // 每条消息多一发 SQL 不划算。参数是**追加**，老插件的多余形参不受影响。
         Plugin::fire('message.after_send', [$id, $actor, $roomId, $content, $type, $toUserId]);
-        return [true, 'ok', $id];
+        // v1.3.23：返回**完整消息行**（pack 后的形态），让前端能立即本地回显。
+        // 为什么必须由服务端给：消息行里有十几处派生字段 —— 时间戳、role、
+        // 头像最终 URL、引用快照、被敏感词插件替换过的正文（text.filter 钩子
+        // 可能改内容）、ip 归属的 guest_id / user_id 判定……
+        // 前端凭空拼一份必然与其他人收到的版本不一致（典型症状就是「自己看到的
+        // 和自己收到的不一样」），而且要重新实现一遍 pack 的口径、必然漂移。
+        // 这里多一次按主键回查（只一条），换来「所见即服务端所见」。
+        $row = DB::one('SELECT * FROM messages WHERE id=?', [$id]);
+        if (!$row) return [true, 'ok', $id];
+        $avMap = self::avatarMap([$row]);
+        return [true, 'ok', $id, self::pack($row, $actor, $avMap)];
     }
 
     // ---------- 消息序列化（含可见性过滤） ----------

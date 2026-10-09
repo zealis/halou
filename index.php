@@ -635,12 +635,15 @@ if ($action !== '') {
             Api::json(['ok' => true, 'data' => Chat::history($actor, $roomId, (int)$p('before', '0'), 30, (int)$p('from_id', '0'))]);
 
         case 'send':
-            [$ok, $msg, $id] = Chat::send($actor, (int)$p('room_id'), $p('type', 'text'), (string)($_POST['content'] ?? ''), [
+            [$ok, $msg, $id, $msgRow] = Chat::send($actor, (int)$p('room_id'), $p('type', 'text'), (string)($_POST['content'] ?? ''), [
                 'to_user_id' => $p('to_user_id'), 'to_guest_id' => $p('to_guest_id'), 'to_nickname' => $p('to_nickname'),
                 // 引用快照（前端「引用」功能）：{nick,text} 的 JSON 字符串，服务端会再校验截断
                 'quote' => (string)($_POST['quote'] ?? ''),
             ]);
-            Api::json(['ok' => $ok, 'msg' => $msg, 'id' => $id ?? null]);
+            // v1.3.23：msg_row = 服务端 pack 后的完整消息行，供前端**立即本地回显**
+            // （原先只回 id，前端只能等长轮询把自己的消息带回来，最长要等 20 秒）
+            Api::json(['ok' => $ok, 'msg' => $msg, 'id' => $id ?? null,
+                'msg_row' => $msgRow ?? null]);
 
         // ---------- 前台编辑群聊信息（列表 ⋮ 菜单，管理员/房主） ----------
         case 'room_update':
