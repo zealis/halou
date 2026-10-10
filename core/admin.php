@@ -421,8 +421,10 @@ class Admin
                 Api::json($okUA ? ['ok' => true] + (array)$resUA : ['ok' => false, 'msg' => (string)$resUA]);
 
             case 'admin_upgrade_rollback':
-                // 敏感路由同上；默认恢复最近一次升级前的状态，可指定备份编号 ts
-                [$okRB, $resRB] = Upgrade::rollback($p('ts') !== '' ? $p('ts') : null);
+                // 敏感路由同上；默认恢复最近一次升级前的状态，可指定备份编号。
+                // ⚠️ 参数不能叫 ts —— 会和 OwApi 签名字段 ts（时间戳）撞名，
+                //    $p('ts') 拿到的是签名时间戳、直接被判「备份编号不合法」。
+                [$okRB, $resRB] = Upgrade::rollback($p('bak_ts') !== '' ? $p('bak_ts') : null);
                 if ($okRB) Sec::log('upgrade_rollback', (string)($actor['nickname'] ?? ''), is_array($resRB) ? $resRB : ['msg' => (string)$resRB]);
                 Api::json($okRB ? ['ok' => true] + (array)$resRB : ['ok' => false, 'msg' => (string)$resRB]);
 
