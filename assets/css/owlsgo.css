@@ -31,6 +31,9 @@
     --ow-green: #237804;            /* 成功 / 可发言：白底 5.59、浅绿标签底 5.44 */
     --ow-yellow: #874D00;           /* 称号标签等：浅黄底 6.53 */
     --ow-red: #C41D1F;              /* 危险 / 管理员标签：白底 5.93、浅红底 5.39，白字 5.93 */
+    /* v1.3.53：小红点专用色（.ow-dot）。不复用 --ow-red —— 那个是为「浅底上的危险文字」
+       调的深红，画成实心小点会偏暗、像脏污；这里要的是提示性的亮红。 */
+    --ow-dot-bg: #E5484D;
     --ow-orange: #A05000;           /* VIP 标签：浅橙底 5.41、白底 5.77 */
     --ow-blue-light: #E6F7FF;
     /* v1.1.22：悬浮底色独立成变量。原先 hover 直接复用 --ow-blue-light(#E6F7FF)，
@@ -119,6 +122,28 @@
     margin-top: 6px;
 }
 
+/* ===================== 小红点（v1.3.53 通用轮子） =====================
+   语义只有一个：「这里有新东西」，不表示数量 —— 要显示数量请用 .ow-cl-badge。
+   现在两处共用：后台「系统维护 → 系统升级」有新版、rail「通知」有未读。
+   ⚠️ 用元素自身画圆，不用文字「●」：字符点会随字体与字号漂移、基线难对齐，
+      颜色也没法在深色模式稳定取色（后台原先那个就是内联 #E5484D 的 ●）。 */
+.ow-dot {
+    display: inline-block; vertical-align: middle;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--ow-dot-bg);
+    margin-left: 5px;
+    flex-shrink: 0; -webkit-flex-shrink: 0;
+}
+/* rail 里的红点挂在图标右上角（.ow-rail-btn 已改为定位父级）。
+   不加描边：选中态的按钮是主色实心方块，任何固定色的环都会在「常态灰 / 选中蓝」
+   两种底上错一个，纯色点反而两边都干净。 */
+.ow-rail-btn .ow-dot {
+    position: absolute; top: 6px; right: 6px;
+    width: 8px; height: 8px;
+    margin-left: 0;
+}
+
 /* v1.3.51：色系卡片样式（.ow-scheme-*）已随功能剥离到插件，见
    plugins/color-schemes/style.css —— 插件停用时那些类根本不会被加载，
    核心样式表里也不该留着它们的残骸。 */
@@ -152,6 +177,7 @@
     --ow-green: #52C41A;            /* 成功/可发言 */
     --ow-yellow: #FFC53D;           /* 称号标签等 */
     --ow-red: #FF7875;              /* 危险/管理员标签（深底上要提亮才够对比） */
+    --ow-dot-bg: #FF6B6E;           /* 小红点：深色底上同样取亮档，与 --ow-red 同向 */
     --ow-orange: #FFA940;           /* VIP 标签 */
     --ow-blue-light: #14323F;       /* 浅蓝底 → 深青底 */
     --ow-hover-bg: #303035;         /* hover（同上，深底更亮） */
@@ -810,6 +836,7 @@ input[type=range] {
     color: var(--ow-text-sub);
     cursor: pointer;
     flex-shrink: 0; -webkit-flex-shrink: 0;
+    position: relative;   /* v1.3.53：作为 rail 小红点（.ow-dot）的定位父级 */
 }
 .ow-rail-btn:hover { background: var(--ow-bg-chat-hover); color: var(--ow-text-title); }
 .ow-rail-btn.is-active { background: var(--ow-primary-strong); color: #FFFFFF; }

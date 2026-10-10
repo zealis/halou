@@ -53,6 +53,9 @@ Plugin::route('plugin_ban_manager_add', function (array $ctx) use ($bmGuard) {
     ]);
     Sec::log('admin_ban', $actor['nickname'], ['type' => $type, 'target' => $target]);
     Plugin::fire('ban.after_add', [$id, $type, $target, $actor]);
+    // v1.3.53：通知本人「在哪个群、被禁多久」。只有 type=user 有账号可投递 ——
+    // 游客身份随会话消亡、IP 段背后是多人，发过去要么没人收要么发错人。
+    if ($type === 'user') Notice::muted((int)$target, (int)($post['room_id'] ?? 0), (int)($post['hours'] ?? 0));
     Api::json(['ok' => true, 'msg' => '已禁言']);
 });
 Plugin::sensitive('plugin_ban_manager_add');   // 禁言：敏感（v1.0.91）
@@ -116,6 +119,7 @@ Plugin::route('plugin_ban_manager_quick', function (array $ctx) {
     ]);
     Sec::log('ban_quick', $actor['nickname'], ['type' => $type, 'target' => $target, 'room' => $roomId, 'hours' => $hours]);
     Plugin::fire('ban.after_add', [$id, $type, $target, $actor]);
+    if ($type === 'user') Notice::muted($uid, $roomId, $hours);   // v1.3.53 通知本人（游客无账号可投递）
     Api::json(['ok' => true, 'msg' => '已禁言' . ($hours > 0 ? "（本房间 {$hours} 小时）" : '（本房间永久）')]);
 });
 Plugin::sensitive('plugin_ban_manager_quick');   // 右键快速禁言：敏感（v1.0.91）

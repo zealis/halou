@@ -1363,8 +1363,12 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
        . '<button class="ow-rail-btn is-active" data-tab="chat" type="button" title="消息" aria-label="消息">' . ow_icon('chat', 20) . '<span class="ow-rail-lb">消息</span></button>'
        . '<button class="ow-rail-btn" data-tab="friends" type="button" title="联系人" aria-label="联系人">' . ow_icon('users', 20) . '<span class="ow-rail-lb">联系人</span></button>'
        . (($actor['kind'] ?? '') === 'user'
-           ? '<button class="ow-rail-btn" data-tab="notice" type="button" title="系统通知" aria-label="系统通知">' . ow_icon('bell', 20) . '<span class="ow-rail-lb">通知</span>'
-             . '<span class="ow-rail-badge" id="owNoticeBadge"' . ($noticeUnread > 0 ? '' : ' style="display:none"') . '>' . $noticeUnread . '</span></button>'
+           ? '<button class="ow-rail-btn" data-tab="notice" type="button" title="系统通知"'
+             . ' aria-label="系统通知' . ($noticeUnread > 0 ? '（' . $noticeUnread . ' 条未读）' : '') . '">'
+             . ow_icon('bell', 20) . '<span class="ow-rail-lb">通知</span>'
+             // v1.3.53：只要「有没有」，不要数量 —— 复用通用小红点 .ow-dot（与后台系统升级同一个轮子）。
+             // 点本身对读屏是装饰（aria-hidden），未读数改放进气泡按钮的 aria-label。
+             . '<span class="ow-dot" id="owNoticeDot" aria-hidden="true"' . ($noticeUnread > 0 ? '' : ' style="display:none"') . '></span></button>'
            : '')
        . Plugin::collect('sidebar.rail')
        . '</nav>';

@@ -3802,7 +3802,7 @@
                 self.renderNoticeStream();
                 // 服务端在返回时就整批标已读了，红点必须跟着清零
                 self.cfg.notice_unread = 0;
-                self.clearNoticeBadge();
+                self.clearNoticeDot();
                 self.renderNoticeRow();
             });
         },
@@ -3850,10 +3850,12 @@
             box.scrollTop = box.scrollHeight;
         },
 
-        /** rail 红点：进入通知流后清零（服务端已把整批标为已读） */
-        clearNoticeBadge: function () {
-            var b = $('owNoticeBadge');
-            if (b) { b.textContent = '0'; b.style.display = 'none'; }
+        /** rail 小红点：进入通知流后熄灭（服务端已把整批标为已读），按钮的未读数一并从 aria-label 去掉 */
+        clearNoticeDot: function () {
+            var b = $('owNoticeDot');
+            if (b) b.style.display = 'none';
+            var btn = document.querySelector('.ow-rail-btn[data-tab="notice"]');
+            if (btn) btn.setAttribute('aria-label', '系统通知');
         },
 
         /**
@@ -6496,7 +6498,7 @@
                             // 红点 = settings.update_info.has_update（每 12h 计划任务 + 手动检查都会刷）。
                             // v1.3.42：原「版本号」展示行已删（升级面板里本地/远端版本对比更全）。
                             + '<div class="ow-form-item"><label>系统升级'
-                            + '<span id="owUpdDot" style="display:none;color:#E5484D;margin-left:5px" title="有新版本可用">●</span></label>'
+                            + '<span id="owUpdDot" class="ow-dot" title="有新版本可用" aria-hidden="true" style="display:none"></span></label>'
                             + '<button type="button" class="ow-btn ow-btn-ghost" id="owUpdBtn" onclick="OwAdmin.upgrade.check()">检查更新</button>'
                             + '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">按 GitHub 仓库逐文件比对，只更新有差异的代码文件。'
                             + '保护路径永不动：core/config.php、data/、uploads/；覆盖前自动备份到 data/backup/，可一键恢复。'
