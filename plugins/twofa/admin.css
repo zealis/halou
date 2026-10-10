@@ -27,7 +27,7 @@
     color: var(--ow-text-sub, #666);
 }
 .ow-twofa-stat-warn .ow-twofa-stat-num {
-    color: #C41D1F;
+    color: var(--ow-red);            /* v1.3.37：写死 #C41D1F，深色底上过暗，改用主题危险色 */
 }
 @media (max-width: 640px) {
     .ow-twofa-stats {

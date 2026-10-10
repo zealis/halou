@@ -934,10 +934,10 @@
             var codeBtn = form.querySelector('[data-sendcode]');
             if (codeBtn) codeBtn.onclick = function () {
                 var email = form.querySelector('[name=email]').value;
-                if (!email) { msg.innerHTML = '<span style="color:#C41D1F">请先填写邮箱</span>'; return; }
+                if (!email) { msg.innerHTML = '<span style="color:var(--ow-red)">请先填写邮箱</span>'; return; }
                 codeBtn.disabled = true;
                 OwApi.post('send_code', { email: email, type: codeBtn.getAttribute('data-sendcode') }, function (r) {
-                    msg.innerHTML = '<span style="color:' + (r.ok ? '#237804' : '#C41D1F') + '">' + esc(r.msg) + '</span>';
+                    msg.innerHTML = '<span style="color:' + (r.ok ? 'var(--ow-green)' : 'var(--ow-red)') + '">' + esc(r.msg) + '</span>';
                     var n = 60;
                     if (r.ok) {
                         var tm = setInterval(function () {
@@ -959,7 +959,7 @@
                 msg.innerHTML = '提交中…';
                 OwApi.post(mode === 'login' ? 'login' : mode, data, function (r) {
                     if (r.ok) {
-                        msg.innerHTML = '<span style="color:#237804">' + esc(r.msg) + '</span>';
+                        msg.innerHTML = '<span style="color:var(--ow-green)">' + esc(r.msg) + '</span>';
                         // 注册成功不进入聊天（后端注册本就不建会话）：跳登录页由用户手动登录
                         setTimeout(function () {
                             location.href = mode === 'login' ? '?page=chat'
@@ -967,7 +967,7 @@
                                 : '?page=login&registered=1';
                         }, 800);
                     } else {
-                        msg.innerHTML = '<span style="color:#C41D1F">' + esc(r.msg) + '</span>';
+                        msg.innerHTML = '<span style="color:var(--ow-red)">' + esc(r.msg) + '</span>';
                         if (r.captcha && $('owCaptchaRow')) {
                             $('owCaptchaRow').style.display = 'block';
                             if (img) img.src = '?action=captcha&_=' + new Date().getTime();
@@ -1475,11 +1475,11 @@
             var input = $('owRoomPw'), msg = $('owRoomPwMsg');
             var submit = function () {
                 var pw = input.value;
-                if (!pw) { msg.innerHTML = '<span style="color:#C41D1F">请输入密码</span>'; return; }
+                if (!pw) { msg.innerHTML = '<span style="color:var(--ow-red)">请输入密码</span>'; return; }
                 msg.innerHTML = '验证中…';
                 OwApi.post('room_join', { room_id: roomId, password: pw }, function (r) {
                     if (!r.ok) {
-                        msg.innerHTML = '<span style="color:#C41D1F">' + esc(r.msg) + '</span>';
+                        msg.innerHTML = '<span style="color:var(--ow-red)">' + esc(r.msg) + '</span>';
                         input.select();
                         return;
                     }
@@ -2277,7 +2277,7 @@
                         if (self.sound) beep();
                     }
                     $('owLatency').innerHTML = '● ' + (new Date().getTime() - t0) + ' ms';
-                    $('owLatency').style.color = '#237804';
+                    $('owLatency').style.color = 'var(--ow-green)';
                     // 有新消息即刷新会话列表（排序会因这条消息而变）
                     if (hasNew) self.loadConversations();
                 }
@@ -2506,14 +2506,14 @@
                         // 降级：短轮询 + 指数退避（2s → 10s 封顶）
                         var wait = Math.min(10000, 2000 * self.failCount);
                         $('owLatency').innerHTML = '重连中…';
-                        $('owLatency').style.color = '#C41D1F';
+                        $('owLatency').style.color = 'var(--ow-red)';
                         setTimeout(loop, wait);
                         return;
                     }
                     self.failCount = 0;
                     var ms = new Date().getTime() - t0;
                     $('owLatency').innerHTML = '● ' + ms + ' ms';
-                    $('owLatency').style.color = '#237804';
+                    $('owLatency').style.color = 'var(--ow-green)';
                     self.since = r.since;
                     var i, hasNew = false;
                     for (i = 0; i < r.messages.length; i++) {
@@ -2706,12 +2706,12 @@
             // v1.1.18：措辞改回「公开 / 仅邀请」。v1.1.16 误用「普通」，与类型撞词。
             var refreshPub = function () {
                 if (!canPrivate) {
-                    pubNote.innerHTML = '<span style="color:#C41D1F">站点已关闭「创建仅邀请群聊」，新群只能公开。</span>';
+                    pubNote.innerHTML = '<span style="color:var(--ow-red)">站点已关闭「创建仅邀请群聊」，新群只能公开。</span>';
                     return;
                 }
                 pubNote.innerHTML = pubBox.checked
                     ? '<span style="color:var(--ow-text-sub)">群聊将出现在左侧列表，所有人（含游客）都能看到并进入。</span>'
-                    : '<span style="color:#C41D1F">仅邀请：群聊不会出现在列表里。创建后只有你能进，其他人需要你或群成员在群聊设置里按用户 ID 邀请。</span>';
+                    : '<span style="color:var(--ow-red)">仅邀请：群聊不会出现在列表里。创建后只有你能进，其他人需要你或群成员在群聊设置里按用户 ID 邀请。</span>';
             };
             pubBox.onchange = refreshPub;
             refreshPub();
@@ -2739,7 +2739,7 @@
                 if (!g) { tip.innerHTML = ''; return; }
                 var html = '';
                 if (!g.allowed) {
-                    html = '<span style="color:#C41D1F">' + esc(g.reason || '当前无法创建群聊') + '</span>';
+                    html = '<span style="color:var(--ow-red)">' + esc(g.reason || '当前无法创建群聊') + '</span>';
                     $('owRCCreate').disabled = true;
                     $('owRCCreate').style.opacity = '.5';
                     $('owRCCreate').style.cursor = 'not-allowed';
@@ -2747,10 +2747,10 @@
                     var why = (typeof g.level === 'number' && g.min_room_level && g.level < g.min_room_level)
                         ? '建群需 <b>' + g.min_room_level + '</b> 级（当前 Lv.' + g.level + '）'
                         : '免费名额已用完（<b>' + g.used + '/' + g.quota + '</b>）';
-                    html = '<span style="color:#B06000">' + why + '，可消耗 <b>' + g.cost
+                    html = '<span style="color:var(--ow-yellow)">' + why + '，可消耗 <b>' + g.cost
                         + '</b> 积分创建（当前 <b>' + g.points + '</b>）。</span>';
                     if (g.points < g.cost) {
-                        html += '<br><span style="color:#C41D1F">积分不足：还需 <b>'
+                        html += '<br><span style="color:var(--ow-red)">积分不足：还需 <b>'
                             + (g.cost - g.points) + '</b> 积分。</span>';
                         $('owRCCreate').disabled = true;
                         $('owRCCreate').style.opacity = '.5';
@@ -2769,7 +2769,7 @@
             }
             var submit = function () {
                 if (gateInfo && !gateInfo.allowed) {
-                    msg.innerHTML = '<span style="color:#C41D1F">'
+                    msg.innerHTML = '<span style="color:var(--ow-red)">'
                         + esc(gateInfo.reason || '当前无法创建群聊') + '</span>';
                     return;
                 }
@@ -2778,13 +2778,13 @@
                    ⚠️ 不能写成 `name.length < 2` —— 那会把「留空」也判成非法，
                    与「可选」的设计直接矛盾。 */
                 if (name !== '' && (name.length < 2 || name.length > 30)) {
-                    msg.innerHTML = '<span style="color:#C41D1F">群名称需 2-30 个字符，'
+                    msg.innerHTML = '<span style="color:var(--ow-red)">群名称需 2-30 个字符，'
                         + '或留空自动命名为「' + esc(autoName) + '」</span>';
                     return;
                 }
                 var t = typeSel.value;
                 if (t === 'password' && !$('owRCPass').value) {
-                    msg.innerHTML = '<span style="color:#C41D1F">密码群必须设置密码</span>'; return;
+                    msg.innerHTML = '<span style="color:var(--ow-red)">密码群必须设置密码</span>'; return;
                 }
                 msg.innerHTML = '创建中…';
                 OwApi.post('room_create', {
@@ -2794,7 +2794,7 @@
                     description: $('owRCDesc').value,
                     is_public: pubBox.checked ? '1' : '0'
                 }, function (r) {
-                    if (!r.ok) { msg.innerHTML = '<span style="color:#C41D1F">' + esc(r.msg) + '</span>'; return; }
+                    if (!r.ok) { msg.innerHTML = '<span style="color:var(--ow-red)">' + esc(r.msg) + '</span>'; return; }
                     self.closeModal();
                     toast('群聊「' + r.name + '」已创建'
                         + (r.cost > 0 ? '，扣除 ' + r.cost + ' 积分' : '')
@@ -4191,7 +4191,7 @@
                 }
             } else {
                 OwApi.post('stickers', {}, function (r) {
-                    if (!r.ok || !r.data.length) { grid.innerHTML = '<p style="padding:20px;color:#5C5C5C;font-size:12px">暂无贴纸：把鼠标悬停在图片消息上点击「收藏贴纸」即可添加</p>'; return; }
+                    if (!r.ok || !r.data.length) { grid.innerHTML = '<p style="padding:20px;color:var(--ow-text-sub);font-size:12px">暂无贴纸：把鼠标悬停在图片消息上点击「收藏贴纸」即可添加</p>'; return; }
                     for (i = 0; i < r.data.length; i++) html += '<img class="ow-sticker-item" src="' + esc(r.data[i].url) + '">';
                     grid.innerHTML = html;
                     var imgs = grid.getElementsByTagName('img');
@@ -4802,7 +4802,7 @@
                 + '<input type="file" id="owSetAvatarFile" accept="image/*" style="display:none">'
                 + '</div>'
                 + '<div class="ow-form-item"><label>昵称</label><input class="ow-input" id="owSetNick" value="' + esc(me.nickname) + '">'
-                + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">2-20 个字符，支持中英文、数字、下划线与短横线，不含空格或 @；允许重名。</p></div>'
+                + '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">2-20 个字符，支持中英文、数字、下划线与短横线，不含空格或 @；允许重名。</p></div>'
                 // v1.2.37：第三方应用授权已剥离为插件 oauth-core，**按需加载**。
                 // 入口按钮按 window.OwOauth 是否存在来渲染 —— 插件停用时它的 chat.js
                 // 不加载，这里自然什么都不显示，核心不需要任何开关判断。
@@ -4814,7 +4814,7 @@
                 + '<p class="ow-form-hint">跟随系统会随操作系统的深浅色设置自动切换。</p></div>'
                 + ((w.OwOauth) ? '<div class="ow-form-item"><label>第三方授权</label>'
                     + '<button class="ow-btn ow-btn-ghost ow-btn-block" onclick="OwOauth.open()">管理应用授权</button>'
-                    + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">'
+                    + '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">'
                     + '把资料、聊天记录等权限授予你安装的插件应用；随时可在此取消。</p></div>' : '')
                 + '<button class="ow-btn ow-btn-primary ow-btn-block" onclick="OwChat.saveSettings()">保存</button>'
             );
@@ -5700,14 +5700,14 @@
                 var h = '<tr><th style="width:32px"><input type="checkbox" id="owLogCheckAll" onchange="OwAdmin.logToggleAll(this)"></th>'
                       + '<th>时间</th><th>动作</th><th>操作者</th><th>IP</th><th>详情</th></tr>';
                 if (!r.data.length) {
-                    h += '<tr><td colspan="6" style="color:#5C5C5C">当前筛选下暂无日志。</td></tr>';
+                    h += '<tr><td colspan="6" style="color:var(--ow-text-sub)">当前筛选下暂无日志。</td></tr>';
                 }
                 for (var i = 0; i < r.data.length; i++) {
                     var x = r.data[i];
                     h += '<tr><td><input type="checkbox" class="owLogChk" value="' + x.id + '" onchange="OwAdmin.logSyncBatch()"></td>'
                        + '<td style="white-space:nowrap">' + esc(OwAdmin._logTs(x.created_at)) + '</td>'
                        + '<td><b>' + esc(OwAdmin._logActName(x.action)) + '</b>'
-                       + '<div style="color:#8A8A8A;font-size:11px">' + esc(x.action) + '</div></td>'
+                       + '<div style="color:var(--ow-text-sub);font-size:11px">' + esc(x.action) + '</div></td>'
                        + '<td>' + esc(x.actor || '—') + '</td>'
                        + '<td>' + esc(x.ip || '—') + '</td>'
                        + '<td style="max-width:420px">' + OwAdmin._logDetail(x) + '</td></tr>';
@@ -5959,7 +5959,7 @@
                            + '<button class="ow-btn ow-btn-ghost" onclick="OwAdmin.pluginUninstall(\'' + esc(d.id) + '\')">卸载</button>'
                            + '</div></div>';
                     }
-                    if (!r.data.length) h += '<div class="ow-card" style="color:#5C5C5C">暂无插件</div>';
+                    if (!r.data.length) h += '<div class="ow-card" style="color:var(--ow-text-sub)">暂无插件</div>';
                     main.innerHTML = h + '</div>';
                     /* 自研上传控件：隐藏原生 file input，选择后回显文件名 */
                     var zip = $('owPluginZip');
@@ -5995,7 +5995,7 @@
                     + '<div class="ow-card"><h3 style="margin:0 0 10px;font-size:14px">审核回收站</h3>'
                     + '<div class="ow-table-wrap"><table class="ow-table" id="owRoomTrash"></table></div>'
                     + '<div id="owTrashPager" style="margin-top:10px"></div>'
-                    + '<p style="font-size:12px;color:#5C5C5C;margin:8px 0 0">撤销有顺序依赖：群聊被删除后，需先撤销「删除」才能恢复其之前的名称 / 头像 / 封禁状态。</p></div>';
+                    + '<p style="font-size:12px;color:var(--ow-text-sub);margin:8px 0 0">撤销有顺序依赖：群聊被删除后，需先撤销「删除」才能恢复其之前的名称 / 头像 / 封禁状态。</p></div>';
                 // 批量操作改下拉（v1.2.60）：原先平铺 4 个按钮，窄屏会折成两行并挤掉统计位
                 OwAdmin.uiBatchBar({
                     id: 'owRVBatch',
@@ -6142,7 +6142,7 @@
                     }
                     function row(items) { return '<div class="ow-form-row">' + items + '</div>'; }
                     function note(html) {
-                        return '<p style="font-size:12px;color:#5C5C5C;margin:4px 0 12px">' + html + '</p>';
+                        return '<p style="font-size:12px;color:var(--ow-text-sub);margin:4px 0 12px">' + html + '</p>';
                     }
                     /* v1.2.53 折叠分组（.ow-fold，样式见 owlsgo.css）——与插件后台的分组同一思路，
                        点标题展开 / 收起。
@@ -6214,7 +6214,7 @@
                               sw('sound_default', '新消息提示音默认', '1')
                             // v1.2.51 调试模式：排错开关，默认关（后端 DB::setting 默认也是 0）
                             + sw('debug_mode', '调试模式', '0')
-                            + '<p style="font-size:12px;color:#B06000;background:#FFF6E5;border:1px solid #FFE1B0;border-radius:4px;padding:8px 10px;margin:4px 0 12px">'
+                            + '<p style="font-size:12px;color:var(--ow-yellow);background:var(--ow-warn-bg);border:1px solid var(--ow-warn-border);border-radius:4px;padding:8px 10px;margin:4px 0 12px">'
                             + '开启后记录 debug 级日志、出错页显示详细报错。仅用于排错，用完请及时关闭 —— 报错细节可能暴露路径、SQL 与配置信息。<br>'
                             + '日志文件：data/logs/debug.log（页面报错实时显示；接口请求只落日志、不回显，避免破坏前端数据）。'
                             + '也可在「安全日志 → 系统日志」查看与清空。</p>'
@@ -6224,10 +6224,10 @@
                             + '<div class="ow-form-item">'
                             + '<label>运行缓存</label>'
                             + '<button type="button" class="ow-btn ow-btn-ghost" id="owOpcacheBtn" onclick="OwAdmin.opcacheReset()">清理 OPcache</button>'
-                            + '<span id="owOpcacheStat" style="font-size:12px;color:#5C5C5C;margin-left:10px"></span>'
+                            + '<span id="owOpcacheStat" style="font-size:12px;color:var(--ow-text-sub);margin-left:10px"></span>'
                             // 必须是<p> 且字号 ≤12.5px——OwTip.isHint() 就是按这两条认提示元素的，
                             // 写成 <span> 或 class 写错都不会被转成 ⓘ 气泡
-                            + '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">刷新已编译脚本缓存，适合代码更新后手动触发。'
+                            + '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">刷新已编译脚本缓存，适合代码更新后手动触发。'
                             + 'PHP 会把源码编译成字节码缓存在内存里（OPcache），更新文件后若仍跑旧代码'
                             + '（尤其是关闭了时间戳校验时），清一次缓存即可立即生效。开启调试模式时会写 '
                             + 'data/logs/debug.log，本操作不影响它。</p>'
@@ -6253,7 +6253,7 @@
                 var el = document.getElementById('owRoomTrash');
                 if (!el) return;
                 var ACT = { reset_name: '重置名称', reset_avatar: '重置头像', toggle_status: '封禁/解封', delete: '删除' };
-                if (!r.data.length) { el.innerHTML = '<span style="font-size:13px;color:#5C5C5C">暂无审核记录</span>'; return; }
+                if (!r.data.length) { el.innerHTML = '<span style="font-size:13px;color:var(--ow-text-sub)">暂无审核记录</span>'; return; }
                 var h = '<table class="ow-table"><tr><th>时间</th><th>群聊</th><th>操作</th><th>操作前</th><th>状态</th><th></th></tr>';
                 for (var i = 0; i < r.data.length; i++) {
                     var d = r.data[i];
@@ -6263,11 +6263,11 @@
                        + '<td>' + esc(d.room_name) + '（' + esc(fmtUid(d.room_id)) + '）</td>'
                        + '<td>' + esc(ACT[d.action] || d.action) + '</td>'
                        + '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + before + '</td>'
-                       + '<td>' + (d.undone == 1 ? '<span style="color:#5C5C5C">已撤销</span>' : '-') + '</td>'
+                       + '<td>' + (d.undone == 1 ? '<span style="color:var(--ow-text-sub)">已撤销</span>' : '-') + '</td>'
                        + '<td>' + (d.undone == 1 ? '' : '<a href="javascript:;" onclick="OwAdmin.roomTrashUndo(' + d.id + ')">撤销</a>') + '</td></tr>';
                 }
                 el.innerHTML = h + '</table>'
-                    + '<p style="font-size:12px;color:#5C5C5C;margin:8px 0 0">撤销有顺序依赖：群聊被删除后，需先撤销「删除」才能恢复其之前的名称 / 头像 / 封禁状态。</p>';
+                    + '<p style="font-size:12px;color:var(--ow-text-sub);margin:8px 0 0">撤销有顺序依赖：群聊被删除后，需先撤销「删除」才能恢复其之前的名称 / 头像 / 封禁状态。</p>';
             });
         },
         roomTrashUndo: function (id) {
@@ -6301,7 +6301,7 @@
                     h += '<tr><td><input type="checkbox" class="owRVChk" value="' + d2.id + '" onchange="OwAdmin.roomSyncBatch()"></td>'
                        + '<td>' + esc(fmtUid(d2.id)) + '</td><td>' + av + '</td><td>' + esc(d2.name) + '</td>'
                        + '<td>' + (d2.owner_id ? esc(fmtUid(d2.owner_id)) : '-') + '</td>'
-                       + '<td>' + (d2.status == 1 ? '正常' : '<span style="color:#C41D1F">已封禁</span>') + '</td>'
+                       + '<td>' + (d2.status == 1 ? '正常' : '<span style="color:var(--ow-red)">已封禁</span>') + '</td>'
                        + '<td style="white-space:nowrap">'
                        + '<a href="javascript:;" onclick="OwAdmin.roomReview(' + d2.id + ',\'reset_name\')">名称不合法</a> '
                        + '<a href="javascript:;" onclick="OwAdmin.roomReview(' + d2.id + ',\'reset_avatar\')">头像不合法</a> '
@@ -6372,7 +6372,7 @@
                            + '<td>' + esc(t.room_name) + '（' + esc(fmtUid(t.room_id)) + '）</td>'
                            + '<td>' + esc(ACT[t.action] || t.action) + '</td>'
                            + '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + before + '</td>'
-                           + '<td>' + (t.undone == 1 ? '<span style="color:#5C5C5C">已撤销</span>' : '-') + '</td>'
+                           + '<td>' + (t.undone == 1 ? '<span style="color:var(--ow-text-sub)">已撤销</span>' : '-') + '</td>'
                            + '<td>' + (t.undone == 1 ? '' : '<a href="javascript:;" onclick="OwAdmin.roomTrashUndo(' + t.id + ')">撤销</a>') + '</td></tr>';
                     }
                     el.innerHTML = h;
@@ -6442,11 +6442,11 @@
                   + '<button type="button" class="ow-btn ow-btn-primary" onclick="OwAdmin.cronRun()">立即执行全部</button>'
                   + '<button type="button" class="ow-btn ow-btn-ghost" onclick="OwAdmin.cronToken()">重置触发令牌</button>'
                   + '<button type="button" class="ow-btn ow-btn-ghost" onclick="OwAdmin.cronClearLogs()">清理 30 天前日志</button>'
-                  + '<span style="margin-left:auto;color:#5C5C5C;font-size:12px">最近一次执行：' + esc(lastRun) + '</span>'
+                  + '<span style="margin-left:auto;color:var(--ow-text-sub);font-size:12px">最近一次执行：' + esc(lastRun) + '</span>'
                   + '</div>'
                   + '<div class="ow-form-row" style="margin-top:10px">'
                   + '<div style="flex:1;min-width:0">'
-                  + '<label style="display:block;font-size:12px;color:#5C5C5C;margin-bottom:4px">外部触发地址（系统计划任务用，间隔建议 1 分钟）</label>'
+                  + '<label style="display:block;font-size:12px;color:var(--ow-text-sub);margin-bottom:4px">外部触发地址（系统计划任务用，间隔建议 1 分钟）</label>'
                   + '<input class="ow-input" readonly value="' + esc(OwAdmin._cronUrl(r.token)) + '" onclick="this.select()">'
                   + '</div></div></div>';
 
@@ -6454,14 +6454,14 @@
                 h += '<div class="ow-card"><table class="ow-table"><tr>'
                   + '<th>任务</th><th>说明</th><th>间隔</th><th>下次执行</th><th>最近执行</th><th>状态</th><th>操作</th></tr>';
                 if (!r.tasks.length) {
-                    h += '<tr><td colspan="7" style="color:#5C5C5C">暂无维护任务。插件在 main.php 顶层调用 Plugin::cron() 注册后，刷新本页即会出现。</td></tr>';
+                    h += '<tr><td colspan="7" style="color:var(--ow-text-sub)">暂无维护任务。插件在 main.php 顶层调用 Plugin::cron() 注册后，刷新本页即会出现。</td></tr>';
                 }
                 for (var i = 0; i < r.tasks.length; i++) {
                     var t = r.tasks[i];
                     h += '<tr>'
                        + '<td><b>' + esc(t.plugin ? t.plugin + '::' + t.name : t.name) + '</b>'
                        +   (t.due ? ' <span class="ow-tag ow-tag-owner">待执行</span>' : '')
-                       +   '<div style="color:#8A8A8A;font-size:12px">已运行 ' + (parseInt(t.run_count, 10) || 0) + ' 次</div></td>'
+                       +   '<div style="color:var(--ow-text-sub);font-size:12px">已运行 ' + (parseInt(t.run_count, 10) || 0) + ' 次</div></td>'
                        + '<td>' + esc(t.description || '—') + '</td>'
                        + '<td>' + esc(t.interval_text) + '</td>'
                        + '<td>' + esc(t.next_run_text) + '</td>'
@@ -6482,7 +6482,7 @@
                 h += '<h2 style="margin-top:20px">执行日志</h2><div class="ow-card"><table class="ow-table"><tr>'
                   + '<th>任务</th><th>结果</th><th>耗时</th><th>信息</th><th>时间</th></tr>';
                 if (!r.logs.length) {
-                    h += '<tr><td colspan="5" style="color:#5C5C5C">暂无执行记录</td></tr>';
+                    h += '<tr><td colspan="5" style="color:var(--ow-text-sub)">暂无执行记录</td></tr>';
                 }
                 for (var j = 0; j < r.logs.length; j++) {
                     var g = r.logs[j];

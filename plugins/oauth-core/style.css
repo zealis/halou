@@ -42,7 +42,7 @@
     font-size: 11px;
     line-height: 17px;
     border-radius: 3px;
-    color: #237804;
+    color: var(--ow-green);          /* v1.3.37：#237804 写死在深色底上过暗，改用主题成功色 */
     background: rgba(35, 120, 4, .10);
 }
 .ow-oa-desc { font-size: 12px; color: var(--ow-text-sub); margin-top: 2px; }

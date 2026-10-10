@@ -52,7 +52,7 @@
                 + '<button class="ow-btn ow-btn-primary" onclick="OwRoomEmbed.copy()">复制代码</button>'
                 + '<button class="ow-btn ow-btn-ghost" onclick="OwChat.closeModal()">关闭</button>'
                 + '</div>'
-                + '<div id="owEmbedTip" style="margin-top:8px;font-size:12px;color:var(--ow-success,#52c41a)"></div>';
+                + '<div id="owEmbedTip" style="margin-top:8px;font-size:12px;color:var(--ow-green,#52c41a)"></div>';
             w.OwChat.openModal(html, 460);
         },
 

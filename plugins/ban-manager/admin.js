@@ -17,7 +17,7 @@
                        + '<td>' + (b.expires_at ? new Date(b.expires_at * 1000).toLocaleString() : '永久') + '</td>'
                        + '<td><a href="javascript:;" onclick="OwBM.del(' + b.id + ')">解除</a></td></tr>';
                 }
-                if (!r.data.length) h += '<tr><td colspan="7" style="color:#5C5C5C">暂无禁言记录</td></tr>';
+                if (!r.data.length) h += '<tr><td colspan="7" style="color:var(--ow-text-sub)">暂无禁言记录</td></tr>';
                 $('owBList').innerHTML = h + '</table></div>';
             });
         },

@@ -70,7 +70,7 @@
                     + '</tr>';
             }
             if (!rows.length) {
-                h = '<tr><td colspan="8" style="color:#999;text-align:center;padding:24px">暂无附件</td></tr>';
+                h = '<tr><td colspan="8" style="color:var(--ow-text-sub);text-align:center;padding:24px">暂无附件</td></tr>';
             }
             // 一次性替换整个表格内容，避免 live collection 操作问题
             tbl.innerHTML = header + h;

@@ -47,7 +47,7 @@
                 }
                 if (!r.data.length) {
                     if (r.hint) toast(r.hint);
-                    h += '<tr><td colspan="8" style="color:#5C5C5C">无匹配用户</td></tr>';
+                    h += '<tr><td colspan="8" style="color:var(--ow-text-sub)">无匹配用户</td></tr>';
                 }
                 $('owAResult').innerHTML = h + '</table></div>';
             });

@@ -25,7 +25,7 @@
         if (!uid || parseInt(uid, 10) <= 0) { toast('请填写有效的目标用户 ID'); return; }
         var btn = null;
         var result = d.getElementById('owDmResult');
-        result.innerHTML = '<div class="ow-card" style="color:#5C5C5C">正在查阅…</div>';
+        result.innerHTML = '<div class="ow-card" style="color:var(--ow-text-sub)">正在查阅…</div>';
 
         OwApi.secure('plugin_dm_compliance_read', {
             uid: uid,
@@ -34,20 +34,20 @@
             limit: d.getElementById('owDmLimit').value || 200
         }, function (r) {
             if (!r.ok) {
-                result.innerHTML = '<div class="ow-card" style="color:#C41D1F">' + esc(r.msg || '查阅失败') + '</div>';
+                result.innerHTML = '<div class="ow-card" style="color:var(--ow-red)">' + esc(r.msg || '查阅失败') + '</div>';
                 toast(r.msg || '查阅失败');
                 return;
             }
             var list = r.data || [];
             if (!list.length) {
-                result.innerHTML = '<div class="ow-card" style="color:#5C5C5C">'
+                result.innerHTML = '<div class="ow-card" style="color:var(--ow-text-sub)">'
                     + '该用户在此条件下没有私聊记录。<br>'
                     + '<span style="font-size:12px">本次查询已记入安全日志（合规答复需举证「查过但没有」）。</span></div>';
                 return;
             }
             var groups = groupByPeer(list);
             var h = '<div class="ow-card">'
-                  + '<p style="margin:0 0 10px;color:#C41D1F;font-size:13px">'
+                  + '<p style="margin:0 0 10px;color:var(--ow-red);font-size:13px">'
                   + '⚠ 本次查阅已记入安全日志，不可删除。</p>'
                   + '<p style="margin:0 0 12px">共命中 <b>' + list.length + '</b> 条，涉及 <b>' + groups.length + '</b> 个对话对象。</p>';
             for (var g = 0; g < groups.length; g++) {
@@ -62,13 +62,13 @@
                 for (var i = 0; i < items.length; i++) {
                     var m = items[i];
                     var body;
-                    if (m.deleted) body = '<span style="color:#5C5C5C">[该消息已删除]</span>';
-                    else if (m.recalled) body = '<span style="color:#5C5C5C">[已撤回]</span>';
+                    if (m.deleted) body = '<span style="color:var(--ow-text-sub)">[该消息已删除]</span>';
+                    else if (m.recalled) body = '<span style="color:var(--ow-text-sub)">[已撤回]</span>';
                     else body = esc(m.content).replace(/\n/g, '<br>');
                     h += '<tr><td style="white-space:nowrap">' + esc(m.time) + '</td>'
                        + '<td>' + esc(m.from_nick) + (m.from_user ? '（' + m.from_user + '）' : '（游客）') + '</td>'
                        + '<td>' + body + '</td>'
-                       + '<td style="font-size:12px;color:#5C5C5C">' + esc(m.ip || '-') + '</td></tr>';
+                       + '<td style="font-size:12px;color:var(--ow-text-sub)">' + esc(m.ip || '-') + '</td></tr>';
                 }
                 h += '</table></div>';
             }

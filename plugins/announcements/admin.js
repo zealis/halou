@@ -58,7 +58,7 @@
                     // v1.1.2：room_id=0 语义已删，不再有「全部」分支；删除改由服务端按公告自身归属判权限
                     + '<td><a href="javascript:;" onclick="OwOA.delOne(' + a.id + ')">删除</a></td></tr>';
             }
-            if (!rows.length) h += '<tr><td colspan="9" style="color:#5C5C5C">暂无公告</td></tr>';
+            if (!rows.length) h += '<tr><td colspan="9" style="color:var(--ow-text-sub)">暂无公告</td></tr>';
             tbl.innerHTML = h;
             var all = $('oaAdmCheckAll');
             if (all) all.checked = false;

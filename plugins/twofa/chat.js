@@ -209,7 +209,7 @@
             svg: function (text, cell) {
                 cell = cell || 4;
                 var version = bestVersion(text.length);
-                if (version === 0) return '<p style="color:#C41D1F;font-size:13px">二维码生成失败：内容超出容量</p>';
+                if (version === 0) return '<p style="color:var(--ow-red);font-size:13px">二维码生成失败：内容超出容量</p>';
                 var cap = CAP[version];
                 var bytes = bitStream(text, version);
                 // 分块 + RS
@@ -269,7 +269,7 @@
             if (msg) msg.innerHTML = '登录中…';
             OwApi.post('login', data, function (r) {
                 if (!r.ok) {
-                    if (msg) msg.innerHTML = '<span style="color:#C41D1F">' + esc(r.msg) + '</span>';
+                    if (msg) msg.innerHTML = '<span style="color:var(--ow-red)">' + esc(r.msg) + '</span>';
                     if (r.captcha && $('owCaptchaRow')) {
                         $('owCaptchaRow').style.display = 'block';
                         var img = $('owCaptchaImg');
@@ -308,11 +308,11 @@
         f.onsubmit = function (e) {
             if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
             var code = ($('owTwoFACode') || {}).value || '';
-            if (!code) { m.innerHTML = '<span style="color:#C41D1F">请填写验证码</span>'; return; }
+            if (!code) { m.innerHTML = '<span style="color:var(--ow-red)">请填写验证码</span>'; return; }
             m.innerHTML = '验证中…';
             OwApi.post('plugin_twofa_verify', { code: code }, function (r) {
                 if (r.ok) { location.href = '?page=chat'; return; }
-                m.innerHTML = '<span style="color:#C41D1F">' + esc(r.msg) + '</span>';
+                m.innerHTML = '<span style="color:var(--ow-red)">' + esc(r.msg) + '</span>';
                 var input = $('owTwoFACode');
                 if (input) { input.value = ''; input.focus(); }
             });
@@ -365,14 +365,14 @@
 
         if (enabled) {
             body = '<div class="ow-form-item"><label>状态</label>'
-                + '<div class="ow-input" style="background:var(--ow-bg-sub,#f5f5f5);color:#237804">已启用 · 剩余恢复码 ' + remain + ' 个</div></div>'
+                + '<div class="ow-input" style="background:var(--ow-bg-sub,#f5f5f5);color:var(--ow-green)">已启用 · 剩余恢复码 ' + remain + ' 个</div></div>'
                 + '<div class="ow-form-row" style="gap:8px">'
                 + '<button class="ow-btn ow-btn-ghost" onclick="OwTwoFA.resetCodes()" style="flex:1">重置恢复码</button>'
                 + '<button class="ow-btn ow-btn-danger" onclick="OwTwoFA.disable()" style="flex:1">关闭两步验证</button>'
                 + '</div>';
         } else {
             body = '<div class="ow-form-item"><label>状态</label>'
-                + '<div class="ow-input" style="background:var(--ow-bg-sub,#f5f5f5);color:#999">未启用</div></div>'
+                + '<div class="ow-input" style="background:var(--ow-bg-sub,#f5f5f5);color:var(--ow-text-sub)">未启用</div></div>'
                 + '<button class="ow-btn ow-btn-primary ow-btn-block" onclick="OwTwoFA.setup()">启用两步验证</button>';
         }
 
@@ -469,7 +469,7 @@
             + '<div style="text-align:center;margin:12px 0">'
             + qrSvg
             + '<div style="margin-top:10px;display:inline-block;background:var(--ow-bg-sub,#f5f5f5);border:1px solid var(--ow-border,#e8e8e8);border-radius:4px;padding:6px 12px">'
-            + '<span style="font-family:monospace;font-size:13px;letter-spacing:2px;color:#333;user-select:all">' + esc(secret) + '</span>'
+            + '<span style="font-family:monospace;font-size:13px;letter-spacing:2px;color:var(--ow-text);user-select:all">' + esc(secret) + '</span>'
             + '</div>'
             + '</div>'
             + '<div class="ow-form-row" style="align-items:stretch">'
@@ -498,10 +498,10 @@
         var list = codes.map(function (c) {
             return '<span style="display:inline-block;font-family:monospace;background:var(--ow-bg-sub,#f5f5f5);padding:4px 10px;margin:4px;border-radius:3px;min-width:90px;text-align:center">' + esc(c) + '</span>';
         }).join('');
-        var html = '<h3 style="margin:0 0 10px;font-size:15px;color:#C41D1F">⚠ 恢复码</h3>'
+        var html = '<h3 style="margin:0 0 10px;font-size:15px;color:var(--ow-red)">⚠ 恢复码</h3>'
             + '<p style="font-size:13px;margin:0 0 12px">' + esc(title) + '</p>'
             + '<div style="text-align:center;margin-bottom:12px">' + list + '</div>'
-            + '<p style="font-size:12px;color:#999;margin:0 0 12px">这些恢复码仅显示一次，请立即复制并保存在安全的地方。丢失后无法找回。</p>'
+            + '<p style="font-size:12px;color:var(--ow-text-sub);margin:0 0 12px">这些恢复码仅显示一次，请立即复制并保存在安全的地方。丢失后无法找回。</p>'
             + '<button class="ow-btn ow-btn-primary ow-btn-block" onclick="OwChat.closeModal()">我已保存</button>';
         modal.innerHTML = '<button class="ow-modal-close" onclick="OwChat.closeModal()">✕</button>' + html;
         $('owModalMask').style.display = 'flex';

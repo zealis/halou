@@ -26,7 +26,7 @@
             OwApi.post('plugin_sensitive_words_admin', { page: page || 1, size: state.size }, function (r) {
                 var table = $('owSWTable');
                 var pager = $('owSWPager');
-                if (!table || !r.ok) { if (table) table.innerHTML = '<tr><td style="color:#5C5C5C">加载失败</td></tr>'; return; }
+                if (!table || !r.ok) { if (table) table.innerHTML = '<tr><td style="color:var(--ow-text-sub)">加载失败</td></tr>'; return; }
                 state.total = r.data.total;
                 state.page = r.data.page;
                 OwSW.render(r.data.list);
@@ -47,7 +47,7 @@
                     + '<td><a href="javascript:;" onclick="OwSW.wordToggle(' + wd.id + ',' + (wd.enabled == 1 ? 0 : 1) + ')">' + (wd.enabled == 1 ? '停用' : '启用') + '</a> '
                     + '<a href="javascript:;" onclick="OwSW.wordDel(' + wd.id + ')">删除</a></td></tr>';
             }
-            if (!rows.length) h += '<tr><td colspan="6" style="color:#5C5C5C">词库为空</td></tr>';
+            if (!rows.length) h += '<tr><td colspan="6" style="color:var(--ow-text-sub)">词库为空</td></tr>';
             table.innerHTML = h;
             var all = $('owSWCheckAll');
             if (all) all.checked = false;

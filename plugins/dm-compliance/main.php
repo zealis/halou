@@ -40,8 +40,8 @@ Plugin::adminPage('dm-compliance', '私聊合规查阅', function () {
        . '<p class="ow-admin-desc">依据《个人信息保护法》第 35 条、GDPR 合法利益例外等法规，'
        . '在取得法定权限（司法协助 / 依法调取）时，可由超级管理员查阅指定用户参与的私聊记录。'
        . '<b>本操作全程留痕且不可关闭</b>：查询条件与命中条数会写入安全日志，作为调取行为的举证材料。</p>'
-       . '<div class="ow-card" style="border-left:3px solid #C41D1F">'
-       . '<p style="margin:0 0 8px;color:#C41D1F"><b>使用前请确认：</b>仅在具有法定权限时使用。'
+       . '<div class="ow-card" style="border-left:3px solid var(--ow-red)">'
+       . '<p style="margin:0 0 8px;color:var(--ow-red)"><b>使用前请确认：</b>仅在具有法定权限时使用。'
        . '无权限调取个人信息可能构成违法。</p></div>'
        . '<div class="ow-card">'
        . '<div class="ow-form-row">'
@@ -57,7 +57,7 @@ Plugin::adminPage('dm-compliance', '私聊合规查阅', function () {
        // 两个按钮相邻但 inline-block 之间不留空隙会贴在一起，加 margin 隔开
        . '<button class="ow-btn ow-btn-primary" style="margin-right:8px" onclick="OwAdmin.dmComplianceSearch()">查阅</button>'
        . '<button class="ow-btn ow-btn-ghost" onclick="OwAdmin.dmComplianceReset()">重置</button>'
-       . '<p style="font-size:12px;color:#5C5C5C;margin:10px 0 0">'
+       . '<p style="font-size:12px;color:var(--ow-text-sub);margin:10px 0 0">'
        . '日期留空表示不限。该用户参与的所有私聊都会返回（含其与游客的对话），按时间正序排列。</p>'
        . '</div>'
        . '<div id="owDmResult"></div>';

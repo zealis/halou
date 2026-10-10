@@ -70,8 +70,11 @@
 .ow-lv-task-v { width: 56px; text-align: right; font-weight: 600; }
 .ow-lv-task-v.done { color: var(--ow-green); }
 .ow-lv-task-alt {
-    font-size: 11px; color: #B06000; background: #FFF6E5;
-    border: 1px solid #FFE1B0; border-radius: 2px; padding: 0 4px;
+    /* v1.3.37：原先写死「暖底暖字」(#B06000 / #FFF6E5 / #FFE1B0) 并在深色下另写覆盖块；
+       现改用核心警示色变量（--ow-yellow / --ow-warn-bg / --ow-warn-border），
+       深浅两套自动跟随，下面的深色补丁随之删除。 */
+    font-size: 11px; color: var(--ow-yellow); background: var(--ow-warn-bg);
+    border: 1px solid var(--ow-warn-border); border-radius: 2px; padding: 0 4px;
 }
 .ow-lv-task-sum { margin-top: 10px; font-size: 13px; color: var(--ow-text-sub); }
 .ow-lv-ch { margin-top: 6px; font-size: 12px; color: var(--ow-text-sub); }
@@ -212,10 +215,9 @@
     vertical-align: middle; cursor: default;
 }
 
-/* ---------- 深色适配（v1.3.36） ----------
-   以下几处是**按浅底设计的固定浅色块**，换成变量反而表达不出原意
-   （黄色小标签要「暖底暖字」），故在深色下单独压暗。
-   ⚠️ 插件里新增浅底小块时请一并在此补一条，否则深色下会露出亮斑。 */
-[data-theme="dark"] .ow-lv-task-alt {
-    color: #FFC53D; background: #4A3B10; border-color: #8A6D1A;
-}
+/* ---------- 深色适配 ----------
+   v1.3.36 时这里还有一条 .ow-lv-task-alt 的深色覆盖块；v1.3.37 起该标签已改用
+   核心 --ow-warn-* 变量，不再需要按主题写两份。本插件剩余的写死颜色只有
+   「5 个阶段语义色 + 60 级金色渐变」（等级识别度/荣誉质感，属数据性质色板，
+   深浅通用），符合 PLUGIN.md「样式与主题」里对例外的界定。
+   ⚠️ 插件里新增浅底小块时，请优先找核心 --ow-* 变量，而不是在这里补深色覆盖。 */

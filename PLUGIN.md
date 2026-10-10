@@ -23,6 +23,8 @@
 - 插件数据库操作一律使用核心 `DB` 类（`DB::run/one/all/val/insert/upsert`），禁止自行 new PDO；表名建议带 `plugin_<id>_` 前缀。建表/改表如需跨驱动兼容，参考 `core/db.php` 既有实现，不要照搬单驱动 SQL。
 - **加列只能用公开的 `DB::ensureColumn($table, $col, $type, $default)`**（`$default` 传**带引号的字面量**，如 `"'1'"` / `"''"`）。`DB::addColumn()` / `hasColumn()` / `dropColumn()` 都是 **private**，插件调用会抛 `Error`。⚠️ 这个坑后果特别隐蔽：`Plugin::loadPlugin()` 用 `try/catch` 吞掉插件异常只记一条 `plugin_error`，于是**该行之后的所有 `Plugin::on()` 都没注册，但缓存清单里仍写着旧的 hooks 列表** —— 表现为「插件静默半个身位」，极像「钩子没触发」，排查方向会被带偏。
 - 插件 `main.php` 顶层**只做 `Plugin::*` 注册与建表/迁移**，不要输出、不要再 `require` 其他文件、也不要有 `exit` 以外的副作用。
+- **样式不得写死颜色**：CSS、内联 `style`、拼进 `innerHTML` 的 HTML 一律引用核心 `--ow-*` 变量
+  （详见下方「样式与主题（禁止硬编码颜色）」）；仅「图像像素 / 数据色板」两类例外，且需就地注释。
 
 ## 目录结构与最小插件
 
@@ -150,6 +152,62 @@ ow_abs_url('uploads/a.jpg');    // 拼接绝对地址；第二个参数默认 tr
 
 - 自动识别顺序：`X-Forwarded-Proto` / `HTTPS` → `X-Forwarded-Host` / `Host` / `SERVER_NAME`（仅兜底时补非标准端口）→ 子目录部署路径。容器反代下不会误拼服务器内部端口（如 `:80`）。
 - 后台设置项 `site_url`：留空自动识别；填写时后端校验必须以 `http://` 或 `https://` 开头。
+
+## 样式与主题（禁止硬编码颜色）
+
+**硬性规则：插件样式里一律不得出现写死的颜色值**（`#RGB` / `#RRGGBB` / `rgb()` / `rgba()` / 颜色名），
+无论它出现在 `.css` 文件、PHP/JS 里的内联 `style="…"`，还是动态拼进 `innerHTML` 的 HTML 字符串里。
+
+原因：全站支持「浅色 / 深色 / 跟随系统」三档主题，实现方式是**只重定义 `--ow-*` CSS 变量**
+（见 `assets/css/owlsgo.css` 的 `[data-theme="dark"]` 块）。写死颜色等于绕开这套机制——
+深色模式下会表现为「深底 + 深字」「整块露白」这类不可读的亮斑，而且核心永远修不到插件里
+（v1.3.37 全量清理插件样式时，公告插件因为整套浅色写死，深色下整片坏掉）。
+
+### 用法
+
+```css
+/* ✅ 正确：引用核心语义变量，深浅两套主题自动跟随 */
+.oa-card { background: var(--ow-bg-sub); color: var(--ow-text); border: 1px solid var(--ow-border); }
+
+/* ❌ 错误：写死浅色，深色模式下必然是亮斑 */
+.oa-card { background: #f5f5f5; color: #333; border: 1px solid #f0f0f0; }
+```
+
+```js
+// ✅ 内联样式同样只能写变量
+'<span style="color:var(--ow-text-sub)">暂无记录</span>'
+// ❌
+'<span style="color:#999">暂无记录</span>'
+```
+
+变量可以带一个浅色回退值（`var(--ow-text-sub, #999)`），但回退值只在前端没加载核心样式表时兜底，
+**不能当成「包在 var 里就不算硬编码」**：正常页面下它永远不生效，深色依旧会坏。
+
+### 常用变量速查
+
+| 用途 | 变量 |
+|---|---|
+| 页面底 / 卡片内小块 / 聊天区与侧栏 | `--ow-bg`、`--ow-bg-sub`、`--ow-bg-chat` |
+| 浮层 / 通栏条 / 带边框面板 | `--ow-surface`、`--ow-surface-2`、`--ow-panel-bg` |
+| 正文 / 副文本 / 标题 | `--ow-text`、`--ow-text-sub`、`--ow-text-title` |
+| 分隔线 / 输入控件边框 | `--ow-border`、`--ow-border-control` |
+| 品牌色（描边 / 实心按钮 / 链接与 hover / 浅蓝底高亮行） | `--ow-primary`、`--ow-primary-strong`、`--ow-primary-dark`、`--ow-blue-light` |
+| 语义色（成功 / 称号 / 危险 / VIP） | `--ow-green`、`--ow-yellow`、`--ow-red`、`--ow-orange` |
+| 交互态 | `--ow-hover-bg`、`--ow-active-bg` |
+| 警示块（配 `--ow-yellow` 文字） | `--ow-warn-bg`、`--ow-warn-border` |
+| 实心徽标 / 按钮上的文字 | `--ow-on-accent` |
+
+⚠️ **插件不要自己写 `[data-theme="dark"]` 覆盖块** —— 出现这种块，基本说明该处本该用变量。
+若核心确实缺一个语义变量，请在核心 `:root` 里补（并在 `[data-theme="dark"]` 里配一份深色值），
+插件直接引用；不要用「插件里再写一套深色规则」的方式绕过。
+
+### 唯二例外（可以写死，但必须就地注释原因）
+
+1. **图像像素**：二维码 / 验证码 / 装饰性 SVG 里的 `fill="#FFFFFF"`、`stroke="#000"`、蒙版黑白色，
+   以及图像缩略图上的半透明黑底白字标签（`rgba(0,0,0,.55)` + `#fff`）。这些是「画出来的内容」，
+   不随主题变化。
+2. **数据性质的色板**：等级阶段色、默认头像底色等**本身就是数据**的颜色。允许写死，
+   但必须保证**在深色底上同样可读**（取中等明度的饱和色），并在注释里点明这是色板而非界面色。
 
 ## 头像相关（v1.3.11 起）
 
@@ -377,6 +435,8 @@ OwChat.onRail({
 - `php -l plugins/<ID>/main.php` 与 `node --check` 全部通过。
 - 插件在「插件管理」中启用后，后台页面、API 路由、钩子输出真实走通一遍；停用后功能整体下线且不报错。
 - 路由 action 带正确前缀；需要管理员的接口有权限自查；SQL 全部参数化。
+- **样式零硬编码**：`grep -nE '#[0-9A-Fa-f]{3,8}|rgba?\(' plugins/<ID>/` 的结果里，
+  除「图像像素 / 数据色板」两类（已就地注释）外不应再有颜色值；深色模式下页面与后台均无亮斑/不可读文字。
 - `plugin.json` 的 `version` 已按改动递增，`description` 与能力一致。
 - 插件文件命名、JS 全局对象、路由前缀均带插件 ID，无与核心或其他插件冲突的通用名。
 - 已核对 `plugins/` 在 `.gitignore` 内，插件不进入 Git 仓库。
@@ -386,6 +446,7 @@ OwChat.onRail({
 ```text
 请先阅读根目录 PLUGIN.md 与 core/plugin.php，并参考现有插件 plugins/user-manager/。
 插件放在 plugins/<插件ID>/，使用 Plugin::adminPage / route / asset / on 注册能力。
+样式只引用核心 --ow-* 变量，不写死颜色（深浅两套主题都要能看）。
 需求：<清楚描述功能、入口、权限>
 完成后执行 php -l 与 node --check，并在后台启用插件做真实验证。
 ```

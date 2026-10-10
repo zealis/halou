@@ -43,7 +43,7 @@
                 // 指纹不符是安全事件（会话被销毁，疑似 Cookie 被盗），非零时才提示，
                 // 平时不占位，免得把真正的告警淹在恒为 0 的数字里。
                 if (r.fp_mismatch > 0) {
-                    h += '<div class="owLLStatItem"><div class="num" style="color:#F4995D">' + r.fp_mismatch
+                    h += '<div class="owLLStatItem"><div class="num" style="color:var(--ow-orange)">' + r.fp_mismatch
                        + '</div><div class="lbl">指纹不符（疑似盗用）</div></div>';
                 }
                 $('owLLStatCard').innerHTML = h;
@@ -99,23 +99,23 @@
                 var extra = '';
                 if (r.reason_cn) extra = esc(r.reason_cn);
                 if (r.identity && r.identity !== r.nickname) {
-                    extra += (extra ? '<br>' : '') + '<span style="color:#888">标识：' + esc(r.identity) + '</span>';
+                    extra += (extra ? '<br>' : '') + '<span style="color:var(--ow-text-sub)">标识：' + esc(r.identity) + '</span>';
                 }
                 h += '<tr>'
                     + '<td>' + r.id + '</td>'
                     + '<td>' + OwLL.resultTag(r) + '</td>'
-                    + '<td>' + (r.user_id ? r.user_id : '<span style="color:#bbb">—</span>') + '</td>'
+                    + '<td>' + (r.user_id ? r.user_id : '<span style="color:var(--ow-text-sub)">—</span>') + '</td>'
                     + '<td>' + esc(who) + '</td>'
                     + '<td title="' + esc(r.email) + '">' + esc(r.email) + '</td>'
                     + '<td>' + esc(r.ip) + '</td>'
                     + '<td>' + esc(r.method_cn) + '</td>'
-                    + '<td>' + (extra || '<span style="color:#bbb">—</span>') + '</td>'
+                    + '<td>' + (extra || '<span style="color:var(--ow-text-sub)">—</span>') + '</td>'
                     + '<td title="' + esc(r.user_agent) + '">' + esc(r.user_agent) + '</td>'
                     + '<td>' + esc(r.time_text) + '</td>'
                     + '</tr>';
             }
             if (!rows.length) {
-                h = '<tr><td colspan="10" style="color:#999;text-align:center;padding:24px">暂无登录记录</td></tr>';
+                h = '<tr><td colspan="10" style="color:var(--ow-text-sub);text-align:center;padding:24px">暂无登录记录</td></tr>';
             }
             tbl.innerHTML = header + h;
             $('owLLStat').innerHTML = '第 ' + state.page + ' / ' + state.pages + ' 页 · 共 ' + state.total + ' 条';

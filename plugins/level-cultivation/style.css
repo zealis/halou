@@ -1,0 +1,125 @@
+/* ---------- 等级修仙（level-cultivation）----------
+   把 .ow-lt-badge 里的文字替换为修仙境界 SVG 图标（仿 QQ 多图标展示）。
+   每个境界内显示 1-4 个图标，4 个合成下一境界。
+   SVG viewBox 为 1024×1024，内容约占 50%，用 transform:scale 放大内容占比。 */
+
+/* 用 .ow-cult-glow 叠加提升特异性（0,2,0），压过 level-trust 的 .ow-lt-badge（0,1,0）。
+   否则 level-trust 的 display:inline-block 会覆盖本插件的 inline-flex，
+   导致多个 SVG 图标从上到下竖排堆叠（资料卡里最明显）。 */
+.ow-lt-badge.ow-cult-glow {
+    display: inline-flex;        /* 多个图标横向排列 */
+    align-items: center;
+    gap: 1px;                    /* 图标间距 */
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 2px 0 0;          /* 贴近左侧"等级"标签，右侧留小缝给阶段名 */
+    line-height: 1;
+    box-shadow: none !important;
+    overflow: visible;
+    vertical-align: middle;     /* 以文字中线为基准 */
+    transform: translateY(-0.5px); /* 再上移 0.5px，补偿中文字符视觉中心偏上 */
+}
+
+/* 去掉 60 级荣誉徽章的渐变背景（图标自身已是金色） */
+.ow-lt-badge.ow-cult-glow.ow-lt-honor {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* 单个 SVG 图标：放大内容占比 + 适中尺寸 */
+.ow-lt-badge svg {
+    display: block;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    transform: scale(1.35);       /* viewBox 内容只占 ~50%，放大后内容约占满容器 */
+    transform-origin: center center;
+}
+
+/* 侧栏小徽章 */
+.ow-lt-badge.ow-lt-badge-sm svg {
+    width: 18px;
+    height: 18px;
+    transform: scale(1.35);
+}
+
+/* 等级页（?page=level）的大号徽章 */
+.ow-lv-hero .ow-lt-badge svg {
+    width: 36px;
+    height: 36px;
+    transform: scale(1.35);
+}
+
+/* ---------- 全境界发光效果（强度随境界递增，飞升感）----------
+   每个境界用自身图标颜色发光，半径与不透明度随境界编号递增。
+   tier-1(练气) 最弱 → tier-11(金仙) 最强带脉动。 */
+
+/* tier-1 练气：极淡青灰微光 */
+.ow-cult-tier-1 svg {
+    filter: drop-shadow(0 0 1px rgba(143, 167, 168, 0.25));
+}
+/* tier-2 筑基：淡翠绿微光 */
+.ow-cult-tier-2 svg {
+    filter: drop-shadow(0 0 1.5px rgba(63, 174, 140, 0.3));
+}
+/* tier-3 金丹：淡金光 */
+.ow-cult-tier-3 svg {
+    filter: drop-shadow(0 0 2px rgba(245, 197, 66, 0.4));
+}
+/* tier-4 元婴：淡蓝光 */
+.ow-cult-tier-4 svg {
+    filter: drop-shadow(0 0 2.5px rgba(98, 181, 255, 0.45));
+}
+/* tier-5 化神：紫光 */
+.ow-cult-tier-5 svg {
+    filter: drop-shadow(0 0 3px rgba(155, 123, 255, 0.5));
+}
+/* tier-6 合体：粉紫光 */
+.ow-cult-tier-6 svg {
+    filter: drop-shadow(0 0 3px rgba(226, 122, 255, 0.55));
+}
+/* tier-7 渡劫：蓝紫光（双层） */
+.ow-cult-tier-7 svg {
+    filter: drop-shadow(0 0 3px rgba(82, 109, 255, 0.6))
+            drop-shadow(0 0 6px rgba(82, 109, 255, 0.3));
+}
+/* tier-8 大乘：橙光（双层） */
+.ow-cult-tier-8 svg {
+    filter: drop-shadow(0 0 3px rgba(255, 179, 71, 0.65))
+            drop-shadow(0 0 7px rgba(255, 179, 71, 0.35));
+}
+/* tier-9 真仙：金白辉光（双层） */
+.ow-cult-tier-9 svg {
+    filter: drop-shadow(0 0 3px rgba(255, 241, 168, 0.7))
+            drop-shadow(0 0 6px rgba(255, 241, 168, 0.4));
+}
+/* tier-10 玄仙：紫色灵气（双层） */
+.ow-cult-tier-10 svg {
+    filter: drop-shadow(0 0 3px rgba(215, 181, 255, 0.75))
+            drop-shadow(0 0 7px rgba(155, 123, 255, 0.5));
+}
+/* tier-11 金仙：强烈金辉（三层）+ 缓慢呼吸脉动 */
+.ow-cult-tier-11 svg {
+    filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.85))
+            drop-shadow(0 0 10px rgba(255, 200, 0, 0.6))
+            drop-shadow(0 0 16px rgba(255, 180, 0, 0.35));
+    animation: ow-cult-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes ow-cult-pulse {
+    0%, 100% {
+        filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.85))
+                drop-shadow(0 0 10px rgba(255, 200, 0, 0.6))
+                drop-shadow(0 0 16px rgba(255, 180, 0, 0.35));
+    }
+    50% {
+        filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.95))
+                drop-shadow(0 0 14px rgba(255, 200, 0, 0.7))
+                drop-shadow(0 0 22px rgba(255, 180, 0, 0.5));
+    }
+}
+
+/* 老浏览器降级：不支持 filter 时发光不生效但图标仍正常显示 */
+@supports not (filter: drop-shadow(0 0 1px #000)) {
+    .ow-cult-glow svg { filter: none; }
+}

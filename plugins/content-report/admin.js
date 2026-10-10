@@ -59,7 +59,7 @@
             }, function (r) {
                 var table = $('owCRTable');
                 if (!table) return;
-                if (!r.ok) { table.innerHTML = '<tr><td style="color:#5C5C5C">加载失败</td></tr>'; return; }
+                if (!r.ok) { table.innerHTML = '<tr><td style="color:var(--ow-text-sub)">加载失败</td></tr>'; return; }
                 state.total = r.data.total;
                 state.page = r.data.page;
                 w.OwCRAdmin.render(r.data.list);
@@ -83,18 +83,18 @@
                 if (row.room_id > 0) {
                     source = '群聊 #' + esc(row.room_id);
                     if (row.msg_time > 0) {
-                        source += '<br><span style="color:#999;font-size:12px">' + esc(new Date(row.msg_time * 1000).toLocaleString()) + '</span>';
+                        source += '<br><span style="color:var(--ow-text-sub);font-size:12px">' + esc(new Date(row.msg_time * 1000).toLocaleString()) + '</span>';
                     }
                 } else {
                     source = '资料卡';
                 }
 
-                var rowClass = row.status == 0 ? ' style="background:#fff8e1"' : '';
+                var rowClass = row.status == 0 ? ' style="background:var(--ow-blue-light)"' : '';
 
                 h += '<tr' + rowClass + '>'
                     + '<td>' + row.id + '</td>'
-                    + '<td>' + esc(row.reporter_nick) + '<br><span style="color:#999;font-size:12px">#' + esc(row.reporter_id) + '</span></td>'
-                    + '<td>' + esc(row.target_nick) + '<br><span style="color:#999;font-size:12px">#' + esc(row.target_uid) + '</span></td>'
+                    + '<td>' + esc(row.reporter_nick) + '<br><span style="color:var(--ow-text-sub);font-size:12px">#' + esc(row.reporter_id) + '</span></td>'
+                    + '<td>' + esc(row.target_nick) + '<br><span style="color:var(--ow-text-sub);font-size:12px">#' + esc(row.target_uid) + '</span></td>'
                     + '<td>' + esc(row.reason) + '</td>'
                     + '<td class="ow-cr-desc">' + esc(row.description) + '</td>'
                     + '<td>' + source + '</td>'
@@ -108,7 +108,7 @@
                     + '<a href="javascript:;" onclick="OwCRAdmin.del(' + row.id + ')">删除</a>'
                     + '</td></tr>';
             }
-            if (!rows.length) h += '<tr><td colspan="9" style="color:#5C5C5C;text-align:center">暂无举报记录</td></tr>';
+            if (!rows.length) h += '<tr><td colspan="9" style="color:var(--ow-text-sub);text-align:center">暂无举报记录</td></tr>';
             table.innerHTML = h;
         },
 

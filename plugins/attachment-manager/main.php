@@ -652,7 +652,7 @@ Plugin::adminPage('attachment-manager', '附件上传', function () {
         . '</div>'
         . '<div class="ow-form-item"><label>允许的文件扩展名</label>'
         . '<input class="ow-input" id="owAtExts" placeholder="zip,pdf,txt,docx">'
-        . '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">逗号分隔。只有安全类型表内登记过的扩展名才会生效；'
+        . '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">逗号分隔。只有安全类型表内登记过的扩展名才会生效；'
         . 'svg / php / html 等可执行或可内嵌脚本的类型不予登记（即使填了也不会放行）。'
         . '当前生效：<span id="owAtActive">-</span></p></div>'
         // v1.2.0：图片压缩（WebP）。v1.3.1：细分开关改通用开关行（与核心 switchHtml 同款，
@@ -662,7 +662,7 @@ Plugin::adminPage('attachment-manager', '附件上传', function () {
         . '<div class="ow-form-row">'
         . '<div class="ow-form-item" style="min-width:160px"><label>图片压缩</label>'
         . '<select class="ow-input" id="owAtCompress"><option value="0">关闭（原图直存）</option><option value="1">开启（转 WebP）</option></select>'
-        . '<p style="font-size:12px;color:#5C5C5C">需 PHP GD 编译 WebP 支持；本机不支持时开关会被自动关回。</p></div>'
+        . '<p style="font-size:12px;color:var(--ow-text-sub)">需 PHP GD 编译 WebP 支持；本机不支持时开关会被自动关回。</p></div>'
         . '<div class="ow-form-item" style="min-width:120px"><label>压缩质量(1-100)</label>'
         . '<input class="ow-input" id="owAtCompressQ" type="number" min="1" max="100" value="80"></div>'
         . '</div>'
