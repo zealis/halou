@@ -905,8 +905,12 @@ input[type=range] {
    ⚠️ 它是 <button> 不是 <input>：不接受直接输入，点一下才开搜索弹窗（OwChat.openSearch），
       输入与结果都在弹窗里。用 button 而不是 readonly input：不抢键盘焦点、Tab 可达、
       读屏读作按钮，也不会留下「光标在闪却打不进字」的死控件观感。
-   ⚠️ 底色不能用 --ow-bg-sub：它与侧栏的 --ow-bg-chat 同为 #F5F5F5（v1.2.55 统一过一档灰），
-      画上去等于隐形。这里沿用全站「白卡片浮在灰底上」的层次，hover 才用 --ow-bg-chat-hover。 */
+   ⚠️ 底色用 --ow-brand-bg（浅色 #E4E4E4 / 深色 #232326），不用 --ow-bg 也不用 --ow-bg-sub：
+      --ow-bg-sub 与侧栏的 --ow-bg-chat 同为 #F5F5F5（v1.2.55 全站统一过一档灰），画上去等于隐形；
+      --ow-bg 是纯白，在灰底侧栏里像一张浮起来的纸，不像控件。
+   ⚠️ hover 必须用 --ow-brand-hover(#D2D2D2) 而不是通用的 --ow-bg-chat-hover(#EBEBEB)：
+      #EBEBEB 比 #E4E4E4 **更浅**，会变成「越悬停越浅」（项目里在品牌条上踩过同款）。
+      深色方向相反：#313136 比 #232326 更亮，仍然是有效的 hover 反馈。 */
 .ow-side-search {
     display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
@@ -916,7 +920,7 @@ input[type=range] {
     padding: 7px 10px;
     border: 1px solid var(--ow-border-control);
     border-radius: 6px;                 /* 与 .ow-input 同圆角，看起来就是同一个控件 */
-    background: var(--ow-bg);
+    background: var(--ow-brand-bg);
     color: var(--ow-text-sub);
     font-family: inherit;
     font-size: 13px;
@@ -924,7 +928,7 @@ input[type=range] {
     text-align: left;
     cursor: pointer;
 }
-.ow-side-search:hover { background: var(--ow-bg-chat-hover); color: var(--ow-text); }
+.ow-side-search:hover { background: var(--ow-brand-hover); color: var(--ow-text); }
 .ow-side-search:focus-visible { outline: 2px solid var(--ow-primary-strong); outline-offset: 1px; }
 .ow-side-search .ow-ico { display: block; flex-shrink: 0; -webkit-flex-shrink: 0; }
 /* ---------- 搜索窗（v1.2.31） ---------- */
