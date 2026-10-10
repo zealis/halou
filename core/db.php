@@ -548,8 +548,23 @@ class DB
             // 原「已删除消息保留期」(msg_deleted_retain_days) 已下线，删除消息同样适用本期限。
             // 0 = 永久保留。默认 90 天（约三个月）。
             'msg_retain_days' => '90',
-            'mail_rate_limit'  => '60',  // 邮件发送最小间隔(秒)
-            'sound_default'    => '1',
+            // ---------- 邮件验证码策略（v1.3.55）----------
+            // 这些键刻意放在核心 settings 而不是插件自有表：读它们的是 Mailer::sendCode/verifyCode，
+            // 邮件插件停用时核心必须带着默认值继续跑（开关关掉即可，不能因为少个插件就炸）。
+            // 后台编辑界面由 email-verify 插件提供；SMTP 账号密码在插件自有表，不在这。
+            'mail_rate_limit'    => '60',   // 同一邮箱重发间隔(秒)
+            'mail_code_ttl'      => '10',   // 验证码有效期(分钟)
+            'mail_mail_hourly'   => '5',    // 单邮箱每小时发送上限，0=不限制
+            'mail_ip_hourly'     => '15',   // 单 IP 每小时发送上限，0=不限制
+            'mail_browser_hourly'=> '15',   // 单浏览器每小时发送上限，0=不限制
+            'mail_max_attempts'  => '5',    // 同一验证码最多输错次数，0=不限制
+            'mail_email_min_len' => '7',    // 邮箱最小长度
+            'mail_email_max_len' => '150',  // 邮箱最大长度
+            'mail_allowed_domains' => '',   // 允许邮箱后缀，逗号分隔，留空=不限制
+            'mail_unique_check'  => '1',    // 邮箱唯一检查
+            'mail_allow_change'  => '1',    // 允许用户修改邮箱
+            'mail_code_verify'   => '1',    // 邮箱验证码总开关（关闭后找回密码一并停用）
+            'sound_default'      => '1',
             'room_pass_ttl'    => '1800', // 密码房通行缓存(秒)，0=每次进入都要输入密码
             // 登录保护
             'login_fail_captcha' => '3',  // 连续失败达此次数后要求图形验证码（0=不启用）

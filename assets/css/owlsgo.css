@@ -121,6 +121,16 @@
     color: var(--ow-text-sub);
     margin-top: 6px;
 }
+/* 打码邮箱一类的「键 + 值」小行（v1.3.55 个人设置 / 改密码弹窗）。
+   刻意与 .ow-form-hint 分开：那个会被 OwTip 整段搬进 ⓘ 气泡，
+   而这一行要**始终可见**（用户必须看清发到哪个地址），且值不参与翻译。 */
+.ow-set-mail {
+    display: flex; display: -webkit-flex;
+    align-items: baseline; -webkit-align-items: baseline;
+    gap: 6px; -webkit-gap: 6px;
+    font-size: 12px; color: var(--ow-text-sub); margin-top: 6px;
+}
+.ow-set-mail b { font-weight: 400; color: var(--ow-text); word-break: break-all; }
 
 /* ===================== 小红点（v1.3.53 通用轮子） =====================
    语义只有一个：「这里有新东西」，不表示数量 —— 要显示数量请用 .ow-cl-badge。

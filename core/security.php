@@ -136,6 +136,20 @@ class Sec
         return true;
     }
 
+    /**
+     * 当前频率窗口还剩多少秒重置（不在窗口内返回 0）。
+     * **只读**：绝不写库、绝不顺延窗口 —— 限流被拒后再调它报剩余时间，
+     * 若实现成「顺手 upsert 一下」就会把窗口起点往后推，用户永远等不到放行。
+     */
+    public static function rateRemaining(string $bucket, string $ident, int $window): int
+    {
+        if ($window <= 0) return 0;
+        $row = DB::one('SELECT window_start FROM rate_limits WHERE bucket=? AND ident=?', [$bucket, $ident]);
+        if (!$row) return 0;
+        $left = $window - (time() - (int)$row['window_start']);
+        return $left > 0 ? $left : 0;
+    }
+
     // ---------- 登录保护 ----------
     public static function loginFails(string $identity): int
     {

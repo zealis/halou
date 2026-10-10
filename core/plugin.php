@@ -71,6 +71,13 @@ class Plugin
         self::cron('purge_expired_messages', 3600, function () {
             if (class_exists('Chat')) Chat::purgeExpired();
         }, '物理清除超过服务器保留期的消息与附件（每小时一次）');
+        // v1.3.55：过期 / 用过的邮箱验证码清理。放核心而不是邮件插件里 ——
+        // 表 email_codes 由核心写入（插件停用也照样写），清理就必须同样在核心，
+        // 否则「停用插件」会让这张表只增不减。
+        self::cron('purge_email_codes', 86400, function () {
+            if (!class_exists('Mailer')) return 'Mailer 类未加载，跳过';
+            return '清理过期验证码 ' . Mailer::purge(3600) . ' 条';
+        }, '清理已过期的邮箱验证码（每天一次，保留最近 1 小时的记录便于排查）');
         // v1.3.42 系统升级红点：每 12 小时比对一次 GitHub 仓库，结果写 settings.update_info，
         // 后台「系统与维护 → 系统升级」按它显隐红点。失败只记 error，不影响其它任务。
         self::cron('check_update', 43200, function () {

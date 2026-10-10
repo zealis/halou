@@ -459,7 +459,10 @@ class Admin
                           // v1.2.3 起这是唯一的消息保留期项（已删除消息同样适用），
                           // 原 msg_deleted_retain_days 已下线、不再读写。
                           'msg_retain_days',
-                          'msg_rate_window', 'msg_rate_max', 'mail_rate_limit',
+                          'msg_rate_window', 'msg_rate_max',
+                          // v1.3.55：mail_rate_limit 不再由本页写入 —— 它和其余 mail_* 策略键
+                          // 一起归到「邮箱验证」插件的后台页（那边按白名单直写 settings）。
+                          // 留在两个页面里改同一个键，迟早出现「这边改了那边被旧表单覆盖」。
                           'sound_default', 'room_pass_ttl',
                           'login_fail_captcha', 'login_fail_lock', 'login_lock_minutes', 'min_register_age',
                           'room_create_allow',

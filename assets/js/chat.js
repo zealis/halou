@@ -404,6 +404,20 @@
     /** 归一化 class 字符串：去掉多余空格（增删 class 时避免累积空白） */
     function trimCls(s) { return String(s || '').replace(/\s+/g, ' ').replace(/^ | $/g, ''); }
 
+    /**
+     * 邮箱打码显示（v1.3.55，改密码弹窗里告诉用户发到哪）。
+     * 留在前端的都是他自己账号的邮箱，打码不是为了防他，是为了让截一张图发给别人时
+     * 不至于把自己的完整地址一起公开出去 —— 本地部分只留头两个字符，域名保留（认出是哪个邮箱要看域名）。
+     */
+    function owMaskEmail(s) {
+        s = String(s || '');
+        var at = s.lastIndexOf('@');
+        if (at <= 0) return s;
+        var local = s.slice(0, at), domain = s.slice(at);
+        var head = local.length > 2 ? local.slice(0, 2) : local.charAt(0);
+        return head + '***' + domain;
+    }
+
     /* 枚举值中文显示（提交时仍用英文原始值，仅界面本地化） */
     // v1.1.16：'public' 的中文统一为「普通」（与后台/插件口径一致）。
     // 'public' 是 rooms.type 的**存储值**（不是 is_public），指「无密码无角色门槛」。
@@ -950,13 +964,16 @@
                 codeBtn.disabled = true;
                 OwApi.post('send_code', { email: email, type: codeBtn.getAttribute('data-sendcode') }, function (r) {
                     msg.innerHTML = '<span style="color:' + (r.ok ? 'var(--ow-green)' : 'var(--ow-red)') + '">' + esc(r.msg) + '</span>';
-                    var n = 60;
-                    if (r.ok) {
-                        var tm = setInterval(function () {
-                            codeBtn.innerHTML = n + 's';
-                            if (--n < 0) { clearInterval(tm); codeBtn.disabled = false; codeBtn.innerHTML = '发验证码'; }
-                        }, 1000);
-                    } else codeBtn.disabled = false;
+                    if (!r.ok) { codeBtn.disabled = false; return; }
+                    // 秒数取服务端返回值：重发间隔在后台可调（mail_rate_limit），
+                    // 写死 60 就会出现「按钮转完了、再点还是提示太频繁」。
+                    var n = parseInt(r.wait, 10);
+                    if (r.remain > 0) n = Math.max(1, parseInt(r.remain, 10));
+                    if (!(n > 0)) n = 60;
+                    var tm = setInterval(function () {
+                        codeBtn.innerHTML = n + 's';
+                        if (--n < 0) { clearInterval(tm); codeBtn.disabled = false; codeBtn.innerHTML = '发验证码'; }
+                    }, 1000);
                 });
             };
 
@@ -4974,6 +4991,19 @@
                     + '<button class="ow-btn ow-btn-ghost ow-btn-block" onclick="OwOauth.open()">管理应用授权</button>'
                     + '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">'
                     + '把资料、聊天记录等权限授予你安装的插件应用；随时可在此取消。</p></div>' : '')
+                // v1.3.55：改密码入口。单独一个弹窗而不是塞进这个表单 ——
+                // 「保存资料」和「改密码」是两回事，混在一个提交按钮里迟早出现
+                // 「改了昵称顺手把密码框当空值提交」这类事故。
+                // 提示语必须是**一整句静态文案**：OwTip 把 <p> 的 textContent 整段搬进气泡，
+                // 拼进邮箱就变成一个独一无二的字符串，语言包的精确匹配必然落空。
+                // 所以邮箱单独一行（.ow-set-mail），键与值各自成节点。
+                + '<div class="ow-form-item"><label>账号安全</label>'
+                + '<button class="ow-btn ow-btn-ghost ow-btn-block" onclick="OwChat.openPwdDialog()">修改登录密码</button>'
+                + '<p class="ow-form-hint">' + (me.email
+                        ? '需要当前密码与邮箱验证码；改完当前设备不会掉线。'
+                        : '账号还没有可用邮箱，本次只验证当前密码。') + '</p>'
+                + (me.email ? '<div class="ow-set-mail"><span>账号邮箱</span><b>' + esc(owMaskEmail(me.email)) + '</b></div>' : '')
+                + '</div>'
                 + '<button class="ow-btn ow-btn-primary ow-btn-block" onclick="OwChat.saveSettings()">保存</button>'
             );
             var self = this;
@@ -4984,6 +5014,82 @@
                 self.avatarCrop(this.files[0]);
                 this.value = '';
             };
+        },
+
+        /* ---------- 修改登录密码（v1.3.55） ----------
+           叠在个人设置之上的第二层浮层复用裁剪那套 overlay（openCropOverlay）：
+           它已经处理了遮罩、关闭按钮与 z-index（110 压在普通弹窗 100 之上），
+           再造一份只是多一个会漂移的层。
+           验证码这一栏是否出现由服务端下发的 cfg.mail_chpwd 决定 —— 判定口径
+           （总开关 + 账号有可用邮箱）在 Auth::changePassword 里，前端只是跟着渲染。 */
+        openPwdDialog: function () {
+            var me = this.cfg.me;
+            if (!me) return;
+            var need = String(this.cfg.mail_chpwd) === '1';
+            var h = '<h3>修改登录密码</h3>'
+                + '<div class="ow-form-item"><label>当前密码</label>'
+                + '<input class="ow-input" type="password" id="owPwdCur" autocomplete="current-password"></div>'
+                + '<div class="ow-form-item"><label>新密码</label>'
+                + '<input class="ow-input" type="password" id="owPwdNew" autocomplete="new-password" placeholder="至少 6 位"></div>'
+                + '<div class="ow-form-item"><label>确认新密码</label>'
+                + '<input class="ow-input" type="password" id="owPwdNew2" autocomplete="new-password"></div>';
+            if (need) {
+                h += '<div class="ow-form-item"><label>邮箱验证码</label>'
+                    + '<div class="ow-captcha-row"><input class="ow-input" id="owPwdCode" maxlength="6" inputmode="numeric" autocomplete="one-time-code">'
+                    + '<button type="button" class="ow-btn ow-btn-ghost" id="owPwdSend" onclick="OwChat.sendPwdCode()">发验证码</button></div>'
+                    + '<p class="ow-form-hint">验证码发到账号绑定的邮箱，有效期内只能用一次。</p>'
+                    + '<div class="ow-set-mail"><span>发送至</span><b>' + esc(owMaskEmail(me.email)) + '</b></div>'
+                    + '</div>';
+            }
+            h += '<div class="ow-modal-actions">'
+                + '<button class="ow-btn ow-btn-ghost" onclick="OwChat.closeCropOverlay()">取消</button>'
+                + '<button class="ow-btn ow-btn-primary" onclick="OwChat.savePwd()">确认修改</button></div>'
+                + '<div class="ow-form-msg" id="owPwdMsg"></div>';
+            this.openCropOverlay(h);
+        },
+
+        /** 发码：收件地址由服务端按当前会话取，前端不传邮箱（传了也不会被用） */
+        sendPwdCode: function () {
+            var btn = $('owPwdSend'), msg = $('owPwdMsg'), self = this;
+            if (!btn) return;
+            btn.disabled = true;
+            OwApi.post('send_code', { type: 'chpwd' }, function (r) {
+                if (msg) msg.innerHTML = '<span style="color:' + (r.ok ? 'var(--ow-green)' : 'var(--ow-red)') + '">' + esc(r.msg) + '</span>';
+                if (!r.ok) { btn.disabled = false; return; }
+                // 倒计时秒数由服务端给（后台能把重发间隔改成非 60），写死 60 会出现
+                // 「按钮转完了、服务端还说太频繁」的死循环。
+                var n = parseInt(r.wait, 10);
+                if (r.remain > 0) n = Math.max(1, parseInt(r.remain, 10));
+                if (!(n > 0)) n = 60;
+                var tm = setInterval(function () {
+                    btn.innerHTML = n + 's';
+                    if (--n < 0) { clearInterval(tm); btn.disabled = false; btn.innerHTML = '发验证码'; }
+                }, 1000);
+            });
+        },
+
+        savePwd: function () {
+            var msg = $('owPwdMsg'), self = this;
+            var fail = function (t) { if (msg) msg.innerHTML = '<span style="color:var(--ow-red)">' + esc(t) + '</span>'; };
+            var cur = ($('owPwdCur') || {}).value || '';
+            var nw = ($('owPwdNew') || {}).value || '';
+            var nw2 = ($('owPwdNew2') || {}).value || '';
+            if (!cur) { fail('请填写当前密码'); return; }
+            if (nw.length < 6) { fail('新密码至少 6 位'); return; }
+            if (nw !== nw2) { fail('两次输入的新密码不一致'); return; }
+            if (nw === cur) { fail('新密码不能与当前密码相同'); return; }
+            if (msg) msg.innerHTML = '提交中…';
+            // 改密码是敏感操作：走一次性票据（OwApi.secure），与登出同档
+            OwApi.secure('change_password', {
+                current: cur, password: nw,
+                code: ($('owPwdCode') || {}).value || ''
+            }, function (r) {
+                if (!r.ok) { fail(r.msg || '修改失败'); return; }
+                if (msg) msg.innerHTML = '<span style="color:var(--ow-green)">密码已修改</span>';
+                toast('密码已修改');
+                // 关掉浮层时密码值随 DOM 一起消失（这些输入框只存在于浮层里）
+                setTimeout(function () { self.closeCropOverlay(); }, 700);
+            });
         },
 
         /* ---------- 头像裁剪：滑块手动缩放 + 圆形取景 ---------- */
@@ -6462,8 +6568,10 @@
                             + sw('guest_chat', '游客可发言', '1')
                             + row(fld('guest_msg_interval', '游客发言间隔(秒)', '30')
                                 + fld('msg_rate_window', '发言频率窗口(秒)', '10')
-                                + fld('msg_rate_max', '窗口内最大条数', '8')
-                                + fld('mail_rate_limit', '邮件发送间隔(秒)', '60'))
+                                + fld('msg_rate_max', '窗口内最大条数', '8'))
+                            // v1.3.55：「邮件发送间隔(秒)」已移入**邮箱验证插件**后台页
+                            //   （连同有效期、各类限流、后缀白名单）。键仍是核心的
+                            //   mail_rate_limit，只是编辑入口收在一处，避免两个页面改同一个值。
                             // v1.2.2 消息服务器保留期：到期即物理清除（附件同步删），无法恢复
                             + fld('msg_retain_days', '消息服务器保留期(天)', '90')
                             + note('超过本期限的消息会被<b>物理删除</b>，其附件文件（uploads/file/）一并删除，'
@@ -6904,7 +7012,8 @@
                 msg_retain_days: $('owS_msg_retain_days') ? $('owS_msg_retain_days').value : '',
                 msg_rate_window: $('owS_msg_rate_window').value,
                 msg_rate_max: $('owS_msg_rate_max').value,
-                mail_rate_limit: $('owS_mail_rate_limit').value,
+                // mail_rate_limit 已移出本页（v1.3.55，见邮箱验证插件），不再提交：
+                // 提交空串会跳过、提交旧值会把插件里改过的设置覆盖回去。
                 room_pass_ttl: $('owS_room_pass_ttl') ? $('owS_room_pass_ttl').value : '',
                 min_register_age: $('owS_min_register_age') ? $('owS_min_register_age').value : '',
                 room_create_allow: swv('owS_room_create_allow'),

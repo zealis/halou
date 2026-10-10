@@ -359,6 +359,9 @@ if ($action !== '') {
         'admin_logs_batch', 'admin_syslog_clear',
         // v1.3.39 在线升级：覆盖整站代码文件 = 全站最高危操作，必须 POST + 一次性票据。
         'admin_upgrade_apply', 'admin_upgrade_rollback',
+        // v1.3.55 修改密码：拿到当前密码就能接管账号（后续可关掉两步验证），
+        // 与登出同档，必须 POST + 一次性票据，防签名窗口期内的重放。
+        'change_password',
     ];
     $isSensitive = in_array($action, $SENSITIVE, true) || Plugin::isSensitive($action);
     if ($isSensitive) {
@@ -373,6 +376,7 @@ if ($action !== '') {
 
     // 关键：长轮询等只读动作提前释放会话锁，避免阻塞同会话的发消息等请求（PHP-FPM 生产环境必需）
     // room_join 需要写入密码房通行缓存；ticket 与敏感操作需要读写会话（票据签发/作废），必须保留会话
+    // （change_password 等敏感动作由下面的 $isSensitive 一并覆盖，不再重复列）
     $keepSession = in_array($action, ['login', 'logout', 'register', 'reset', 'send_code', 'room_join', 'ticket'], true) || $isSensitive;
     if (!$keepSession) {
         session_write_close();
@@ -383,13 +387,30 @@ if ($action !== '') {
     switch ($action) {
         // ---------- 认证 ----------
         case 'send_code':
-            $type = $p('type') === 'reset' ? 'reset' : 'register';
-            $email = $p('email');
+            // v1.3.55：三类验证码 —— 注册、找回密码、修改密码（个人设置）。
+            // 换邮箱 / 注销账号还没有功能入口，将来做时直接用这里的同一套策略
+            // （Mailer::sendCode 自带长度、后缀白名单、五路限流）。
+            $type = in_array($p('type'), ['reset', 'chpwd'], true) ? $p('type') : 'register';
+            $name = '';
+            if ($type === 'chpwd') {
+                // 修改密码：收件地址**只取会话用户自己那行**，绝不接受前端传来的邮箱。
+                // 收客户端邮箱就等于开了「借别人的改码按钮给任意地址发信」的口子。
+                if (($actor['kind'] ?? '') !== 'user') Api::json(['ok' => false, 'msg' => '请先登录']);
+                $me = DB::one('SELECT email, nickname FROM users WHERE id=?', [(int)$actor['id']]);
+                $email = (string)($me['email'] ?? '');
+                $name = (string)($me['nickname'] ?? '');
+            } else {
+                $email = $p('email');
+                if ($type === 'register' && DB::one('SELECT id FROM users WHERE email=?', [$email])) {
+                    Api::json(['ok' => false, 'msg' => '该邮箱已注册']);
+                }
+                if ($type === 'reset' && !DB::one('SELECT id FROM users WHERE email=?', [$email])) {
+                    Api::json(['ok' => false, 'msg' => '该邮箱未注册']);
+                }
+            }
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) Api::json(['ok' => false, 'msg' => '邮箱格式不正确']);
-            if ($type === 'register' && DB::one('SELECT id FROM users WHERE email=?', [$email])) Api::json(['ok' => false, 'msg' => '该邮箱已注册']);
-            if ($type === 'reset' && !DB::one('SELECT id FROM users WHERE email=?', [$email])) Api::json(['ok' => false, 'msg' => '该邮箱未注册']);
-            [$ok, $msg] = Mailer::sendCode($email, $type, $CFG);
-            Api::json(['ok' => $ok, 'msg' => $msg]);
+            [$ok, $msg, $extra] = Mailer::sendCode($email, $type, [], ['name' => $name]);
+            Api::json(['ok' => $ok, 'msg' => $msg] + (array)$extra);
 
         case 'register':
             // 组装出生日期（年/月/日 → Y-m-d），未开启年龄限制时为空
@@ -441,6 +462,18 @@ if ($action !== '') {
 
         case 'reset':
             [$ok, $msg] = Auth::resetPassword($p('email'), $p('code'), (string)($_POST['password'] ?? ''));
+            Api::json(['ok' => $ok, 'msg' => $msg]);
+
+        case 'change_password':
+            // v1.3.55 个人设置改密码：只对**当前会话的用户**操作，
+            // 用户 id 一律取 $actor，不接受前端传来的 uid（否则就是任意账号改密码）。
+            if (($actor['kind'] ?? '') !== 'user') Api::json(['ok' => false, 'msg' => '请先登录'], 403);
+            [$ok, $msg] = Auth::changePassword(
+                (int)$actor['id'],
+                (string)($_POST['current'] ?? ''),
+                (string)($_POST['password'] ?? ''),
+                $p('code')
+            );
             Api::json(['ok' => $ok, 'msg' => $msg]);
 
         case 'logout':
@@ -1171,6 +1204,15 @@ function ageFieldHtml(): string
         . '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">注册需年满 ' . $min . ' 周岁（按出生日期精确计算）。</p></div>';
 }
 
+/** 邮箱后缀白名单 + 长度提示（注册 / 找回密码页用，未限制时返回空串） */
+function ow_mail_suffix_tip(): string
+{
+    $p = Mailer::policy();
+    $list = Mailer::allowedDomains();
+    if (!$list) return '';
+    return ' 仅接受以下邮箱后缀：' . implode('、', $list) . '。';
+}
+
 /** 页面语言（v1.3.44）：cookie ow_lang（登录页切换器写）优先，回落后台默认语言。
  *  只输出合法 code；zh 或非法值 = 不翻译。实际翻译由 assets/js/i18n.js 引擎 + 语言包插件完成。
  *  ⚠️ 「没带 cookie」和「cookie 里写的是 zh」是两回事：后者是访客在切换器里**主动选了中文**，
@@ -1286,7 +1328,7 @@ function renderAuth(string $mode): void
            . '<div class="ow-auth-links"><a href="?page=register">注册账号</a><a href="?page=forgot">忘记密码</a><a href="?page=chat">返回聊天</a></div>';
     } elseif ($mode === 'register') {
         // 是否要求邮箱验证由后台设置决定：关闭时不再显示验证码输入框与发码按钮
-        $needMail = DB::setting('reg_email_verify', '1') === '1';
+        $needMail = Mailer::needRegisterCode();
         echo '<form class="ow-auth-form" data-mode="register">'
            . Sec::signField(Sec::anonKey(), 'register')
            . '<div class="ow-form-item"><label>昵称</label><input class="ow-input" name="nickname" required placeholder="2-20 个字符，支持中英文"></div>'
@@ -1297,6 +1339,7 @@ function renderAuth(string $mode): void
                : '<input class="ow-input" type="email" name="email" required>')
            . '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">'
            . ($needMail ? '注册需要邮箱验证码。' : '当前未开启邮箱验证，邮箱仅用于找回密码。')
+           . ow_mail_suffix_tip()
            . '</p></div>'
            . ($needMail ? '<div class="ow-form-item"><label>邮箱验证码</label><input class="ow-input" name="code" required></div>' : '')
            // 年龄限制：开启时要求选择出生日期（年/月/日，兼容不支持 date 类型的老浏览器）
@@ -1305,14 +1348,25 @@ function renderAuth(string $mode): void
            . '<button class="ow-btn ow-btn-primary ow-btn-block" type="submit">注 册</button><div class="ow-form-msg"></div></form>'
            . '<div class="ow-auth-links"><a href="?page=login">已有账号，去登录</a><a href="?page=chat">返回聊天</a></div>';
     } else {
-        echo '<form class="ow-auth-form" data-mode="reset">'
-           . Sec::signField(Sec::anonKey(), 'reset')
-           . '<div class="ow-form-item"><label>注册邮箱</label><div class="ow-captcha-row"><input class="ow-input" type="email" name="email" required>'
-           . '<button type="button" class="ow-btn ow-btn-ghost" data-sendcode="reset">发验证码</button></div></div>'
-           . '<div class="ow-form-item"><label>邮箱验证码</label><input class="ow-input" name="code" required></div>'
-           . '<div class="ow-form-item"><label>新密码</label><input class="ow-input" type="password" name="password" required></div>'
-           . '<button class="ow-btn ow-btn-primary ow-btn-block" type="submit">重置密码</button><div class="ow-form-msg"></div></form>'
-           . '<div class="ow-auth-links"><a href="?page=login">返回登录</a></div>';
+        // 找回密码的唯一凭证就是邮箱验证码：总开关关掉（或邮件通道没配）时，
+        // 与其留一张「点发验证码只会报错」的死表单，不如直接说明走管理员。
+        // 只换表单内容、不改页面收尾 —— 收尾那段（i18n/chat/插件包/OwAuth.init）
+        // 复制两份迟早跟登录页不同步。
+        if (!Mailer::policy()['code_verify']) {
+            $form = '<p style="color:var(--ow-text-sub);font-size:13px;line-height:1.7;margin:0 0 14px">'
+                . '站点当前未开启邮箱验证码，无法自助找回密码，请联系管理员在后台处理。</p>';
+        } else {
+            $form = '<form class="ow-auth-form" data-mode="reset">'
+               . Sec::signField(Sec::anonKey(), 'reset')
+               . '<div class="ow-form-item"><label>注册邮箱</label><div class="ow-captcha-row"><input class="ow-input" type="email" name="email" required>'
+               . '<button type="button" class="ow-btn ow-btn-ghost" data-sendcode="reset">发验证码</button></div>'
+               . '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">' . ow_mail_suffix_tip() . '</p></div>'
+               . '<div class="ow-form-item"><label>邮箱验证码</label><input class="ow-input" name="code" required></div>'
+               . '<div class="ow-form-item"><label>新密码</label><input class="ow-input" type="password" name="password" required></div>'
+               . '<button class="ow-btn ow-btn-primary ow-btn-block" type="submit">重置密码</button><div class="ow-form-msg"></div></form>';
+        }
+        echo $form;
+        echo '<div class="ow-auth-links"><a href="?page=login">返回登录</a></div>';
     }
     echo '</div><script src="assets/js/i18n.js?v=' . OWLSGO_VERSION . '"></script>'
        . '<script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>';
@@ -1540,10 +1594,19 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
         'room' => $entered ? (int)$first['id'] : 0,
         'site_url' => ow_site_url(),
         'settings' => $settings,
+        // v1.3.55：改密码是否要邮箱验证码，前端按它决定要不要渲染验证码那一栏。
+        // 只有「开关开着 **且** 本人有可用邮箱」才要求 —— 与 Auth::changePassword 同口径，
+        // 两边判定不一致就会出现「界面要求、服务端忽略」或反之。
+        'mail_chpwd' => (Mailer::policy()['code_verify']
+            && filter_var((string)($user['email'] ?? ''), FILTER_VALIDATE_EMAIL)) ? '1' : '0',
         'me' => $user ? [
             'nickname' => $user['nickname'], 'id' => (int)$user['id'],
             'role' => $user['role'], 'title' => $user['title'] ?? '',
             'avatar' => Auth::avatarUrlFor($user, (string)$user['id']), 'points' => (int)($user['points'] ?? 0),
+            // v1.3.55：改密码要往本人邮箱发验证码，弹窗里得显示发到哪。
+            // 这是用户自己的邮箱、下发给他自己的浏览器，不是泄露。
+            'email' => (string)($user['email'] ?? ''),
+            'email_verified' => (int)($user['email_verified'] ?? 0),
         ] : null,
         'ts' => time(),
         'version' => OWLSGO_VERSION,

@@ -1,0 +1,55 @@
+/* email-verify · 后台配置页（v1.0.0）
+   只用核心令牌：后台内容区是白底（.ow-card 同款），统计条用次级底把它和表单卡片区分开，
+   深色档由令牌自己跟进，这里不写死颜色。 */
+.ow-ev-cards {
+    display: flex; display: -webkit-flex;
+    flex-wrap: wrap; -webkit-flex-wrap: wrap;
+    gap: 10px; -webkit-gap: 10px;
+    margin-bottom: 14px;
+}
+.ow-ev-card {
+    -webkit-flex: 1 1 150px; flex: 1 1 150px;
+    min-width: 140px;
+    background: var(--ow-bg-chat);
+    border: 1px solid var(--ow-border);
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+.ow-ev-card b {
+    display: block;
+    font-size: 22px; line-height: 1.25;
+    color: var(--ow-text-title);
+    font-weight: 600;
+    word-break: break-all;
+}
+.ow-ev-card span { display: block; font-size: 12px; color: var(--ow-text-sub); margin-top: 2px; }
+/* 状态卡：就绪绿、未就绪红，颜色只加在数字上（说明文字保持灰色，别整块变彩） */
+.ow-ev-card.is-ok b { color: var(--ow-green); }
+.ow-ev-card.is-off b { color: var(--ow-red); }
+.ow-ev-last { font-size: 12px; color: var(--ow-red); margin: -6px 0 14px; word-break: break-all; }
+.ow-ev-note { font-size: 12px; color: var(--ow-text-sub); margin: 8px 0 0; line-height: 1.6; }
+.ow-ev-note code { font-size: 11.5px; background: var(--ow-bg-sub); padding: 1px 5px; border-radius: 4px; }
+.ow-ev-src { font-size: 12px; color: var(--ow-text-sub); line-height: 1.6; }
+
+/* 占位符 chips：点一下插进正文，一排小按钮而不是下拉（看得见有什么可用才想得起用） */
+.ow-ev-chips { display: flex; display: -webkit-flex; flex-wrap: wrap; -webkit-flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.ow-ev-chip {
+    padding: 4px 9px !important;
+    font-size: 12px !important;
+    font-family: Consolas, Menlo, monospace;
+    line-height: 1.5 !important;
+}
+.ow-ev-chip i { font-style: normal; color: var(--ow-text-sub); margin-left: 6px; font-family: inherit; }
+
+/* 预览：沙箱 iframe（模板里的脚本被 sandbox 禁掉），高度固定避免撑破后台 */
+.ow-ev-prev {
+    display: block;
+    width: 100%; height: 300px;
+    margin-top: 12px;
+    border: 1px solid var(--ow-border);
+    border-radius: 8px;
+    background: #fff;
+}
+.ow-ev-sent { color: var(--ow-green); }
+.ow-ev-failed { color: var(--ow-red); }
+.ow-ev-pending { color: var(--ow-text-sub); }

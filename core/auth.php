@@ -164,8 +164,12 @@ class Auth
         if (!$nickOk) return [false, $nick];
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return [false, '邮箱格式不正确'];
         if (strlen($password) < 6) return [false, '密码至少 6 位'];
-        if (DB::one('SELECT id FROM users WHERE email=?', [$email])) return [false, '该邮箱已注册'];
-        if (DB::setting('reg_email_verify', '1') === '1' && !Mailer::verifyCode($email, 'register', $code)) {
+        // 邮箱合法性（格式/长度/后缀白名单/唯一检查）统一走 Mailer::checkEmail：
+        // 规则写在核心和写在插件里各一份，迟早变成「注册能过、发码被拒」。
+        [$mailOk, $mailMsg] = Mailer::checkEmail($email, ['scene' => 'register']);
+        if (!$mailOk) return [false, $mailMsg];
+        $email = $mailMsg;
+        if (Mailer::needRegisterCode() && !Mailer::verifyCode($email, 'register', $code)) {
             return [false, '邮箱验证码错误或已过期'];
         }
         // 年龄限制（周岁，按出生日期精确计算）
@@ -186,7 +190,7 @@ class Auth
             'avatar_seed' => (string)random_int(1, self::AVATAR_SEED_COUNT),
             'role' => 'member',
             'client_key' => Sec::clientKey(), 'status' => 1,
-            'email_verified' => DB::setting('reg_email_verify', '1') === '1' ? 1 : 0,
+            'email_verified' => Mailer::needRegisterCode() ? 1 : 0,
             'birthdate' => $birthdate,
             'created_at' => time(),
             'reg_ip' => Sec::ip(),   // v1.2.56 用户概览：记录注册来源 IP
@@ -301,6 +305,45 @@ class Auth
         Notice::push((int)$user['id'], 'pwd');
         return [true, '密码已重置，请重新登录'];
     }
+
+    /**
+     * 修改密码（v1.3.55，个人设置里的入口）。与「找回密码」的区别是这里人已经登录，
+     * 所以凭证是**当前密码**——验证码只是第二道，不是替代品。
+     *
+     * ⚠️ 账号没有可用邮箱时不要求验证码（只验当前密码）。这不是漏洞而是刻意的兜底：
+     * 「必须收到邮件才能改密码」在邮箱为空 / 早已失效的账号上等于永久改不了密码，
+     * 而当前密码仍是那道真正的门。要强制全员验证码，请管理员先补齐邮箱再开启总开关。
+     *
+     * @return array [bool, string 文案]
+     */
+    public static function changePassword(int $uid, string $current, string $new, string $code = ''): array
+    {
+        $user = DB::one('SELECT * FROM users WHERE id=? AND status=1', [$uid]);
+        if (!$user) return [false, '账号不存在或已被禁用'];
+        if (!password_verify($current, (string)$user['password'])) {
+            Sec::log('chpwd_fail', (string)$user['nickname']);
+            return [false, '当前密码不正确'];
+        }
+        if (strlen($new) < 6) return [false, '新密码至少 6 位'];
+        if ($new === $current) return [false, '新密码不能与当前密码相同'];
+        $email = trim((string)($user['email'] ?? ''));
+        $needCode = Mailer::policy()['code_verify'] && filter_var($email, FILTER_VALIDATE_EMAIL);
+        if ($needCode && !Mailer::verifyCode($email, 'chpwd', $code)) {
+            Sec::log('chpwd_code_fail', (string)$user['nickname']);
+            return [false, '邮箱验证码错误或已过期'];
+        }
+        DB::run('UPDATE users SET password=? WHERE id=?', [password_hash($new, PASSWORD_DEFAULT), $uid]);
+        Sec::log('change_password', (string)$user['nickname'], ['code' => $needCode ? 1 : 0]);
+        Notice::push($uid, 'pwd');
+        return [true, '密码已修改'];
+    }
+
+    /**
+     * 修改邮箱 / 注销账号**本轮不做**（这两个功能本身还没有）。
+     * 将来做时不必新写一套校验：邮箱合法性用 `Mailer::checkEmail($e, ['scene' => 'change', 'exclude_uid' => $uid])`，
+     * 发码用 `Mailer::sendCode($新邮箱, 'change', ...)`，验码用 `Mailer::verifyCode($新邮箱, 'change', $code)` ——
+     * 长度、后缀白名单、唯一检查、五路限流都在 Mailer 里，插件停不停都一样生效。
+     */
 
     /**
      * 资料更新：昵称 / 头像。
