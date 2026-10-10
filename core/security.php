@@ -7,6 +7,8 @@ class Sec
     private static array $cfg = [];
     /** 是否把 IP 段并入会话指纹（由 loadFpOptions() 在 DB::init() 之后回填） */
     private static bool $fpIpStrict = false;
+    /** 强制 HTTPS 的跳转标记 Cookie（v1.3.47）：只活 60 秒，用来识别「跳了但没真到 https」 */
+    private const TLS_PING = 'ow_tlschk';
 
     public static function init(array $cfg): void { self::$cfg = $cfg; }
 
@@ -387,6 +389,9 @@ class Sec
      * ③ 明文的 POST 等**交互**请求：**不重定向**。301/302 会把 POST 降级成 GET 并丢掉请求体，
      *    等于把用户刚提交的发言/表单/上传悄悄吞掉，再点一次就是重复提交 —— 直接 403 报错，
      *    让调用方改用 https 重试。
+     * ④ 防死循环（v1.3.47）：跳转时带一个 60 秒标记 Cookie。若跟着跳转过来的 https 请求
+     *    仍被判定成明文（TLS 在别的机器终结、回源走 HTTP 的典型症状），就不再跳第二次，
+     *    直接返回一页可读的修复说明 —— 否则用户只能看到浏览器的「重定向次数过多」。
      */
     public static function enforceHttps(bool $trustProxy = false): void
     {
@@ -396,6 +401,10 @@ class Sec
             // 加上它就会把同域下别的、可能没有证书的服务一起锁死（部署在 chat.example.com 时
             // 波及 *.example.com）。本站强制 HTTPS 不需要这个范围。
             header('Strict-Transport-Security: max-age=31536000');
+            if (!empty($_COOKIE[self::TLS_PING])) {
+                // 跳转成功落到加密通道了：标记即刻作废，免得 60 秒内下次真出问题时误判
+                setcookie(self::TLS_PING, '', ['expires' => time() - 3600, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
+            }
             return;
         }
         $m = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
@@ -413,6 +422,13 @@ class Sec
             echo json_encode(['ok' => false, 'msg' => '无法确定站点主机，请直接使用 https:// 地址访问'], JSON_UNESCAPED_UNICODE);
             exit;
         }
+        // 标记还在 = 上一次跳转浏览器确实去了 https，可回到服务器时又成了明文 → 这是拓扑问题，
+        // 再跳一次也只是让浏览器撞重定向上限。停下来给修法。（客户端禁用 Cookie 时本保险不触发，
+        // 那种情况由浏览器自己的 ERR_TOO_MANY_REDIRECTS 兜底，不会真的无限循环。）
+        if (!empty($_COOKIE[self::TLS_PING])) self::tlsLoopPage();
+        setcookie(self::TLS_PING, '1', [
+            'expires' => time() + 60, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax',
+        ]);
         $uri = (string)($_SERVER['REQUEST_URI'] ?? '/');
         // 只接受绝对路径；带控制字符（响应头注入）或协议相对写法的一律退回根
         if (!preg_match('#^/[^\x00-\x1f\x7f]*$#', $uri)) $uri = '/';
@@ -434,6 +450,65 @@ class Sec
         if ($host === '') $host = trim((string)($_SERVER['SERVER_NAME'] ?? ''));
         if (!preg_match('#^[a-zA-Z0-9._\[\]:-]+$#', $host)) return '';
         return (string)preg_replace('#:80$#', '', $host);   // 明文端口不带进 https 地址
+    }
+
+    /**
+     * 「跳了 https 却又被判定成明文」的停机说明页（v1.3.47）。
+     *
+     * 走到这里说明再跳一次也没用：请求确实经过了 TLS 终结点，但那一段没把加密事实
+     * 透传给源站。与其让浏览器撞重定向次数上限（ERR_TOO_MANY_REDIRECTS，用户什么也看不出来），
+     * 不如把根因和三条修法摊开。状态码用 503 —— 这是服务器配置不可用，不是用户请求有问题。
+     */
+    private static function tlsLoopPage(): void
+    {
+        // 本方法跑在 DB 初始化之前（enforceHttps 必须先于会话与输出），所以这条审计
+        // 走的是 Sec::log 的文件兜底 → 落在 data/security_log_fallback.log，
+        // 后台「安全日志」页里看不到。要查历史就看那个文件。
+        self::log('https_loop', '', [
+            'host' => (string)($_SERVER['HTTP_HOST'] ?? ''),
+            'uri'  => (string)($_SERVER['REQUEST_URI'] ?? ''),
+        ]);
+        http_response_code(503);
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!doctype html><meta charset="utf-8"><title>HTTPS 跳转未生效</title>'
+           . '<div style="max-width:660px;margin:10vh auto;padding:0 20px;font:14px/1.9 system-ui,-apple-system,sans-serif;color:#333">'
+           . '<h2 style="font-size:18px">HTTPS 跳转没有生效</h2>'
+           . '<p>本站强制 HTTPS。刚才已经把你跳到 <code>https://</code>，但请求回到服务器时<strong>仍被判定为明文</strong>，'
+           . '所以这里停下来不再跳第二次 —— 继续跳只会让浏览器报「重定向次数过多」。</p>'
+           . '<p>这通常是 TLS 在另一台机器（负载均衡 / CDN / 反向代理）上终结、回源走的是 HTTP。按优先级三选一：</p>'
+           . '<ol>'
+           . '<li><strong>推荐</strong>：在源站 Nginx 的 PHP 转发段里硬写一行 <code>fastcgi_param HTTPS on;</code> 后 reload。'
+           . '这是服务器自己声明加密事实，客户端伪造不了。</li>'
+           . '<li>让反代到源站这一段也走 https（源站配好证书即可，无需改代码）。</li>'
+           . '<li>退路：在 <code>core/config.php</code> 里加 <code>&#39;trust_proxy&#39; =&gt; true</code>。'
+           . '这等于选择相信 <code>X-Forwarded-Proto</code> 头，而任何客户端都能带上这个头，只在改不动 Nginx 时用。</li>'
+           . '</ol>'
+           . '<p style="color:#888">修好后清掉本站 Cookie 再刷新（本页靠一个 60 秒的标记 Cookie 触发）。</p>';
+        if (self::debugModeOn()) {
+            // 判定依据只在调试模式下外露：默认不给外部看服务器的内部端口与转发头
+            echo '<pre style="background:#f5f5f5;padding:12px;border-radius:6px;font-size:12px;overflow:auto">'
+               . htmlspecialchars(print_r([
+                    'HTTPS'            => $_SERVER['HTTPS'] ?? '(未设置)',
+                    'SERVER_PORT'      => $_SERVER['SERVER_PORT'] ?? '(未设置)',
+                    'X-Forwarded-Proto'=> $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '(未设置)',
+                    'X-Forwarded-Ssl'  => $_SERVER['HTTP_X_FORWARDED_SSL'] ?? '(未设置)',
+                    'REMOTE_ADDR'      => $_SERVER['REMOTE_ADDR'] ?? '(未设置)',
+                    'trust_proxy'      => '见 core/config.php',
+               ], true), ENT_QUOTES, 'UTF-8')
+               . '</pre>';
+        }
+        echo '</div>';
+        exit;
+    }
+
+    /** 调试开关（DB 里的 settings.debug_mode）。本方法可能在 DB 尚未就绪时被调到，取不到就当关。 */
+    private static function debugModeOn(): bool
+    {
+        try {
+            return class_exists('DB') && DB::setting('debug_mode', '0') === '1';
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**
