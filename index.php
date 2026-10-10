@@ -154,14 +154,16 @@ if ($installed && $dbOk && DB::setting('debug_mode', '0') === '1') {
 // ================= 安装向导 =================
 if (!$installed) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'install') {
+        $cfgWritten = false;      // 是否已经把新配置落盘（决定失败时要不要退回）
         try {
             $driver = $_POST['driver'] ?? 'sqlite';
             if (!in_array($driver, ['sqlite', 'mysql', 'pgsql'], true)) throw new RuntimeException('非法数据库类型');
             // 改写 config.php
             $cfgFile = __DIR__ . '/core/config.php';
-            $src = file_get_contents($cfgFile);
+            $cfgOld = file_get_contents($cfgFile);
+            if ($cfgOld === false) throw new RuntimeException('无法读取 core/config.php（检查文件权限）');
             $secret = bin2hex(random_bytes(32));
-            $src = preg_replace("/'secret'\s*=>\s*'[^']*'/", "'secret'     => '$secret'", $src);
+            $src = preg_replace("/'secret'\s*=>\s*'[^']*'/", "'secret'     => '$secret'", $cfgOld);
             $src = preg_replace("/'driver'\s*=>\s*'[a-z]*'/", "'driver'   => '$driver'", $src, 1);
             if ($driver !== 'sqlite') {
                 $map = ['host' => $_POST['db_host'] ?? '127.0.0.1', 'port' => (int)($_POST['db_port'] ?? 3306),
@@ -172,7 +174,13 @@ if (!$installed) {
                 }
             }
             // 邮件发送不再属于核心（v1.0.81 移除 SMTP 配置）：安装后由邮件插件提供
-            file_put_contents($cfgFile, $src);
+            if (file_put_contents($cfgFile, $src) === false) throw new RuntimeException('无法写入 core/config.php（检查目录写权限）');
+            $cfgWritten = true;
+            // 写进去就必须让本进程读到它：OPcache 会把 config.php 的编译结果留在内存里
+            // （validate_timestamps=0 时必然），不主动失效就会出现「新配置指向 MySQL、
+            // 进程还在读旧的 SQLite」——安装把管理员写进了 A 库，站点查的是 B 库，
+            // 表现就是「装完了但邮箱和用户 ID 都登不进去」。
+            if (function_exists('opcache_invalidate')) @opcache_invalidate($cfgFile, true);
 
             $CFG = require $cfgFile;
             DB::init($CFG);
@@ -225,7 +233,17 @@ if (!$installed) {
             file_put_contents($LOCK, date('c') . ' v' . OWLSGO_VERSION);
             Api::json(['ok' => true, 'msg' => '安装完成']);
         } catch (Throwable $e) {
-            Api::json(['ok' => false, 'msg' => '安装失败：' . $e->getMessage()]);
+            // 安装没成功就把配置退回原样 —— 绝不留「配置指向一个没装好的库」的中间态
+            // （以前会：MySQL 建表中途 1064/1101 报错，config 已经改成了 MySQL，
+            //   站点从此一直停在错误页，或像现场那样读着另一个库）。
+            // 备份只放在内存里，不落 .bak 文件：config.php 含密钥，多一份副本就多一处泄露面。
+            $rolled = null;
+            if ($cfgWritten) {
+                $rolled = @file_put_contents($cfgFile, $cfgOld) !== false;
+                if ($rolled && function_exists('opcache_invalidate')) @opcache_invalidate($cfgFile, true);
+            }
+            Api::json(['ok' => false, 'msg' => '安装失败：' . $e->getMessage()
+                . ($cfgWritten ? ($rolled ? '（配置已退回原样）' : '（配置退回失败，请手工恢复 core/config.php）') : '')]);
         }
     }
     renderInstall($dbOk ? '' : ($dbErr ?? ''));
