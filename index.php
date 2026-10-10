@@ -1537,6 +1537,6 @@ function renderAdmin(array $actor): void
        . '<script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>'
        // 插件注册的 JS 资源合并输出（用户管理等插件的后台交互脚本）
        . '<script src="?action=assets&type=js"></script>'
-       . '<script>OwAdmin.init(' . json_encode(['key' => $actor['key'], 'ts' => time()]) . ');</script>'
+       . '<script>OwAdmin.init(' . json_encode(['key' => $actor['key'], 'ts' => time(), 'version' => OWLSGO_VERSION]) . ');</script>'
        . '</body></html>';
 }

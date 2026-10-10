@@ -5808,6 +5808,7 @@
         init: function (opt) {
             OwApi.key = opt.key;
             OwApi.setServerTime(opt.ts);
+            this.version = opt.version || '';   // v1.3.38：后台「系统与维护」展示版本号用
             var menu = $('owAdminMenu'), self = this;
             // 移动端抽屉：顶栏汉堡开合 + 遮罩点击收起 + 回到桌面宽度自动复位
             var side = $('owAdminSide'), mask = $('owAdminMask');
@@ -6231,7 +6232,11 @@
                             + 'PHP 会把源码编译成字节码缓存在内存里（OPcache），更新文件后若仍跑旧代码'
                             + '（尤其是关闭了时间戳校验时），清一次缓存即可立即生效。开启调试模式时会写 '
                             + 'data/logs/debug.log，本操作不影响它。</p>'
-                            + '</div>')
+                            + '</div>'
+                            // v1.3.38 版本号：只读展示（后台 boot 下发），不是设置项、不进保存表单
+                            + '<div class="ow-form-item"><label>版本号</label>'
+                            + '<span style="font-size:13px;color:var(--ow-text);padding-top:6px">v'
+                            + esc(OwAdmin.version || '?') + '</span></div>')
 
                         + '<button class="ow-btn ow-btn-primary" onclick="OwAdmin.settingsSave()">保存设置</button>';
 
