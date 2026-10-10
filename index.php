@@ -1172,6 +1172,10 @@ function pageHead(string $title): void
        . '<title>' . Sec::e($title) . ' - ' . $site . '</title>'
        . '<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">'
        . owThemeBootstrap()   // v1.3.25：先定主题再加载样式，避免首屏闪一下浅色
+       // v1.3.50：色系引擎。放在样式表**之前**且不加 defer/async —— 阻塞脚本仍在首帧绘制前
+       // 执行，刷新时才会直接以目标色系上色（放 body 末尾就会先闪一帧经典蓝）。
+       // 只写行内 CSS 变量，不碰 data-theme（那是上面内联脚本的职责，两处各算必漂移）。
+       . '<script src="assets/js/theme-boot.js?v=' . OWLSGO_VERSION . '"></script>'
        . '<link rel="stylesheet" href="assets/css/owlsgo.css?v=' . OWLSGO_VERSION . '">';
     Plugin::fire('page.head');
     echo '</head>';

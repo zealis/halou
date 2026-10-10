@@ -119,6 +119,89 @@
     margin-top: 6px;
 }
 
+/* ===================== 色系卡片（v1.3.50） =====================
+   从姊妹实现（参考文献/forum theme.css 第 19 节）移植，令牌换成 --ow-*。
+   卡片三格色板 = 主色/悬浮/浅底，宽度 50/30/20 对应它们在界面里的实际用量，
+   所以「看到的」和「选中后的」是一致的。
+   色板外框用 --ow-border 而不是原实现的 rgba(0,0,0,.08)：后者在深色底上等于没有。 */
+.ow-scheme-grid {
+    display: -webkit-flex; display: flex;
+    flex-wrap: wrap; -webkit-flex-wrap: wrap;
+    gap: 8px;
+}
+.ow-scheme-card { position: relative; display: -webkit-flex; display: flex; -webkit-flex: 1 1 132px; flex: 1 1 132px; }
+.ow-scheme-pick {
+    display: -webkit-flex; display: flex;
+    -webkit-align-items: center; align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--ow-border);
+    border-radius: 8px;
+    background: var(--ow-surface);
+    color: var(--ow-text);
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+.ow-scheme-pick:hover { border-color: var(--ow-primary); background: var(--ow-blue-light); }
+.ow-scheme-card.is-active .ow-scheme-pick,
+.ow-scheme-pick[aria-pressed="true"] {
+    border-color: var(--ow-primary-strong);
+    box-shadow: 0 0 0 1px var(--ow-primary-strong);
+}
+.ow-scheme-sw {
+    display: -webkit-flex; display: flex;
+    width: 32px; height: 32px;
+    -webkit-flex: none; flex: none;
+    overflow: hidden;
+    border: 1px solid var(--ow-border);
+    border-radius: 6px;
+}
+.ow-scheme-sw i { display: block; height: 100%; }
+.ow-scheme-sw i:nth-child(1) { width: 50%; }
+.ow-scheme-sw i:nth-child(2) { width: 30%; }
+.ow-scheme-sw i:nth-child(3) { width: 20%; }
+.ow-scheme-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ow-scheme-del {
+    position: absolute; top: -6px; right: -6px;
+    width: 20px; height: 20px; padding: 0;
+    border: 1px solid var(--ow-border);
+    border-radius: 999px;
+    background: var(--ow-surface);
+    color: var(--ow-text-sub);
+    font-size: 13px; line-height: 1;
+    cursor: pointer;
+}
+.ow-scheme-del:hover { border-color: var(--ow-red); color: var(--ow-red); }
+/* 新增自建色系：名称 + 三个取色器横排，窄弹窗里自动换行 */
+.ow-scheme-add {
+    display: -webkit-flex; display: flex;
+    flex-wrap: wrap; -webkit-flex-wrap: wrap;
+    -webkit-align-items: center; align-items: center;
+    gap: 10px;
+    margin-top: 12px; padding-top: 12px;
+    border-top: 1px solid var(--ow-border);
+}
+/* 名称独占一行（弹窗只有 ~420px 宽，横排会把「浅底 + 新增」挤到第二行且参差），
+   三个取色器与按钮走第二行。 */
+.ow-scheme-add .ow-input { -webkit-flex: 1 1 100%; flex: 1 1 100%; max-width: none; }
+.ow-scheme-color {
+    display: -webkit-inline-flex; display: inline-flex;
+    -webkit-align-items: center; align-items: center;
+    gap: 6px;
+    color: var(--ow-text-sub);
+    font-size: 13px;
+}
+.ow-scheme-color input[type="color"] {
+    width: 34px; height: 28px; padding: 2px;
+    border: 1px solid var(--ow-border-control);
+    border-radius: 6px;
+    background: var(--ow-surface);
+    cursor: pointer;
+}
+
 /* ===================== 深色主题（v1.3.25） =====================
    机制：只**重定义 CSS 变量**，不重写任何选择器。
    —— 本项目 269 处颜色都走 var(--ow-*)，所以覆盖变量就等于换肤，

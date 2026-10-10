@@ -358,7 +358,32 @@
         '举报功能不可用': 'Reporting is unavailable',
         '请先打开群聊设置弹窗': 'Open the room settings first',
         '上传头像需要启用「附件上传」插件；也可以在头像设置里选「浏览插图」': 'Uploading an avatar needs the Attachments plugin — or pick a Browse illustration in the avatar settings',
-        '上传群头像需要启用「附件上传」插件；也可以选「浏览插图」': 'Uploading a room avatar needs the Attachments plugin — or pick a Browse illustration'
+        '上传群头像需要启用「附件上传」插件；也可以选「浏览插图」': 'Uploading a room avatar needs the Attachments plugin — or pick a Browse illustration',
+
+        /* ---------- appearance settings: day/night + color schemes (v1.3.50) ---------- */
+        '日夜模式': 'Day / night mode',
+        '浅色': 'Light',
+        '深色': 'Dark',
+        '跟随系统': 'System',
+        '跟随系统会随操作系统的深浅色设置自动切换。': 'Follows your operating system’s light or dark setting.',
+        '色系': 'Color scheme',
+        '经典蓝': 'Classic blue',
+        '翡翠绿': 'Emerald',
+        '品牌红': 'Brand red',
+        '紫罗兰': 'Violet',
+        '猛男粉': 'Pink',
+        '雅酷黑': 'Ink',
+        '色系名称': 'Scheme name',
+        '主色': 'Brand',
+        '悬浮': 'Hover',
+        '浅底': 'Tint',
+        '新增色系': 'Add scheme',
+        '删除该色系': 'Delete this scheme',
+        '色系已删除': 'Scheme deleted',
+        '请先填写色系名称': 'Give the scheme a name first',
+        '色系保存失败，请检查颜色值': 'Could not save the scheme — check the colour values',
+        '自建色系已达 20 个上限，删除后才能再加。': 'Custom schemes are capped at 20 — delete one to add another.',
+        '内置 6 套 + 自建（最多 20 个），只改界面配色、不动消息内容，且仅对本浏览器生效。深色档下主色会自动提到可读亮度，所以同一色系在深浅两档看起来不完全一样。删除正在使用的色系会回到经典蓝。': 'Six built-in schemes plus up to 20 custom ones. Only interface colours change — messages are untouched, and the choice lives in this browser. In dark mode the brand colour is lifted to a readable brightness, so the same scheme looks different between the two modes. Deleting the scheme in use falls back to Classic blue.'
     };
 
     w.OwI18n.register('en', 'English', dict);
