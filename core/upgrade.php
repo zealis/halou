@@ -171,6 +171,24 @@ class Upgrade
         return ['added' => $added, 'modified' => $modified];
     }
 
+    /**
+     * 把检查结果落到 settings.update_info —— 后台「系统升级」红点的唯一数据源。
+     * 三个写入点：12 小时计划任务（Plugin::cron check_update）、手动 check、apply/rollback 后。
+     */
+    public static function saveInfo(?array $chk, ?string $err = null): void
+    {
+        $v = $chk === null
+            ? json_encode(['error' => mb_substr((string)$err, 0, 140), 'ts' => time()], JSON_UNESCAPED_UNICODE)
+            : json_encode([
+                'has_update'     => $chk['has_update'] ? 1 : 0,
+                'local_version'  => $chk['local_version'],
+                'remote_version' => $chk['remote_version'],
+                'count'          => count($chk['added']) + count($chk['modified']),
+                'ts'             => time(),
+            ], JSON_UNESCAPED_UNICODE);
+        DB::upsert('settings', ['k' => 'update_info', 'v' => $v], ['k']);
+    }
+
     /** 检查更新（供 check 路由与 apply 前置复用） */
     public static function check(?string &$err = null): ?array
     {

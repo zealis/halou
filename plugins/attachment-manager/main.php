@@ -41,6 +41,9 @@ function owATDefaultConfig(): array
     return [
         'enabled' => '1',   // 是否允许上传附件（0=关闭）
         'max_mb'  => '10',  // 单文件大小上限（MB）
+        // v1.4.0：上传速率上限（MB/分钟，按用户滚动窗口）。默认 60 = 单文件上限 10MB 的 6 倍，
+        // 正常连发够用，脚本刷盘会撞限。
+        'rate_mb' => '60',
         // v1.3.13：默认白名单补上一般图片格式 —— 头像上传也走这张表
         'exts'    => 'jpg,jpeg,png,gif,webp,bmp,zip,rar,7z,pdf,txt,md,doc,docx,xls,xlsx,ppt,pptx,mp3,mp4',
         // v1.2.0：图片压缩（WebP 有损转换）。总开关默认关闭 = 原图直存，与旧行为一致。
@@ -83,6 +86,7 @@ function owATConfig(): array
         if (array_key_exists($r['k'], $cfg)) $cfg[$r['k']] = (string)$r['v'];
     }
     $cfg['max_mb'] = max(1, min(1024, (int)$cfg['max_mb']));   // 夹在 1~1024MB
+    $cfg['rate_mb'] = max(1, min(10240, (int)$cfg['rate_mb']));
     $cfg['compress'] = $cfg['compress'] === '1' ? '1' : '0';
     foreach (['compress_avatar', 'compress_image', 'compress_sticker'] as $ck) {
         $cfg[$ck] = $cfg[$ck] === '1' ? '1' : '0';
@@ -101,6 +105,8 @@ function owATSaveConfig(array $in): array
         $v = trim((string)$v);
         if ($k === 'max_mb') {
             $v = (string)max(1, min(1024, (int)$v));
+        } elseif ($k === 'rate_mb') {
+            $v = (string)max(1, min(10240, (int)$v));
         } elseif ($k === 'compress' || $k === 'compress_avatar' || $k === 'compress_image' || $k === 'compress_sticker') {
             $v = $v === '1' ? '1' : '0';
         } elseif ($k === 'compress_q') {
@@ -324,6 +330,31 @@ Plugin::on('upload.image', function (array &$f, string $kind) {
 });
 
 /**
+ * 上传速率闸门（v1.4.0）：每个身份每 60 秒滚动窗口累计 ≤ rate_mb。
+ * 复用核心 rate_limits 表 —— 与 Sec::rateLimit 同一套行结构，只是 count 存**字节数**
+ * 而非次数，所以桶名单独用 upload_bytes，不与次数桶互相污染。
+ * 返回 null = 放行（并已预扣本次字节数）；返回字符串 = 拒绝理由。
+ * 注意：先扣后传 —— 落盘失败也当作已用额度，宁可少容忍一次重试，不给刷盘者留空子。
+ */
+function owATRateTry(?array $actor, int $bytes): ?string
+{
+    $cap = (int)owATConfig()['rate_mb'] * 1048576;
+    $ident = ($actor['kind'] ?? 'none') . (int)($actor['id'] ?? 0);
+    $now = time();
+    $row = DB::one('SELECT * FROM rate_limits WHERE bucket=? AND ident=?', ['upload_bytes', $ident]);
+    if (!$row || $now - (int)$row['window_start'] >= 60) {
+        DB::upsert('rate_limits', ['bucket' => 'upload_bytes', 'ident' => $ident, 'window_start' => $now, 'count' => $bytes], ['bucket', 'ident']);
+        return null;
+    }
+    if ((int)$row['count'] + $bytes > $cap) {
+        $left = 60 - ($now - (int)$row['window_start']);
+        return '上传太快：每分钟上限 ' . (int)($cap / 1048576) . ' MB 已用完，请 ' . max(1, $left) . ' 秒后再试';
+    }
+    DB::run('UPDATE rate_limits SET count=count+? WHERE bucket=? AND ident=?', [$bytes, 'upload_bytes', $ident]);
+    return null;
+}
+
+/**
  * 存图片消息：复用核心 Upload（头像/贴纸同一条本地存储通道），
  * 这里额外先卡一次体积上限（配置项在插件里，不能指望核心再读）。
  */
@@ -337,6 +368,7 @@ function owATStoreImage(array $f, ?array $actor = null): array
     if ($tmp !== '' && is_file($tmp) && (int)@filesize($tmp) > $max) {
         return [false, '图片超过 ' . round($max / 1048576, 1) . ' MB 限制'];
     }
+    if ($tmp !== '' && is_file($tmp) && ($rl = owATRateTry($actor, (int)filesize($tmp))) !== null) return [false, $rl];
     // 压缩由 upload.image 钩子在 Upload::handle 内统一做（细分开关见后台「图片压缩」）
     return Upload::handle($f, 'image');   // 核心内部还会做「仅 jpg/png/gif/webp」校验
 }
@@ -360,6 +392,7 @@ function owATStoreFile(array $f, ?array $actor = null): array
     $size = (int)@filesize($tmp);
     if ($size <= 0) return [false, '文件内容为空'];
     if ($size > $max) return [false, '文件超过 ' . round($max / 1048576) . ' MB 限制'];   // ⚠️ $max 是字节，别直接当 MB 显示
+    if (($rl = owATRateTry($actor, $size)) !== null) return [false, $rl];
 
     $mime  = owATRealMime($tmp);
     $extIn = strtolower((string)pathinfo($orig, PATHINFO_EXTENSION));
@@ -510,6 +543,7 @@ function owATStoreAvatar(array $f, array $actor): array
     if ($ext === '' || !in_array($ext, owATExts(), true)) {
         return [false, '头像格式不在允许列表内（' . implode(' / ', owATExts()) . '）'];
     }
+    if ($tmp !== '' && is_file($tmp) && ($rl = owATRateTry($actor, (int)filesize($tmp))) !== null) return [false, $rl];
     // 压缩由 upload.image 钩子在 Upload::handle 内统一做
     return Upload::handle($f, 'avatar');
 }
@@ -572,6 +606,7 @@ Plugin::route('plugin_attachment_manager_cfg_save', function (array $ctx) use ($
     $cfg = owATSaveConfig([
         'enabled' => $post['enabled'] ?? '',
         'max_mb'  => $post['max_mb'] ?? '',
+        'rate_mb' => $post['rate_mb'] ?? '',
         'exts'    => $post['exts'] ?? '',
         'compress'   => $post['compress'] ?? '',
         'compress_q' => $post['compress_q'] ?? '',
@@ -649,6 +684,10 @@ Plugin::adminPage('attachment-manager', '附件上传', function () {
         . '<select class="ow-input" id="owAtEnabled"><option value="1">允许</option><option value="0">禁止</option></select></div>'
         . '<div class="ow-form-item" style="min-width:140px"><label>单文件大小上限(MB)</label>'
         . '<input class="ow-input" id="owAtMaxMb" type="number" min="1" max="1024" value="10"></div>'
+        . '<div class="ow-form-item" style="min-width:150px"><label>每分钟上传量上限(MB)</label>'
+        . '<input class="ow-input" id="owAtRateMb" type="number" min="1" max="10240" value="60">'
+        . '<p style="font-size:12px;color:#5C5C5C;margin-top:4px">按用户滚动 60 秒窗口累计，图片/文件/头像共用。'
+        . '默认 60 = 单文件上限的 6 倍：正常连发够用，脚本刷盘会撞限。</p></div>'
         . '</div>'
         . '<div class="ow-form-item"><label>允许的文件扩展名</label>'
         . '<input class="ow-input" id="owAtExts" placeholder="zip,pdf,txt,docx">'

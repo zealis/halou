@@ -26,6 +26,8 @@
     --ow-text: #333333;
     --ow-text-sub: #5C5C5C;         /* 副文本：白底 6.69、浅灰底 6.23、徽章底 5.23 */
     --ow-text-title: #1A1A1A;
+    --ow-toast-bg: #1A1A1A;         /* 提示条：深色底白字（深色模式整体翻转，见 dark 块） */
+    --ow-toast-fg: #FFFFFF;
     --ow-green: #237804;            /* 成功 / 可发言：白底 5.59、浅绿标签底 5.44 */
     --ow-yellow: #874D00;           /* 称号标签等：浅黄底 6.53 */
     --ow-red: #C41D1F;              /* 危险 / 管理员标签：白底 5.93、浅红底 5.39，白字 5.93 */
@@ -141,6 +143,8 @@
     --ow-text: #DCDCE0;             /* 正文：对主背景 10.6:1 */
     --ow-text-sub: #A2A2AA;         /* 副文本：对主背景 5.9:1 */
     --ow-text-title: #F2F2F5;       /* 标题：对主背景 15.3:1 */
+    --ow-toast-bg: #F2F2F5;         /* 提示条整体翻转：浅底深字。原写法 color:#fff 配 */
+    --ow-toast-fg: #1A1A1A;         /*   var(--ow-text-title)（深色模式下是浅色）= 白字白底看不见 */
     --ow-green: #52C41A;            /* 成功/可发言 */
     --ow-yellow: #FFC53D;           /* 称号标签等 */
     --ow-red: #FF7875;              /* 危险/管理员标签（深底上要提亮才够对比） */
@@ -1930,8 +1934,8 @@ input[type=range] {
     top: 20px; left: 50%;
     transform: translateX(-50%);
     -webkit-transform: translateX(-50%);
-    background: var(--ow-text-title);
-    color: #fff;
+    background: var(--ow-toast-bg);
+    color: var(--ow-toast-fg);
     padding: 8px 18px;
     border-radius: 6px;
     font-size: 13px;

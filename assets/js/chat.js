@@ -5792,6 +5792,15 @@
         upgrade: {
             info: null,
 
+            /** 红点显隐：raw = settings.update_info（JSON 字符串）。有更新才亮。 */
+            paintDot: function (raw) {
+                var dot = $('owUpdDot');
+                if (!dot) return;
+                var ui = null;
+                try { ui = JSON.parse(raw || '{}'); } catch (e) { ui = null; }
+                dot.style.display = (ui && ui.has_update) ? '' : 'none';
+            },
+
             check: function () {
                 var btn = $('owUpdBtn'), panel = $('owUpdPanel');
                 if (!btn || !panel) return;
@@ -5832,6 +5841,8 @@
                     + '<div id="owUpdBak" style="margin-top:8px;font-size:12px;color:var(--ow-text-sub)"></div>';
                 panel.innerHTML = h;
                 OwAdmin.upgrade.loadBackups();
+                var dot = $('owUpdDot');
+                if (dot) dot.style.display = r.has_update ? '' : 'none';   // 手动检查后红点即时同步
             },
 
             apply: function () {
@@ -6325,12 +6336,11 @@
                             + '（尤其是关闭了时间戳校验时），清一次缓存即可立即生效。开启调试模式时会写 '
                             + 'data/logs/debug.log，本操作不影响它。</p>'
                             + '</div>'
-                            // v1.3.38 版本号：只读展示（后台 boot 下发），不是设置项、不进保存表单
-                            + '<div class="ow-form-item"><label>版本号</label>'
-                            + '<span style="font-size:13px;color:var(--ow-text);padding-top:6px">v'
-                            + esc(OwAdmin.version || '?') + '</span></div>'
-                            // v1.3.39 在线升级：入口按钮 + 内联模块面板（检查/升级/恢复备份）
-                            + '<div class="ow-form-item"><label>在线升级</label>'
+                            // v1.3.42 系统升级：入口按钮 + 内联模块面板（检查/升级/恢复备份）。
+                            // 红点 = settings.update_info.has_update（每 12h 计划任务 + 手动检查都会刷）。
+                            // v1.3.42：原「版本号」展示行已删（升级面板里本地/远端版本对比更全）。
+                            + '<div class="ow-form-item"><label>系统升级'
+                            + '<span id="owUpdDot" style="display:none;color:#E5484D;margin-left:5px" title="有新版本可用">●</span></label>'
                             + '<button type="button" class="ow-btn ow-btn-ghost" id="owUpdBtn" onclick="OwAdmin.upgrade.check()">检查更新</button>'
                             + '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">按 GitHub 仓库逐文件比对，只更新有差异的代码文件。'
                             + '保护路径永不动：core/config.php、data/、uploads/；覆盖前自动备份到 data/backup/，可一键恢复。'
@@ -6342,6 +6352,7 @@
                     // 开关视觉同步（is-on 类）：新增 DOM 后必须调，轨道才有开/关配色
                     bindSwitches(main);
                     if (w.OwTip && typeof w.OwTip.scan === 'function') w.OwTip.scan(main);
+                    OwAdmin.upgrade.paintDot(d.update_info);   // v1.3.42 系统升级红点
                 });
             },
             /* 禁言管理自 v1.0.52 起剥离为插件 ban-manager，页面与交互见 plugins/ban-manager/ */

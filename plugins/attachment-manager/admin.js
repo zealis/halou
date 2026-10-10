@@ -167,6 +167,8 @@
                 if (en) en.value = c.enabled === '0' ? '0' : '1';
                 if (mb) mb.value = c.max_mb || '10';
                 if (ex) ex.value = c.exts || '';
+                var rb = $('owAtRateMb');
+                if (rb) rb.value = c.rate_mb || '60';
                 var act = $('owAtActive');
                 if (act) act.textContent = (r.active_exts || []).join('、') || '（无）';
                 // v1.2.0：压缩开关；v1.3.1：细分改通用开关行（checked 置位后 bindSwitches 同步轨道）
@@ -189,6 +191,8 @@
             if (!en || !mb || !ex) { toast('配置表单不存在'); return; }
             var mbv = parseInt(mb.value, 10);
             if (isNaN(mbv) || mbv < 1 || mbv > 1024) { toast('大小上限请填 1~1024 的整数'); return; }
+            var rb = $('owAtRateMb'), rbv = rb ? parseInt(rb.value, 10) : 60;
+            if (isNaN(rbv) || rbv < 1 || rbv > 10240) { toast('每分钟上传量请填 1~10240 的整数'); return; }
             var cp = $('owAtCompress'), cq = $('owAtCompressQ');
             var qv = cq ? parseInt(cq.value, 10) : 80;
             if (isNaN(qv) || qv < 1 || qv > 100) { toast('压缩质量请填 1~100 的整数'); return; }
@@ -198,7 +202,7 @@
             }
             var ck = function (id) { var el = $(id); return el && el.checked ? '1' : '0'; };
             OwApi.post('plugin_attachment_manager_cfg_save', {
-                enabled: en.value, max_mb: String(mbv), exts: ex.value,
+                enabled: en.value, max_mb: String(mbv), rate_mb: String(rbv), exts: ex.value,
                 compress: cp ? cp.value : '0', compress_q: String(qv),
                 compress_avatar: ck('owAtcAvatar'), compress_image: ck('owAtcImage'),
                 compress_sticker: ck('owAtcSticker')

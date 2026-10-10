@@ -71,6 +71,15 @@ class Plugin
         self::cron('purge_expired_messages', 3600, function () {
             if (class_exists('Chat')) Chat::purgeExpired();
         }, '物理清除超过服务器保留期的消息与附件（每小时一次）');
+        // v1.3.42 系统升级红点：每 12 小时比对一次 GitHub 仓库，结果写 settings.update_info，
+        // 后台「系统与维护 → 系统升级」按它显隐红点。失败只记 error，不影响其它任务。
+        self::cron('check_update', 43200, function () {
+            if (!class_exists('Upgrade')) return 'Upgrade 类未加载，跳过';
+            $r = Upgrade::check($err);
+            Upgrade::saveInfo($r, $err);
+            return $r === null ? ('检查失败：' . $err)
+                : ('v' . $r['local_version'] . ' → v' . $r['remote_version'] . ($r['has_update'] ? '（有更新）' : '（已最新）'));
+        }, '检查 GitHub 仓库更新（每 12 小时一次，后台「系统升级」处显示红点）');
         self::$loading = '';
 
         // 1) 轻量目录扫描（目录名 + mtime），识别插件名单变化

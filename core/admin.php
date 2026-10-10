@@ -412,12 +412,16 @@ class Admin
             // ---------- 在线升级（v1.3.39，实现见 core/upgrade.php） ----------
             case 'admin_upgrade_check':
                 $r = Upgrade::check($errUpd);
+                Upgrade::saveInfo($r, $errUpd);   // 同步红点数据（手动检查也要立刻反映到入口）
                 Api::json($r === null ? ['ok' => false, 'msg' => $errUpd] : ['ok' => true] + $r);
 
             case 'admin_upgrade_apply':
                 // 敏感路由：POST + 一次性票据（index.php $SENSITIVE），且只认字符串 '1' 的降级授权
                 [$okUA, $resUA] = Upgrade::apply($p('allow_downgrade') === '1');
-                if ($okUA) Sec::log('upgrade_apply', (string)($actor['nickname'] ?? ''), is_array($resUA) ? $resUA : ['msg' => (string)$resUA]);
+                if ($okUA) {
+                    Sec::log('upgrade_apply', (string)($actor['nickname'] ?? ''), is_array($resUA) ? $resUA : ['msg' => (string)$resUA]);
+                    Upgrade::saveInfo(Upgrade::check($eUa));   // 升级后重比一次，红点即时熄灭
+                }
                 Api::json($okUA ? ['ok' => true] + (array)$resUA : ['ok' => false, 'msg' => (string)$resUA]);
 
             case 'admin_upgrade_rollback':
@@ -425,7 +429,10 @@ class Admin
                 // ⚠️ 参数不能叫 ts —— 会和 OwApi 签名字段 ts（时间戳）撞名，
                 //    $p('ts') 拿到的是签名时间戳、直接被判「备份编号不合法」。
                 [$okRB, $resRB] = Upgrade::rollback($p('bak_ts') !== '' ? $p('bak_ts') : null);
-                if ($okRB) Sec::log('upgrade_rollback', (string)($actor['nickname'] ?? ''), is_array($resRB) ? $resRB : ['msg' => (string)$resRB]);
+                if ($okRB) {
+                    Sec::log('upgrade_rollback', (string)($actor['nickname'] ?? ''), is_array($resRB) ? $resRB : ['msg' => (string)$resRB]);
+                    Upgrade::saveInfo(Upgrade::check($eUr));   // 回滚后本地又落后了，红点应重新亮起
+                }
                 Api::json($okRB ? ['ok' => true] + (array)$resRB : ['ok' => false, 'msg' => (string)$resRB]);
 
             case 'admin_upgrade_backups':
