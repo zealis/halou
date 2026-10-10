@@ -357,6 +357,35 @@ class DB
             }
         }
 
+        // v1.3.59：users.email / email_codes.email 一次性归一为小写。
+        // 不修不行：SQLite 排序是 BINARY，`Admin@qq.com` 与 `admin@qq.com` 是两个账号 ——
+        // 安装/注册时浏览器自动首字母大写、登录时手输全小写，就直接「邮箱未注册」。
+        // 用 settings 标记做一次性（migrate 每请求都跑，不能每次都全表扫）。
+        if ((string)self::setting('email_lower_migrated', '') !== '1') {
+            $byLower = [];
+            foreach (self::all('SELECT id, email FROM users') as $r) {
+                $byLower[mb_strtolower(trim((string)$r['email']))][] = $r;
+            }
+            $changed = 0; $collide = [];
+            foreach ($byLower as $low => $group) {
+                // 归一后撞车的（两个账号只差大小写）一律不动：合并账号等于删数据，
+                // 必须人来判断，这里只把它记进安全日志。
+                if (count($group) > 1) { $collide[] = $low; continue; }
+                if ((string)$group[0]['email'] === $low) continue;
+                self::run('UPDATE users SET email=? WHERE id=?', [$low, (int)$group[0]['id']]);
+                $changed++;
+            }
+            // 待发中的验证码也一并归一，否则「用大写地址刚领了码」的人在部署后那一次校验会失败
+            foreach (self::all('SELECT id, email FROM email_codes') as $c) {
+                $low = mb_strtolower(trim((string)$c['email']));
+                if ((string)$c['email'] !== $low) self::run('UPDATE email_codes SET email=? WHERE id=?', [$low, (int)$c['id']]);
+            }
+            self::setSetting('email_lower_migrated', '1');
+            if ($collide && class_exists('Sec')) {
+                Sec::log('email_case_collision', '', ['count' => count($collide), 'emails' => implode(',', array_slice($collide, 0, 20))]);
+            }
+        }
+
         // 计划任务表与几张关系表的唯一/查询索引。
         // ⚠️ 这里以前是「exec + try/catch 吞掉」，看着兼容，实际 MySQL 上**一条索引都没建成**
         //   （它不支持 CREATE INDEX IF NOT EXISTS，异常被吞掉=静默缺失），表一大就全表扫。
@@ -622,7 +651,11 @@ class DB
         $defs = [
             'site_name'        => 'Owlsgo-Chat',
             'allow_register'   => '1',
-            'reg_email_verify' => '1',
+            // v1.3.59：新装站点**默认不要求**注册邮箱验证码。
+            // 原因很实际：核心不内置 SMTP（v1.0.81 起），发信要装并配好「邮箱验证」插件；
+            // 默认开着就等于「装完站谁都无法注册」，而且报错文案指向邮件通道，
+            // 管理员第一反应会是「注册功能坏了」。要开请在后台「系统设置」勾上。
+            'reg_email_verify' => '0',
             'guest_browse'     => '1',
             'guest_chat'       => '1',
             // v1.1.0 起游客发言限制改为「两条消息之间的最小间隔（秒）」，

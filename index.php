@@ -195,7 +195,7 @@ if (!$installed) {
                 DB::defaults();
 
                 $n = trim($_POST['nickname'] ?? '');
-            $e = trim($_POST['email'] ?? '');
+            $e = Auth::normEmail((string)($_POST['email'] ?? ''));   // 管理员邮箱同样归一化
             $pw = (string)($_POST['password'] ?? '');
             // 取消用户名后，账号显示名就是昵称；规则与注册/改资料共用 Auth::checkNickname
             [$nickOk, $nickRes] = Auth::checkNickname($n, ['scene' => 'install']);   // 通过时返回归一化昵称，失败时返回错误文案
@@ -400,7 +400,9 @@ if ($action !== '') {
                 $email = (string)($me['email'] ?? '');
                 $name = (string)($me['nickname'] ?? '');
             } else {
-                $email = $p('email');
+                // 一律先归一化（小写）再查库：SQLite 是 BINARY 排序，
+                // 不归一就会出现「注册填 Xxx@qq.com、登录输 xxx@qq.com → 查不到人」。
+                $email = Auth::normEmail($p('email'));
                 if ($type === 'register' && DB::one('SELECT id FROM users WHERE email=?', [$email])) {
                     Api::json(['ok' => false, 'msg' => '该邮箱已注册']);
                 }

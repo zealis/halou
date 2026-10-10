@@ -68,7 +68,9 @@ class Mailer
     public static function checkEmail(string $email, array $ctx = []): array
     {
         $p = self::policy();
-        $e = trim($email);
+        // 归一化（去空格 + 小写）与 Auth::normEmail 同一口径：这里是所有**写入**路径的必经之地，
+        // 归一放在最前面，后面的长度/后缀/唯一检查与落库用的就是同一个值。
+        $e = class_exists('Auth') ? Auth::normEmail($email) : mb_strtolower(trim($email));
         $len = strlen($e);
         if ($e === '') return [false, '请填写邮箱'];
         if ($len < $p['email_min_len'] || $len > $p['email_max_len']) {

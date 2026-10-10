@@ -4,6 +4,20 @@
  */
 class Auth
 {
+    /**
+     * 邮箱归一化：去空格 + 转小写。**所有**写入与查询用户的邮箱都要过它。
+     *
+     * 为什么必须归一：邮箱在实践里不区分大小写（MX 投递不区分，服务商也不区分），
+     * 而 SQLite 的排序是 BINARY —— `Admin@qq.com` 与 `admin@qq.com` 在库里是两个账号。
+     * 现场故障：安装/注册时填了首字母大写的地址（浏览器自动大写、或手机输入法），
+     * 登录时输全小写 → 「邮箱未注册」。MySQL 默认 ci 排序碰巧能匹配，所以这个坑
+     * 只在 SQLite 上必现，更容易被当成「数据库选错了」。
+     */
+    public static function normEmail(string $email): string
+    {
+        return mb_strtolower(trim($email));
+    }
+
     /** 当前登录用户（数组）或 null */
     public static function user(): ?array
     {
@@ -162,10 +176,10 @@ class Auth
         [$nickOk, $nick] = self::checkNickname($nickname, ['scene' => 'register']);
         if ($nickOk) Chat::filterText($nick, 'nickname');   // 敏感词过滤（sensitive-words 插件经 text.filter 钩子处理）
         if (!$nickOk) return [false, $nick];
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return [false, '邮箱格式不正确'];
         if (strlen($password) < 6) return [false, '密码至少 6 位'];
-        // 邮箱合法性（格式/长度/后缀白名单/唯一检查）统一走 Mailer::checkEmail：
+        // 邮箱合法性（格式/长度/后缀白名单/唯一检查）与归一化统一走 Mailer::checkEmail：
         // 规则写在核心和写在插件里各一份，迟早变成「注册能过、发码被拒」。
+        // 返回的第二项已是**小写归一**后的地址，后面所有查询与落库都用它。
         [$mailOk, $mailMsg] = Mailer::checkEmail($email, ['scene' => 'register']);
         if (!$mailOk) return [false, $mailMsg];
         $email = $mailMsg;
@@ -241,7 +255,7 @@ class Auth
         if (preg_match('/^\d{1,19}$/', $identity)) {
             $user = DB::one('SELECT * FROM users WHERE id=?', [(int)$identity]);
         }
-        if (!$user) $user = DB::one('SELECT * FROM users WHERE email=?', [$identity]);
+        if (!$user) $user = DB::one('SELECT * FROM users WHERE email=?', [self::normEmail($identity)]);
         if (!$user || !password_verify($password, $user['password'])) {
             Sec::loginFail($key);
             Sec::log('login_fail', $identity);
@@ -294,6 +308,7 @@ class Auth
 
     public static function resetPassword(string $email, string $code, string $password): array
     {
+        $email = self::normEmail($email);
         $user = DB::one('SELECT * FROM users WHERE email=?', [$email]);
         if (!$user) return [false, '该邮箱未注册'];
         if (strlen($password) < 6) return [false, '密码至少 6 位'];
