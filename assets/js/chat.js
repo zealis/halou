@@ -375,6 +375,16 @@
     function esc(s) {
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
+    /**
+     * 把任意值序列化成可安全嵌进 onclick/on* 属性里当 JS 字符串实参的字面量。
+     * 用法：onclick="OwChat.userCard(1,' + jsAttr(nick) + ')" —— 注意调用点
+     * **不要再自己包引号**，jsAttr 产出的是带双引号的完整字符串字面量。
+     * 为什么 esc() 不够：浏览器执行 onclick 前会把属性值 HTML 解码，
+     * esc() 转出的 &#39; 还原成 ' 照样闭合 JS 字符串 —— esc 在属性内嵌 JS
+     * 的上下文防不住注入（此前 4 处 userCard 全靠昵称校验不含引号才没炸）。
+     * JSON.stringify 先处理 JS 层（引号/反斜杠/控制符），esc 再处理 HTML 属性层。
+     */
+    function jsAttr(s) { return esc(JSON.stringify(String(s == null ? '' : s))); }
     function toast(msg, ms) {
         var t = $('owToast'); if (!t) return;
         t.innerHTML = esc(msg); t.style.display = 'block';
@@ -2620,7 +2630,7 @@
             // 悬停满 2 秒才显示（见 ow-time-show 类与 hideMsgTime）
             var timeHtml = '<span class="ow-msg-time">' + esc(m.date + ' ' + m.time) + '</span>';
             var mainPart = roleTag(m.role, m.title, m.uid)
-                + ' <span class="ow-msg-nick" onclick="OwChat.userCard(' + (m.uid || 0) + ',\'' + esc(m.nickname) + '\')">' + esc(m.nickname) + '</span>';
+                + ' <span class="ow-msg-nick" onclick="OwChat.userCard(' + (m.uid || 0) + ',' + jsAttr(m.nickname) + ')">' + esc(m.nickname) + '</span>';
             // v1.1.0：去掉昵称后的「→ 昵称」私信文字标签。
             // 私聊会话页双方已确定；群聊内的 @提及 足以定位发给人，额外标注纯噪音。
             //
@@ -2640,7 +2650,7 @@
                 //（原先只有昵称带 onclick，头像是纯展示，两处行为不一致）。
                 // 游客（uid 为 0）传 0，userCard 内部会走 pmHint 提示不可查看。
                 // 加 .ow-msg-av 可点类供 CSS 给 cursor:pointer 与 hover 反馈。
-                html: (isSys ? '' : '<span class="ow-msg-av" onclick="OwChat.userCard(' + (m.uid || 0) + ',\'' + esc(m.nickname) + '\')">'
+                html: (isSys ? '' : '<span class="ow-msg-av" onclick="OwChat.userCard(' + (m.uid || 0) + ',' + jsAttr(m.nickname) + ')">'
                     + avatarHtml(m.avatar, m.nickname, false, m.role) + '</span>')
                     + '<div class="ow-msg-body">' + meta + content + '</div>'
             };
@@ -3567,7 +3577,7 @@
                     if (!u.is_friend) {
                         acts += '<button class="ow-btn ow-btn-ghost" onclick="OwChat.addFriend(' + (u.id) + ')">加好友</button>';
                     }
-                    acts += '<button class="ow-btn ow-btn-primary" onclick="OwChat.closeModal();OwChat.openDm(\'user:' + (u.id) + '\',' + JSON.stringify(u.nickname).replace(/"/g, '&quot;') + ')">发私信</button>';
+                    acts += '<button class="ow-btn ow-btn-primary" onclick="OwChat.closeModal();OwChat.openDm(' + jsAttr('user:' + (u.id)) + ',' + jsAttr(u.nickname) + ')">发私信</button>';
                 } else {
                     acts += '<button class="ow-btn ow-btn-primary" onclick="OwChat.closeModal();OwChat.openSettings()">编辑资料</button>';
                 }
@@ -3640,7 +3650,7 @@
                 html += '<li class="ow-online-item">'
                       + (canStatus ? '<span class="ow-online-dot"></span>' : '')
                       + avatarHtml(o.avatar, o.nickname, true, o.role)
-                      + '<span class="ow-online-name" onclick="OwChat.userCard(' + (o.uid || 0) + ',\'' + esc(o.nickname) + '\')">' + esc(o.nickname) + '</span>'
+                      + '<span class="ow-online-name" onclick="OwChat.userCard(' + (o.uid || 0) + ',' + jsAttr(o.nickname) + ')">' + esc(o.nickname) + '</span>'
                       + roleTag(o.role, '', o.uid) + '</li>';
             }
             box.innerHTML = html;
@@ -3669,7 +3679,7 @@
             var dot = canStatus
                 ? '<span class="ow-online-dot' + (o.online ? '' : ' is-off') + '"></span>'
                 : '';
-            var nameAttr = ' onclick="OwChat.userCard(' + (o.uid || 0) + ',\'' + esc(o.nickname) + '\')"';
+            var nameAttr = ' onclick="OwChat.userCard(' + (o.uid || 0) + ',' + jsAttr(o.nickname) + ')"';
             return '<li class="ow-online-item">'
                 + dot
                 + avatarHtml(o.avatar, o.nickname, true, o.role)
