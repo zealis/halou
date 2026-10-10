@@ -1295,8 +1295,8 @@
             };
             $('owTogglePanel').onclick = togglePanel;
             $('owOnlineClose').onclick = function () { setPanel(false); };
-            // v1.2.31：站点名右侧 → 搜索按钮（原竖三点菜单已删除）
-            var sb = $('owBrandSearch');
+            // v1.2.31：品牌条搜索图标 → v1.3.48 改为侧栏顶部的搜索框（点它开弹窗，本身不可输入）
+            var sb = $('owSideSearch');
             if (sb) sb.onclick = function () { self.openSearch(); };
             // 所有成员面板默认一律不展开（v1.0.101，v1.0.119 恢复：游客入口已移到顶栏）
             setPanel(false);
@@ -4374,7 +4374,16 @@
         /** 当前搜索上下文：群聊给 room_id，私聊给 peer；都没有返回 null */
         searchContext: function () {
             if (this.dm) return { roomId: 0, peer: this.dm.peer, name: this.roomName || '私聊' };
-            if (this.room) return { roomId: this.room, peer: '', name: this.roomName || '' };
+            if (this.room) {
+                // roomName 只在点过一次会话列表后才填上；用 ?page=chat&room=ID 直达时它是空的，
+                // 不兜底就会渲染出「在「」里搜索」这种空壳提示（搜索框现在是侧栏常驻入口，更容易撞到）。
+                var nm = this.roomName;
+                if (!nm) {
+                    var li = document.querySelector('#owRoomList li.active[data-name]');
+                    nm = li ? String(li.getAttribute('data-name') || '') : '';
+                }
+                return { roomId: this.room, peer: '', name: nm };
+            }
             return null;
         },
 

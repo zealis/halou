@@ -1321,13 +1321,13 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
     echo '<div class="ow-layout">';
 
     // ---------- 顶部品牌条（v1.3.6） ----------
-    // 从侧栏内部移到整个布局的顶部：logo + 站点名 + 搜索横跨全宽，
+    // 从侧栏内部移到整个布局的顶部：logo + 站点名横跨全宽，
     // rail 与会话列表从品牌条下方开始 —— rail 的「消息」图标与列表第一行天然对齐，
     // 也符合「品牌在所有栏目之上」的常规聊天客户端版式。
-    // 类名保持 .ow-brand（样式复用，只把容器从侧栏挪到布局顶层）。
+    // v1.3.48：搜索入口不再放这里（挪进 .ow-sidebar 顶部做成搜索框），
+    //          条高改由 .ow-brand 的 min-height 钉住，见 CSS 同条注释。
     echo '<header class="ow-brand">'
        . '<img src="assets/img/logo.svg" alt="logo"><span>' . Sec::e(DB::setting('site_name', 'Owlsgo-Chat')) . '</span>'
-       . '<button class="ow-icon-btn ow-brand-search" id="owBrandSearch" aria-label="搜索" title="搜索">' . ow_icon('search', 16) . '</button>'
        . '</header>';
 
     // 三栏主体：rail + 侧栏 + 主区 + 右侧栏（品牌条不在其中，见上）
@@ -1356,6 +1356,11 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
        //   切换控件改为最左侧的 .ow-rail 图标条（见上方 rail 区块）。
        //   ⚠️ 插件注册入口随之迁移：Plugin::collect('sidebar.tabs') → 'sidebar.rail'，
        //      OwChat.onSideTabs → OwChat.onRail（旧名保留为兼容别名）。
+       // v1.3.48：搜索入口从顶部品牌条挪到这里，做成侧栏最上方的搜索框。
+       //   它是 <button> 不是 <input>：本身不接受输入，点一下开搜索弹窗（OwChat.openSearch），
+       //   输入与结果都在弹窗里 —— 避免「光标在闪却打不进字」的死输入框观感。
+       . '<button class="ow-side-search" id="owSideSearch" type="button" aria-label="搜索" title="搜索">'
+       . ow_icon('search', 15) . '<span>搜索</span></button>'
        // 聊天面板（核心两个面板之一是「消息」，另一个是「联系人」）
        . '<ul class="ow-room-list ow-tab-panel is-active" id="owRoomList" data-panel="chat"></ul>'
        // 插件面板容器：由 OwChat 在切换时创建/复用，插件标签对应的内容挂这里

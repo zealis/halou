@@ -862,11 +862,16 @@ input[type=range] {
     background: var(--ow-brand-bg);
     font-weight: 600;
     color: var(--ow-text-title);
+    /* v1.3.48：搜索入口挪进侧栏后，这条高度不再有任何 28px 的子元素撑着 ——
+       原先条高 = 14px×2 padding + 搜索按钮 28px = 56 + 1px 下边框 = 57，
+       只剩 logo(26px) 时会塌到 54。57 是承重数值：窄屏 .ow-sidebar 的 top:57px、
+       以及「顶栏 / 侧栏 / rail 三线齐平」的对齐关系都按它算，所以在这里显式钉住。 */
+    min-height: 57px;
 }
 /* v1.2.25：28px → 22px。品牌条总高 57px（14px 上下内边距 + 28px 内容），
    28px 的图标在条内基本顶满，与旁边 16px 的站点名并排偏大。
    缩到 22px 后图标不再压住站点名，但**品牌条高度不变** ——
-   条高由 .ow-brand-search 的 28px 撑住（见下一条），
+   条高原先由 .ow-brand-search 的 28px 撑住，v1.3.48 起由上面的 min-height 钉住，
    所以顶栏与左侧栏的分隔线仍在 y=56/57，三线齐平不受影响。 */
 /* v1.2.26：光学居中补偿 translateY(1.5px)。
    为什么盒子已经居中了还是看着歪：本 logo 的造型是「上方实心方块 + 下方伸出一个尖角」，
@@ -883,7 +888,8 @@ input[type=range] {
    不存在「与文字并排」的对齐诉求，加了反而整体下沉。
    ⚠️ transform 不参与布局，品牌条高度与分隔线位置不受影响。 */
 /* v1.3.3：22px → 26px。22px 与旁边 16px 的站点名并排时偏小、品牌感弱，
-   26px 仍在「条高支点」（.ow-brand-search 的 28px）之内，不会把品牌条顶高，
+   26px 仍在「条高支点」（28px，v1.3.48 起由 .ow-brand 的 min-height 保证）之内，
+   不会把品牌条顶高，
    顶栏与左侧栏的分隔线位置不受影响。
    光学补偿同步按公式重算：26 × 8.8% × 0.75 ≈ 1.7px（22px 时是 1.5px）。 */
 .ow-brand img { width: 26px; height: 26px; transform: translateY(1.7px); -webkit-transform: translateY(1.7px); }
@@ -893,33 +899,34 @@ input[type=range] {
    ⚠️ 这个 28px 同时是**品牌条高度的支点**：logo 26px（v1.3.3）、站点名 16px 之后，
    整条的高度就靠它撑着（实测 57px）。别再顺手改小，否则品牌条会跟着变矮，
    与顶栏、侧栏第一行的分隔线错位（下方「首行分隔线与顶栏下边框水平对齐」一节有说明）。 */
-/* v1.3.7：品牌条底色换成 #E4E4E4 后，hover 必须换一档更深的。
-   全局 `.ow-icon-btn:hover` 用的是 --ow-bg-chat-hover(#EBEBEB)，它比 #E4E4E4 **更浅**，
-   在品牌条上会变成「越悬停越浅」且差值只有 7 级、几乎看不出反馈（项目里踩过同款：
-   灰底区域的 hover 与底色同色失效）。这里单独给一档 #D2D2D2。
-   v1.3.37：同样收进 --ow-brand-hover，深色下反向取更亮的一档。 */
-.ow-brand .ow-brand-search:hover { background: var(--ow-brand-hover); }
-
-.ow-brand .ow-brand-search {
-    margin-left: auto;
-    margin-right: -8px;          /* 视觉贴右：抵消 icon-btn 自带留白 + .ow-brand 的 16px padding */
-    /* ⚠️ 负边距的上限：hover 背景块（28px 宽）右缘不得越过侧栏右边界。
-       -8px 时块右缘 = 侧栏右缘 - 4px，仍在界内；再往负就溢到聊天区了。 */
-    width: 28px; height: 28px;
-    display: inline-flex; display: -webkit-inline-flex;
+/* ---------- 侧栏顶部搜索框（v1.3.48）----------
+   由品牌条上的搜索图标改造而来：位置从全宽顶栏挪进 .ow-sidebar 第一行，
+   形态从「28px 图标按钮」变成「看着能输入的搜索框」。
+   ⚠️ 它是 <button> 不是 <input>：不接受直接输入，点一下才开搜索弹窗（OwChat.openSearch），
+      输入与结果都在弹窗里。用 button 而不是 readonly input：不抢键盘焦点、Tab 可达、
+      读屏读作按钮，也不会留下「光标在闪却打不进字」的死控件观感。
+   ⚠️ 底色不能用 --ow-bg-sub：它与侧栏的 --ow-bg-chat 同为 #F5F5F5（v1.2.55 统一过一档灰），
+      画上去等于隐形。这里沿用全站「白卡片浮在灰底上」的层次，hover 才用 --ow-bg-chat-hover。 */
+.ow-side-search {
+    display: flex; display: -webkit-flex;
     align-items: center; -webkit-align-items: center;
-    justify-content: center; -webkit-justify-content: center;
-    line-height: 1;
+    gap: 7px;
     flex-shrink: 0; -webkit-flex-shrink: 0;
+    margin: 0 12px 10px;
+    padding: 7px 10px;
+    border: 1px solid var(--ow-border-control);
+    border-radius: 6px;                 /* 与 .ow-input 同圆角，看起来就是同一个控件 */
+    background: var(--ow-bg);
+    color: var(--ow-text-sub);
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.2;
+    text-align: left;
+    cursor: pointer;
 }
-/* v1.2.34：图标再下沉 1.5px，与 logo 的光学补偿后中心（29.5）齐平。
-   实测：logo 中心 29.5 / 站点名文字墨迹中心 28 / 品牌条中心 28.5。
-   原先图标与文字严格齐平（28），但 logo 是这一行最显眼的参照物，
-   图标比它高 1.5px 就会显得「飘在上面」。 */
-.ow-brand .ow-brand-search .ow-ico {
-    display: block;            /* 消掉 svg 的基线间隙 */
-    transform: translateY(1.5px); -webkit-transform: translateY(1.5px);
-}
+.ow-side-search:hover { background: var(--ow-bg-chat-hover); color: var(--ow-text); }
+.ow-side-search:focus-visible { outline: 2px solid var(--ow-primary-strong); outline-offset: 1px; }
+.ow-side-search .ow-ico { display: block; flex-shrink: 0; -webkit-flex-shrink: 0; }
 /* ---------- 搜索窗（v1.2.31） ---------- */
 .ow-sr-scope { margin-bottom: 10px; }        /* 范围切换复用 .ow-tabs 组件外观 */
 .ow-sr-scope .ow-tab { font-size: 13px; padding: 6px 8px; }
