@@ -38,6 +38,31 @@ class Upgrade
     /** 站点根目录（core/ 的上一级） */
     public static function root(): string { return dirname(__DIR__); }
 
+    /**
+     * CA 证书包发现：phpStudy 的 Windows PHP 默认没配 curl.cainfo，
+     * HTTPS 校验会报 "unable to get local issuer certificate"。
+     * 按序找：php.ini 配置 → PHP 自带 extras → Git for Windows 的 Mozilla CA 包 → Linux 系统路径。
+     * 全找不到就返回 null 走系统默认 —— 绝不关闭校验（下载的是代码）。
+     */
+    private static function caBundle(): ?string
+    {
+        static $found = false;
+        static $path = null;
+        if ($found) return $path;
+        $cands = [(string)ini_get('curl.cainfo'), (string)ini_get('openssl.cafile')];
+        if (defined('PHP_BINARY')) {
+            $cands[] = dirname(PHP_BINARY) . '/extras/cacert.pem';
+        }
+        $cands[] = 'C:/Program Files/Git/mingw64/etc/ssl/certs/ca-bundle.crt';
+        $cands[] = 'D:/sdk/Git/ucrt64/etc/ssl/certs/ca-bundle.crt';
+        $cands[] = '/etc/ssl/certs/ca-certificates.crt';
+        foreach ($cands as $c) {
+            if ($c !== '' && $c !== null && is_file($c)) { $path = $c; $found = true; return $path; }
+        }
+        $found = true;
+        return null;
+    }
+
     /** 带超时的 HTTPS GET（curl 优先，无 curl 回落 allow_url_fopen）。失败返回 null 并写 $err */
     private static function get(string $url, ?string &$err = null): ?string
     {
@@ -51,6 +76,8 @@ class Upgrade
                 CURLOPT_CONNECTTIMEOUT => 10,
                 CURLOPT_HTTPHEADER     => ['User-Agent: Owlsgo-Updater', 'Accept: application/vnd.github+json'],
             ]);
+            $ca = self::caBundle();
+            if ($ca !== null) curl_setopt($ch, CURLOPT_CAINFO, $ca);
             $body = curl_exec($ch);
             $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
             if ($body === false) $err = '网络请求失败：' . curl_error($ch);
@@ -59,7 +86,13 @@ class Upgrade
             return $body === false || $err !== null ? null : (string)$body;
         }
         if (ini_get('allow_url_fopen') == false) { $err = '服务器无 curl 扩展且 allow_url_fopen 关闭，无法联网升级'; return null; }
-        $ctx = stream_context_create(['http' => ['timeout' => 30, 'header' => "User-Agent: Owlsgo-Updater\r\n"]]);
+        $ssl = ['verify_peer' => true, 'verify_peer_name' => true];
+        $ca = self::caBundle();
+        if ($ca !== null) $ssl['cafile'] = $ca;
+        $ctx = stream_context_create([
+            'http' => ['timeout' => 30, 'header' => "User-Agent: Owlsgo-Updater\r\n"],
+            'ssl'  => $ssl,
+        ]);
         $body = @file_get_contents($url, false, $ctx);
         if ($body === false) { $err = '网络请求失败：' . (error_get_last()['message'] ?? '未知'); return null; }
         return $body;
@@ -106,10 +139,22 @@ class Upgrade
         return $path !== '' && $path[0] !== '/' && strpos($path, '..') === false && strpos($path, "\0") === false;
     }
 
-    public static function rawUrl(string $path): string
+    /**
+     * 拉单个文件内容：git blob API（api.github.com/git/blobs/{sha}，base64 返回）。
+     * 不用 raw.githubusercontent.com —— 实测本机网络环境 api.github.com 通、raw 不通；
+     * 且 blob 按 sha 寻址，URL 本身就锁定了要的内容。
+     * ⚠️ 未认证 API 限流 60 次/小时：一次升级 = 1 tree + N blob，
+     *    差异文件数接近 50 时提前中止并提示（避免限流后卡在半程）。
+     */
+    public static function fetchBlob(string $sha, ?string &$err = null): ?string
     {
-        return 'https://raw.githubusercontent.com/' . self::REPO . '/' . self::BRANCH . '/'
-            . implode('/', array_map('rawurlencode', explode('/', $path)));
+        $j = self::get('https://api.github.com/repos/' . self::REPO . '/git/blobs/' . $sha, $err);
+        if ($j === null) return null;
+        $d = json_decode($j, true);
+        if (!is_array($d) || !isset($d['content'])) { $err = 'blob 响应异常（限流或 sha 不存在）'; return null; }
+        $bin = base64_decode((string)$d['content'], true);
+        if ($bin === false) { $err = 'blob base64 解码失败'; return null; }
+        return $bin;
     }
 
     /** 差异比对：added（远端有本地无）+ modified（sha 不同）。保护名单与非法路径跳过 */
@@ -135,7 +180,7 @@ class Upgrade
         $localVer = trim((string)@file_get_contents(self::root() . '/VERSION'));
         $remoteVer = null;
         if (isset($tree['VERSION'])) {
-            $rv = self::get(self::rawUrl('VERSION'), $e2);
+            $rv = self::fetchBlob($tree['VERSION'], $e2);
             $remoteVer = $rv === null ? null : trim($rv);
         }
         $n = count($d['added']) + count($d['modified']);
@@ -170,6 +215,10 @@ class Upgrade
         $tree = self::fetchTree($err);
         if ($tree === null) return [false, '重新获取文件树失败：' . $err];
         $files = array_merge($chk['added'], $chk['modified']);
+        // 未认证 API 限流 60 次/小时：留 tree+VERSION 的余量，超 45 个差异文件直接提示分批发
+        if (count($files) > 45) {
+            return [false, '差异文件 ' . count($files) . ' 个，超过单次升级上限 45（GitHub 未认证 API 限流 60 次/小时）。请在服务器配置 GitHub token 或分批提交。'];
+        }
         $root = self::root();
         $tmpDir = $root . '/data/upgrade/tmp';
         @mkdir($tmpDir, 0775, true);
@@ -177,7 +226,7 @@ class Upgrade
         // ---- 第一阶段：全部下载 + 逐个复核 blob sha（此阶段不碰站点文件） ----
         $contents = [];
         foreach ($files as $path) {
-            $body = self::get(self::rawUrl($path), $e);
+            $body = self::fetchBlob($tree[$path], $e);
             if ($body === null) { self::rrmdir($tmpDir); return [false, '下载失败：' . $path . '（' . $e . '）']; }
             if (sha1('blob ' . strlen($body) . "\0" . $body) !== $tree[$path]) {
                 self::rrmdir($tmpDir);
