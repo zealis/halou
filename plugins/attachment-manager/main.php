@@ -32,7 +32,7 @@ if (!defined('OWLSGO_VERSION')) exit;   // 禁止直接 HTTP 访问本文件
 /* ============================ 配置（原核心设置项迁入） ============================ */
 DB::run("CREATE TABLE IF NOT EXISTS plugin_attachment_config (
     k VARCHAR(32) PRIMARY KEY,
-    v TEXT NOT NULL DEFAULT ''
+    " . DB::textCol('v') . "
 )");
 
 /** 默认配置 */
@@ -73,7 +73,7 @@ function owATInitOnce(): void
         if (isset($have[$newKey])) continue;
         $v = DB::setting($oldKey, '');
         if ($v === '') continue;   // 核心没这个键（全新安装）→ 保持默认值
-        DB::run('INSERT OR REPLACE INTO plugin_attachment_config (k, v) VALUES (?, ?)', [$newKey, (string)$v]);
+        DB::upsert('plugin_attachment_config', ['k' => $newKey, 'v' => (string)$v], ['k']);
     }
 }
 owATInitOnce();
@@ -119,7 +119,8 @@ function owATSaveConfig(array $in): array
             }
             $v = $clean ? implode(',', array_keys($clean)) : $def['exts'];
         }
-        DB::run('INSERT OR REPLACE INTO plugin_attachment_config (k, v) VALUES (?, ?)', [(string)$k, $v]);
+        // upsert 三驱动通用；INSERT OR REPLACE 是 SQLite 方言，MySQL 会 1064
+        DB::upsert('plugin_attachment_config', ['k' => (string)$k, 'v' => $v], ['k']);
     }
     return owATConfig();
 }

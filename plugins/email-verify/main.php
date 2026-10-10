@@ -44,8 +44,8 @@ DB::run("CREATE TABLE IF NOT EXISTS plugin_email_verify_log (
     id $id, kind $str NOT NULL DEFAULT '', recipient $str NOT NULL,
     subject TEXT, status $str NOT NULL, error TEXT, created_at $int NOT NULL
 )");
-DB::run('CREATE INDEX IF NOT EXISTS idx_pev_log_created ON plugin_email_verify_log(created_at)');
-DB::run('CREATE INDEX IF NOT EXISTS idx_pev_log_status ON plugin_email_verify_log(status, created_at)');
+DB::createIndex('idx_pev_log_created', 'plugin_email_verify_log', 'created_at');
+DB::createIndex('idx_pev_log_status', 'plugin_email_verify_log', 'status, created_at');
 
 /** 场景清单：kind => 中文名。模板与统计都按它分组。 */
 function owEVKinds(): array

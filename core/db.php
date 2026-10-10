@@ -44,6 +44,70 @@ class DB
     public static function pdo(): PDO { return self::$pdo; }
     public static function driver(): string { return self::$driver; }
 
+    /**
+     * 建表片段：长文本列。
+     *
+     * MySQL 的 TEXT/BLOB **不允许有默认值**（错误 1101），而只写 `TEXT NOT NULL`
+     * 又会在「INSERT 省略这一列」时报 1364（Field doesn't have a default value，
+     * 严格模式下必炸）。所以 MySQL 上退化成可空无默认，其余驱动保持原样。
+     * 读取侧一律 `(string)$row['x']` / `?? ''`，可空不会改变行为。
+     *
+     * @param string $col     列名
+     * @param string $default 非 MySQL 驱动的默认值字面量（带引号），如 "''" / "'[]'"
+     */
+    public static function textCol(string $col, string $default = "''"): string
+    {
+        if (self::$driver === 'mysql') return "$col TEXT NULL";
+        return "$col " . self::t('text') . " NOT NULL DEFAULT $default";
+    }
+
+    /**
+     * 幂等建索引。
+     *
+     * ⚠️ MySQL 全系（含 8.0）都**不支持** `CREATE INDEX IF NOT EXISTS` —— 不是报错就是
+     * 被 try/catch 吞掉，而吞掉的后果比报错更坏：**索引静默缺失**，表一大就全表扫，
+     * 且后台看不出任何异常。所以 MySQL 走 information_schema 先查后建。
+     * SQLite / PostgreSQL 的 IF NOT EXISTS 是真支持的，直接用。
+     */
+    public static function createIndex(string $name, string $table, string $cols, bool $unique = false): void
+    {
+        $u = $unique ? 'UNIQUE ' : '';
+        if (self::$driver === 'mysql') {
+            $has = (bool)self::val(
+                'SELECT COUNT(*) FROM information_schema.statistics
+                 WHERE table_schema=DATABASE() AND table_name=? AND index_name=?',
+                [$table, $name]
+            );
+            if ($has) return;
+            self::$pdo->exec("CREATE {$u}INDEX $name ON $table ($cols)");
+            return;
+        }
+        self::$pdo->exec("CREATE {$u}INDEX IF NOT EXISTS $name ON $table ($cols)");
+    }
+
+    /**
+     * 唯一键冲突就整行忽略的插入（三驱动语法各不相同）。
+     * @param array $keys 冲突判定列（仅 PG 需要：ON CONFLICT (keys) DO NOTHING）
+     */
+    public static function insertIgnore(string $table, array $data, array $keys): int
+    {
+        $cols = array_keys($data);
+        $ph = implode(',', array_fill(0, count($cols), '?'));
+        $colList = implode(',', $cols);
+        switch (self::$driver) {
+            case 'mysql':
+                $sql = "INSERT IGNORE INTO $table ($colList) VALUES ($ph)";
+                break;
+            case 'pgsql':
+                $sql = "INSERT INTO $table ($colList) VALUES ($ph) ON CONFLICT (" . implode(',', $keys) . ') DO NOTHING';
+                break;
+            default:
+                $sql = "INSERT OR IGNORE INTO $table ($colList) VALUES ($ph)";
+        }
+        self::run($sql, array_values($data));
+        return (int)self::$pdo->lastInsertId();
+    }
+
     public static function run(string $sql, array $args = []): PDOStatement
     {
         $st = self::$pdo->prepare($sql);
@@ -103,7 +167,8 @@ class DB
     }
 
     /** 自增主键方言 */
-    private static function autoId(): string
+    /** 自增主键片段（三驱动语法不同）。插件建表要用它，别自己写 AUTOINCREMENT。 */
+    public static function autoId(): string
     {
         return match (self::$driver) {
             'mysql' => 'INT AUTO_INCREMENT PRIMARY KEY',
@@ -216,9 +281,11 @@ class DB
             // 插件计划任务（v1.1.13）：由 Plugin::cron() 声明后同步入库，
             // 本表只存**调度状态**，执行逻辑在 Plugin::runCron()。
             // plugin+name 唯一 —— 插件重复加载（清单重建时也会真加载一次）不会插出重复行。
+            // ⚠️ 列名是 interval_sec 而不是 interval：`INTERVAL` 是 MySQL 保留字，
+            //   叫 interval 会在建表时直接 1064（SQLite 不拦，所以这个坑藏到第一次连 MySQL 才炸）。
             "CREATE TABLE IF NOT EXISTS cron_tasks (
                 id $id, plugin $str NOT NULL DEFAULT '', name $str NOT NULL,
-                interval $int NOT NULL DEFAULT 3600,
+                interval_sec $int NOT NULL DEFAULT 3600,
                 last_run_at $int NOT NULL DEFAULT 0, next_run_at $int NOT NULL DEFAULT 0,
                 last_status $str NOT NULL DEFAULT '', run_count $int NOT NULL DEFAULT 0,
                 enabled $int NOT NULL DEFAULT 1, created_at $ts NOT NULL, updated_at $ts NOT NULL)",
@@ -277,23 +344,38 @@ class DB
         // body 让管理员直接读库时也看得懂、且旧前端不改也能继续显示。
         self::ensureColumn('notices', 'params', 'text', "''");
 
-        // 计划任务表的复合唯一索引：SQLite / MySQL / PostgreSQL 都要求先有唯一列才能建，
-        // 且 SQLite 的 CREATE UNIQUE INDEX IF NOT EXISTS 三驱动均支持（MySQL 8 见下方兜底）。
+        // v1.3.57：cron_tasks 旧列名 `interval` 撞 MySQL 保留字，改名 interval_sec。
+        // 改名语法三驱动各不相同，必须分支：MySQL 5.7 **没有** RENAME COLUMN（8.0.3 才有），
+        // 只能 CHANGE COLUMN 重写一遍列定义；SQLite 3.25+ / PG 都支持 RENAME COLUMN。
+        // 双判（有旧列 **且** 没有新列）才动手，保证幂等：中途失败重来不会撞「列已存在」。
+        if (self::hasColumn('cron_tasks', 'interval') && !self::hasColumn('cron_tasks', 'interval_sec')) {
+            $int = self::t('int');
+            if (self::$driver === 'mysql') {
+                self::$pdo->exec("ALTER TABLE cron_tasks CHANGE COLUMN `interval` interval_sec $int NOT NULL DEFAULT 3600");
+            } else {
+                self::$pdo->exec('ALTER TABLE cron_tasks RENAME COLUMN interval TO interval_sec');
+            }
+        }
+
+        // 计划任务表与几张关系表的唯一/查询索引。
+        // ⚠️ 这里以前是「exec + try/catch 吞掉」，看着兼容，实际 MySQL 上**一条索引都没建成**
+        //   （它不支持 CREATE INDEX IF NOT EXISTS，异常被吞掉=静默缺失），表一大就全表扫。
+        //   改走 DB::createIndex()：MySQL 先查 information_schema 再建，另两驱动用 IF NOT EXISTS。
         foreach ([
-            'CREATE UNIQUE INDEX IF NOT EXISTS idx_cron_tasks_key ON cron_tasks (plugin, name)',
-            'CREATE INDEX IF NOT EXISTS idx_cron_tasks_due ON cron_tasks (enabled, next_run_at)',
-            'CREATE INDEX IF NOT EXISTS idx_cron_logs_created ON cron_logs (created_at)',
+            ['idx_cron_tasks_key',   'cron_tasks',      'plugin, name',        true],
+            ['idx_cron_tasks_due',   'cron_tasks',      'enabled, next_run_at', false],
+            ['idx_cron_logs_created','cron_logs',       'created_at',           false],
             // 同一用户重复隐藏同一条消息必须幂等，否则反复点会插出一堆重复行
-            'CREATE UNIQUE INDEX IF NOT EXISTS idx_msg_hides_key ON message_hides (user_id, message_id)',
+            ['idx_msg_hides_key',    'message_hides',   'user_id, message_id', true],
             // 同一人重复加同一好友必须幂等（否则联系人列表出现重名行）
-            'CREATE UNIQUE INDEX IF NOT EXISTS idx_friends_pair ON friends (user_id, friend_id)',
+            ['idx_friends_pair',     'friends',         'user_id, friend_id',  true],
             // 同一用户对同一会话只能置顶一次，重复点由代码先查后写，这里兜底防重行
-            'CREATE UNIQUE INDEX IF NOT EXISTS idx_conv_pins_key ON conversation_pins (user_id, peer_key)',
-            'CREATE UNIQUE INDEX IF NOT EXISTS idx_conv_reads_key ON conversation_reads (user_id, peer_key)',
+            ['idx_conv_pins_key',    'conversation_pins',  'user_id, peer_key', true],
+            ['idx_conv_reads_key',   'conversation_reads', 'user_id, peer_key', true],
             // 通知永远是「按用户取最近 N 条」和「按用户数未读」，没有跨用户查询
-            'CREATE INDEX IF NOT EXISTS idx_notices_user ON notices (user_id, id)',
-        ] as $sql) {
-            try { self::$pdo->exec($sql); } catch (Throwable $e) { /* MySQL 8 不支持 IF NOT EXISTS，忽略 */ }
+            ['idx_notices_user',     'notices',         'user_id, id',          false],
+        ] as $ix) {
+            self::createIndex($ix[0], $ix[1], $ix[2], $ix[3]);
         }
 
         // ---------- 增量迁移（幂等） ----------
@@ -377,24 +459,19 @@ class DB
         // 幂等：改写后 WHERE 不再命中。必须排在上面 room_id 迁移之后。
         self::$pdo->exec("UPDATE messages SET type='text' WHERE type='private'");
 
-        // 索引（跨引擎兼容语法）
-        $idx = [
-            'CREATE INDEX IF NOT EXISTS idx_msg_room ON messages (room_id, id)',
-            'CREATE INDEX IF NOT EXISTS idx_msg_private ON messages (to_user_id, to_guest_id)',
+        // 热路径索引。原来 MySQL 分支是「去掉 IF NOT EXISTS 再逐个 try/catch」——
+        // 结果是**每次请求都真的去建一遍已存在的索引**再吞掉异常，白跑一趟还留着
+        // 「哪天异常没被吞就整站 500」的隐患。统一走 createIndex()：先查存在性再建。
+        foreach ([
+            ['idx_msg_room',      'messages',      'room_id, id'],
+            ['idx_msg_private',   'messages',      'to_user_id, to_guest_id'],
             // v1.1.0 私聊：历史/增量轮询按「room_id=0 + 发送方 + id」过滤，补一条发送方索引
-            'CREATE INDEX IF NOT EXISTS idx_msg_dm_sender ON messages (user_id, guest_id, id)',
-            'CREATE INDEX IF NOT EXISTS idx_online_seen ON online (last_seen)',
-            'CREATE INDEX IF NOT EXISTS idx_email ON email_codes (email, type, created_at)',
-            'CREATE INDEX IF NOT EXISTS idx_logs ON security_logs (created_at)',
-        ];
-        if (self::$driver === 'mysql') {
-            // MySQL 8 不支持 IF NOT EXISTS 的 CREATE INDEX，逐个捕获
-            foreach ($idx as $sql) {
-                try { self::$pdo->exec(str_replace(' IF NOT EXISTS', '', $sql)); }
-                catch (PDOException $e) { /* 已存在则忽略 */ }
-            }
-        } else {
-            foreach ($idx as $sql) self::$pdo->exec($sql);
+            ['idx_msg_dm_sender', 'messages',      'user_id, guest_id, id'],
+            ['idx_online_seen',   'online',        'last_seen'],
+            ['idx_email',         'email_codes',   'email, type, created_at'],
+            ['idx_logs',          'security_logs', 'created_at'],
+        ] as $ix) {
+            self::createIndex($ix[0], $ix[1], $ix[2]);
         }
     }
 

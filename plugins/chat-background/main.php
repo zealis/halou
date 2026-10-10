@@ -66,7 +66,7 @@ owCBEnsureDirs();
 /* ============================ 数据表 ============================ */
 
 DB::run("CREATE TABLE IF NOT EXISTS plugin_chat_bg_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id " . DB::autoId() . ",
     name VARCHAR(120) NOT NULL DEFAULT '',
     kind VARCHAR(16) NOT NULL DEFAULT 'image',   -- svg | image | url
     source VARCHAR(16) NOT NULL DEFAULT 'admin', -- preset | admin | unsplash | remote
@@ -89,7 +89,7 @@ DB::run("CREATE TABLE IF NOT EXISTS plugin_chat_bg_user (
 )");
 DB::run("CREATE TABLE IF NOT EXISTS plugin_chat_bg_config (
     k VARCHAR(32) PRIMARY KEY,
-    v TEXT NOT NULL DEFAULT ''
+    " . DB::textCol('v') . "
 )");
 
 /* ============================ 配置 ============================ */
@@ -121,7 +121,8 @@ function owCBSaveConfig(array $in): array
         if ($k === 'min_level_custom') {
             $v = (string)max(0, (int)$v);
         }
-        DB::run('INSERT OR REPLACE INTO plugin_chat_bg_config (k, v) VALUES (?, ?)', [$k, $v]);
+        // upsert 而不是 INSERT OR REPLACE：后者是 SQLite 方言，MySQL 直接 1064
+        DB::upsert('plugin_chat_bg_config', ['k' => (string)$k, 'v' => $v], ['k']);
     }
     return owCBConfig();
 }
@@ -613,10 +614,17 @@ Plugin::route('plugin_chat_background_user_save', function (array $ctx) {
     if (!isset($overlays[$overlay])) $overlay = 'none';
     $opacity = max(0, min(100, (int)($p['opacity'] ?? 50)));
 
-    DB::run('INSERT OR REPLACE INTO plugin_chat_bg_user
-        (user_id, mode, item_id, custom_url, custom_file, overlay, opacity, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [$uid, $mode, $itemId, $customUrl, $customFile, $overlay, $opacity, time()]);
+    // user_id 是主键 → upsert 三驱动通用（INSERT OR REPLACE 只有 SQLite 认）
+    DB::upsert('plugin_chat_bg_user', [
+        'user_id'     => $uid,
+        'mode'        => $mode,
+        'item_id'     => $itemId,
+        'custom_url'  => $customUrl,
+        'custom_file' => $customFile,
+        'overlay'     => $overlay,
+        'opacity'     => $opacity,
+        'updated_at'  => time(),
+    ], ['user_id']);
     Api::json(['ok' => true, 'msg' => '背景已更新']);
 });
 

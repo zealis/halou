@@ -72,13 +72,12 @@ Plugin::on('install', function () {
         app_name VARCHAR(100) NOT NULL,
         app_desc TEXT,
         icon TEXT,
-        scopes TEXT NOT NULL DEFAULT '',
+        " . DB::textCol('scopes') . ",
         created_at $ts, updated_at BIGINT UNSIGNED NOT NULL DEFAULT 0,
         revoked_at BIGINT UNSIGNED)");
-    // MySQL 8 不支持 CREATE INDEX IF NOT EXISTS，重复执行报错直接忽略（幂等）
-    try {
-        DB::run('CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_grants_key ON oauth_grants (user_id, plugin_name, app_id)');
-    } catch (Throwable $e) { /* 索引已存在 */ }
+    // 唯一索引是「一人+一应用只一行」的正确性保证，不能用 try/catch 吞：
+    // MySQL 不支持 CREATE INDEX IF NOT EXISTS，吞掉的后果是索引**静默缺失**。
+    DB::createIndex('idx_oauth_grants_key', 'oauth_grants', 'user_id, plugin_name, app_id', true);
 });
 
 /* ============================ 授权逻辑 ============================ */

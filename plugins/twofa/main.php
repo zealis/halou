@@ -99,11 +99,11 @@ function owTwoFAEnsureTable(): void
     $drv = DB::driver();
     $int = $drv === 'mysql' ? 'INT' : ($drv === 'pgsql' ? 'INTEGER' : 'INTEGER');
     $str = $drv === 'sqlite' ? 'TEXT' : 'VARCHAR(191)';
-    $text = 'TEXT';
+    // recovery_codes 走 DB::textCol()：MySQL 的 TEXT 不能带默认值（1101）
     $sql = "CREATE TABLE IF NOT EXISTS plugin_twofa (
         user_id $int PRIMARY KEY,
         secret $str NOT NULL DEFAULT '',
-        recovery_codes $text NOT NULL DEFAULT '[]',
+        " . DB::textCol('recovery_codes', "'[]'") . ",
         enabled $int NOT NULL DEFAULT 0,
         created_at $int NOT NULL DEFAULT 0
     )";

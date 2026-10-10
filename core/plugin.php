@@ -389,13 +389,15 @@ class Plugin
     {
         $now = time();
         foreach (self::$crons as $t) {
-            $row = DB::one('SELECT id, interval FROM cron_tasks WHERE plugin=? AND name=?',
+            $row = DB::one('SELECT id, interval_sec FROM cron_tasks WHERE plugin=? AND name=?',
                 [$t['plugin'], $t['name']]);
             if (!$row) {
                 DB::insert('cron_tasks', [
                     'plugin'      => $t['plugin'],
                     'name'        => $t['name'],
-                    'interval'    => (int)$t['interval'],
+                    // 列名是 interval_sec：`INTERVAL` 是 MySQL 保留字（见 DB::migrate 的说明）。
+                    // 注册数组的键仍叫 interval —— 那是 PHP 侧的形状，只有落库时才换名。
+                    'interval_sec' => (int)$t['interval'],
                     'last_run_at' => 0,
                     'next_run_at' => $now + (int)$t['interval'],
                     'last_status' => '',
@@ -407,8 +409,8 @@ class Plugin
                 continue;
             }
             // 间隔被插件改过 → 按新间隔重算到期时间；否则原样保留
-            if ((int)$row['interval'] !== (int)$t['interval']) {
-                DB::run('UPDATE cron_tasks SET interval=?, next_run_at=?, updated_at=? WHERE id=?',
+            if ((int)$row['interval_sec'] !== (int)$t['interval']) {
+                DB::run('UPDATE cron_tasks SET interval_sec=?, next_run_at=?, updated_at=? WHERE id=?',
                     [(int)$t['interval'], $now + (int)$t['interval'], $now, (int)$row['id']]);
             }
         }
@@ -462,7 +464,8 @@ class Plugin
             }
 
             $duration = (int)round((microtime(true) - $started) * 1000);
-            $interval = max(60, (int)$task['interval']);
+            // $task 是 cron_tasks 的行（列名 interval_sec，见 syncCronTasks 的说明）
+            $interval = max(60, (int)$task['interval_sec']);
             // 状态与日志必须成对写：只更新状态没日志，后台看不出这次跑了什么；
             // 只写日志没更新状态，任务会被反复重跑。
             DB::run('UPDATE cron_tasks SET last_run_at=?, next_run_at=?, last_status=?, run_count=run_count+1, updated_at=? WHERE id=?',

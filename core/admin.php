@@ -506,7 +506,7 @@ class Admin
                     // 停用插件的任务仍在表里，但每次执行都会被跳过 →
                     // 对它显示「启用」按钮是误导，前端据此隐藏启停开关。
                     $r['plugin_active'] = ($r['plugin'] === '') || isset($enabledPlugins[$r['plugin']]);
-                    $r['interval_text'] = Admin::intervalText((int)$r['interval']);
+                    $r['interval_text'] = Admin::intervalText((int)$r['interval_sec']);
                     $r['next_run_text'] = (int)$r['next_run_at'] > 0
                         ? date('Y-m-d H:i:s', (int)$r['next_run_at']) : '—';
                     $r['last_run_text'] = (int)$r['last_run_at'] > 0
@@ -543,7 +543,7 @@ class Admin
                 if (!$row) Api::json(['ok' => false, 'msg' => '任务不存在'], 404);
                 $on = (int)$row['enabled'] !== 1;
                 DB::run('UPDATE cron_tasks SET enabled=?, next_run_at=?, updated_at=? WHERE id=?',
-                    [$on ? 1 : 0, $on ? time() + max(60, (int)$row['interval']) : 0, time(), $id]);
+                    [$on ? 1 : 0, $on ? time() + max(60, (int)$row['interval_sec']) : 0, time(), $id]);
                 Sec::log('cron_toggle', $row['plugin'] . '::' . $row['name']);
                 Api::json(['ok' => true, 'msg' => $on ? '任务已启用' : '任务已停用', 'enabled' => $on]);
             }

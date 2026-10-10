@@ -385,7 +385,8 @@ Plugin::route('plugin_captcha_verify_save', function (array $ctx) {
         foreach ($kv as $k => $v) $merged[$k] = $v;
         if (!owCVReady($provider, $merged)) Api::json(['ok' => false, 'msg' => '请填写该服务商的全部必填项']);
     }
-    foreach ($kv as $k => $v) DB::run('INSERT OR REPLACE INTO plugin_captcha_verify_config (k, v) VALUES (?, ?)', [$k, $v]);
+    // upsert 而非 INSERT OR REPLACE：后者是 SQLite 方言，MySQL / PG 都不认
+    foreach ($kv as $k => $v) DB::upsert('plugin_captcha_verify_config', ['k' => $k, 'v' => $v], ['k']);
     Api::json(['ok' => true, 'msg' => '已保存']);
 });
 Plugin::sensitive('plugin_captcha_verify_save');

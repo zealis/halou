@@ -24,12 +24,14 @@ if (!defined('OWLSGO_VERSION')) exit;
 /* ===================== 数据表（幂等建表） ===================== */
 
 DB::run("CREATE TABLE IF NOT EXISTS plugin_user_blocks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id " . DB::autoId() . ",
     blocker_id INTEGER NOT NULL DEFAULT 0,
     blocked_id INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL DEFAULT 0
 )");
-DB::run("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_blocks_pair ON plugin_user_blocks (blocker_id, blocked_id)");
+// 唯一索引是「同一人不会被重复屏蔽」的正确性保证，不能靠 try/catch：
+// MySQL 不支持 CREATE INDEX IF NOT EXISTS，吞掉=索引静默缺失。
+DB::createIndex('idx_user_blocks_pair', 'plugin_user_blocks', 'blocker_id, blocked_id', true);
 
 /* ===================== 工具函数 ===================== */
 

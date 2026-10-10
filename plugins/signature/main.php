@@ -18,9 +18,10 @@ function owSigEnsureTable(): void
     $done = true;
     $drv = DB::driver();
     $int  = $drv === 'mysql' ? 'INT' : 'INTEGER';
+    // signature 走 DB::textCol()：MySQL 的 TEXT 不能带默认值（1101）
     $sql  = "CREATE TABLE IF NOT EXISTS plugin_signature (
         user_id $int PRIMARY KEY,
-        signature TEXT NOT NULL DEFAULT '',
+        " . DB::textCol('signature') . ",
         updated_at $int NOT NULL DEFAULT 0
     )";
     DB::run($sql);

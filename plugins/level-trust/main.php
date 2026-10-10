@@ -58,17 +58,17 @@ function owLTBoot(): void
         login_streak INTEGER NOT NULL DEFAULT 0,      -- C：连续登录天数
         login_days   INTEGER NOT NULL DEFAULT 0,      -- 累计登录天数
         file_w_days  INTEGER NOT NULL DEFAULT 0,      -- 文件加权已累积次数（上限 3）
-        day          TEXT    NOT NULL DEFAULT '',     -- 上次活跃日 Y-m-d
-        today        TEXT    NOT NULL DEFAULT '{}',   -- 今日进度 JSON
+        " . DB::textCol('day') . ",                    -- 上次活跃日 Y-m-d
+        " . DB::textCol('today', "'{}'") . ",          -- 今日进度 JSON
         settled      INTEGER NOT NULL DEFAULT 0,      -- 今日是否已结算（加权每天只结算一次）
         frozen_day   INTEGER NOT NULL DEFAULT 0,      -- 被冻结的自然日 Ymd（0=未冻结）
         protect_used INTEGER NOT NULL DEFAULT 0,      -- 本月已用「连续登录保护」次数
-        protect_mon  TEXT    NOT NULL DEFAULT '',     -- 保护计数所属月份 Y-m
+        " . DB::textCol('protect_mon') . ",            -- 保护计数所属月份 Y-m
         patch_used   INTEGER NOT NULL DEFAULT 0,      -- 本周已补签次数
-        patch_week   TEXT    NOT NULL DEFAULT '',     -- 补签计数所属周（Y-W）
+        " . DB::textCol('patch_week') . ",             -- 补签计数所属周（Y-W）
         updated_at   {$ts} DEFAULT 0)");
     DB::run("CREATE TABLE IF NOT EXISTS plugin_level_config (
-        k TEXT PRIMARY KEY, v TEXT NOT NULL DEFAULT '')");
+        k TEXT PRIMARY KEY, " . DB::textCol('v') . ")");
     // v1.2.44：按自然日归档的活跃数据（后台「活跃趋势」用）。
     //   不逐条记流水 —— 那样表会无上限膨胀，而趋势图只需要每天的汇总数。
     DB::run("CREATE TABLE IF NOT EXISTS plugin_level_daily (

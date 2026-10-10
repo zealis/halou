@@ -17,13 +17,13 @@ if (!defined('OWLSGO_VERSION')) exit;
 /* ===================== 数据表（幂等建表） ===================== */
 
 DB::run("CREATE TABLE IF NOT EXISTS plugin_content_report (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id " . DB::autoId() . ",
     reporter_id INTEGER NOT NULL DEFAULT 0,
     reporter_nick VARCHAR(64) NOT NULL DEFAULT '',
     target_uid INTEGER NOT NULL DEFAULT 0,
     target_nick VARCHAR(64) NOT NULL DEFAULT '',
     reason VARCHAR(64) NOT NULL DEFAULT '',
-    description TEXT NOT NULL DEFAULT '',
+    " . DB::textCol('description') . ",
     room_id INTEGER NOT NULL DEFAULT 0,
     msg_id INTEGER NOT NULL DEFAULT 0,
     msg_time INTEGER NOT NULL DEFAULT 0,
@@ -31,22 +31,13 @@ DB::run("CREATE TABLE IF NOT EXISTS plugin_content_report (
     created_at INTEGER NOT NULL DEFAULT 0
 )");
 
-// 增量迁移：旧版数据表补齐 msg_time 字段（DB::addColumn 为核心私有方法，插件用原始 SQL + try/catch）
-try {
-    $cols = array_column(DB::all('PRAGMA table_info(plugin_content_report)'), 'name');
-    if (!in_array('msg_time', $cols, true)) {
-        DB::run('ALTER TABLE plugin_content_report ADD COLUMN msg_time INTEGER NOT NULL DEFAULT 0');
-    }
-} catch (Throwable $e) {
-    // SQLite 之外的驱动用 INFORMATION_SCHEMA 探测；字段已存在时 ALTER 会报错，忽略即可
-    try {
-        DB::run('ALTER TABLE plugin_content_report ADD COLUMN msg_time INTEGER NOT NULL DEFAULT 0');
-    } catch (Throwable $e2) { /* 字段已存在，忽略 */ }
-}
+// 增量迁移：旧版数据表补齐 msg_time 字段。用公开的 ensureColumn()（内部按驱动查列是否存在），
+// 不再自己写 PRAGMA + try/catch —— PRAGMA 是 SQLite 专有语句，MySQL 上只能靠吞异常兜过。
+DB::ensureColumn('plugin_content_report', 'msg_time', 'int', '0');
 
 DB::run("CREATE TABLE IF NOT EXISTS plugin_content_report_config (
     k VARCHAR(32) PRIMARY KEY,
-    v TEXT NOT NULL DEFAULT ''
+    " . DB::textCol('v') . "
 )");
 
 /* ===================== 配置读取 ===================== */

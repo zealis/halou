@@ -54,9 +54,9 @@ function owLLEnsureTable(): void
         method $str NOT NULL DEFAULT 'password',
         created_at $int NOT NULL
     )");
-    // 索引（IF NOT EXISTS 三驱动均支持）
-    DB::run('CREATE INDEX IF NOT EXISTS idx_pllogin_user ON plugin_login_logs(user_id)');
-    DB::run('CREATE INDEX IF NOT EXISTS idx_pllogin_created ON plugin_login_logs(created_at)');
+    // 索引：MySQL 不支持 CREATE INDEX IF NOT EXISTS，统一走 DB::createIndex()
+    DB::createIndex('idx_pllogin_user', 'plugin_login_logs', 'user_id');
+    DB::createIndex('idx_pllogin_created', 'plugin_login_logs', 'created_at');
     // v1.1.12：新增 result / identity / reason 三列（幂等迁移，存量行默认 'ok'）
     // ⚠️ 必须用公开的 ensureColumn()，不能用 DB::addColumn()——后者是 private，
     // 插件调用会抛 Error；而 Plugin::loadPlugin() 吞掉插件异常后，

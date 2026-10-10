@@ -1097,8 +1097,9 @@ class Chat
             DB::run('DELETE FROM conversation_pins WHERE user_id=? AND peer_key=?', [$uid, $peerKey]);
             return [true, '已取消置顶', false];
         }
-        DB::run('INSERT OR REPLACE INTO conversation_pins (user_id, peer_key, created_at) VALUES (?,?,?)',
-            [$uid, $peerKey, time()]);
+        DB::upsert('conversation_pins',
+            ['user_id' => $uid, 'peer_key' => $peerKey, 'created_at' => time()],
+            ['user_id', 'peer_key']);   // 唯一索引 idx_conv_pins_key
         return [true, '已置顶', true];
     }
 
@@ -1121,8 +1122,9 @@ class Chat
         $uid = (int)$actor['id'];
         $now = time();
         foreach ($rows as $r) {
-            DB::run('INSERT OR REPLACE INTO message_hides (user_id, message_id, created_at) VALUES (?,?,?)',
-                [$uid, (int)$r['id'], $now]);
+            DB::upsert('message_hides',
+                ['user_id' => $uid, 'message_id' => (int)$r['id'], 'created_at' => $now],
+                ['user_id', 'message_id']);   // 唯一索引 idx_msg_hides_key
         }
         return [true, '已清空 ' . count($rows) . ' 条聊天记录', count($rows)];
     }
