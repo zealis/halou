@@ -163,13 +163,18 @@
     var GLOBE_SVG = '<svg focusable="false" aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3.385 5.997a6.067 6.067 0 0 1 4.576-.467h.001c1.232.362 1.906 1.11 2.237 1.94c.3.754.3 1.536.3 1.99v5.79a.75.75 0 0 1-1.5 0v-.3a9.34 9.34 0 0 1-.396.222c-.952.505-2.327 1.018-3.757.761c-1.584-.285-2.576-1.595-2.8-2.952c-.229-1.38.316-2.937 1.902-3.697c1.44-.69 2.99-.628 4.122-.427c.342.061.653.136.923.211c-.013-.351-.055-.71-.188-1.042c-.166-.417-.491-.83-1.264-1.056a4.57 4.57 0 0 0-3.431.34a.75.75 0 0 1-.725-1.313m4.423 4.337c-.986-.175-2.175-.194-3.212.303c-.891.427-1.208 1.27-1.07 2.1c.141.854.741 1.568 1.586 1.72c.938.169 1.947-.164 2.788-.61a8.296 8.296 0 0 0 1.098-.702v-2.507a8.41 8.41 0 0 0-1.19-.304m8.677-3.296a.75.75 0 0 1 .476.948c-.09.27-.185.61-.271.94c.948-.088 1.87-.226 2.638-.406a.75.75 0 1 1 .343 1.46c-.973.229-2.152.392-3.336.481c-.11.546-.194 1.045-.257 1.5a5.939 5.939 0 0 1 1.672-.238a.75.75 0 0 1 1.5.027l-.003.222a4.035 4.035 0 0 1 2.504 2.423a3.98 3.98 0 0 1-.154 3.128c-.496 1.025-1.44 1.894-2.827 2.427a.75.75 0 0 1-.538-1.4c1.083-.416 1.708-1.046 2.015-1.68a2.48 2.48 0 0 0 .097-1.954a2.548 2.548 0 0 0-1.278-1.399a7.63 7.63 0 0 1-2.285 4.047c.057.132.114.272.17.424a.75.75 0 1 1-1.423.478a4.67 4.67 0 0 1-1.24.474c-.72.155-1.557.099-2.13-.486c-.865-.886-.818-2.277-.204-3.442c.477-.908 1.323-1.77 2.538-2.413c.06-.614.157-1.298.3-2.064c-.654.014-1.28.002-1.844-.037a.75.75 0 0 1 .102-1.496c.622.042 1.331.05 2.067.024c.116-.472.272-1.067.42-1.512a.75.75 0 0 1 .948-.476m-2.058 7.372c-.546.413-.92.87-1.146 1.3c-.444.843-.289 1.45-.05 1.695c.055.057.258.172.742.068c.345-.074.672-.202.977-.373a7.84 7.84 0 0 1-.386-1.373a9.112 9.112 0 0 1-.137-1.317m1.755 1.66a6.647 6.647 0 0 0 1.413-2.848a4.725 4.725 0 0 0-1.328.25a7.56 7.56 0 0 0-.34.12a8.618 8.618 0 0 0 .113 1.867c.041.227.089.428.142.611"></path></svg>';
 
     function renderSwitcher() {
-        if (!d.body || d.body.className.indexOf('ow-auth-body') < 0) return;   // 只在登录/注册/找回页放切换器
+        // 切换器挂在**登录卡片**右上角（不是页面右上角）：只认 .ow-auth-card，
+        // 没有卡片就不是登录/注册/找回页，直接不渲染。
+        var card = d.querySelector('.ow-auth-body .ow-auth-card');
+        if (!card) return;
         var box = d.getElementById('owLangBox');
         if (!box) {
             box = d.createElement('div');
             box.id = 'owLangBox';
-            box.style.cssText = 'position:fixed;top:12px;right:14px;z-index:400;font-size:14px';
-            d.body.appendChild(box);
+            box.className = 'ow-lang-box';
+            card.appendChild(box);
+        } else if (box.parentNode !== card) {
+            card.appendChild(box);   // 首屏早于卡片渲染时（理论上不会）补挪一次
         }
         var opts = [{ code: 'zh', label: '简体中文' }], i;
         for (i = 0; i < packs.length; i++) opts.push({ code: packs[i].code, label: packs[i].label });
@@ -177,16 +182,16 @@
         box.setAttribute('data-built', opts.length + ':' + (current || ''));
         var btn = d.createElement('button');
         btn.type = 'button';
+        btn.className = 'ow-lang-btn';
         btn.setAttribute('aria-label', 'Language');
-        btn.style.cssText = 'display:inline-flex;align-items:center;gap:4px;border:none;background:transparent;color:var(--ow-text-sub);cursor:pointer;padding:6px;border-radius:6px';
-        btn.innerHTML = GLOBE_SVG + '<span style="font-size:12px">\u25be</span>';
+        btn.innerHTML = GLOBE_SVG + '<span class="ow-lang-caret">\u25be</span>';
         var menu = d.createElement('div');
-        menu.style.cssText = 'display:none;position:absolute;top:36px;right:0;min-width:130px;background:var(--ow-bg,#fff);border:1px solid var(--ow-border,#e4e4e4);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.16);padding:4px;max-height:280px;overflow:auto';
+        menu.className = 'ow-lang-menu';
         for (i = 0; i < opts.length; i++) {
             (function (o) {
                 var it = d.createElement('div');
                 var on = (o.code === (current || 'zh'));
-                it.style.cssText = 'padding:8px 12px;border-radius:6px;cursor:pointer;color:var(--ow-text,#333);' + (on ? 'background:var(--ow-bg-sub,#eef4fb);font-weight:600' : '');
+                it.className = 'ow-lang-item' + (on ? ' ow-lang-on' : '');
                 it.textContent = o.label;
                 it.onclick = function (e) {
                     e && e.stopPropagation && e.stopPropagation();
@@ -199,7 +204,9 @@
         }
         btn.onclick = function (e) {
             e && e.stopPropagation && e.stopPropagation();
-            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+            // ⚠️ 判据只能是「已经开着」：菜单初始隐藏来自 CSS 类，内联 display 是空串，
+            //    写成 === 'none' 会让第一次点击把 display 设成 none —— 表现为点一下没反应。
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
         };
         d.addEventListener('click', function () { menu.style.display = 'none'; });
         box.innerHTML = '';

@@ -6372,7 +6372,7 @@
                             return '<div class="ow-form-item"><label>站点默认语言</label>'
                                 + '<select class="ow-input" id="owS_ow_lang_default">' + opts + '</select>'
                                 + '<p style="font-size:12px;color:var(--ow-text-sub)">只翻译系统界面文字（含提示），聊天消息、昵称、群名等用户内容不翻译。'
-                                + '访客在登录页右上角切换后以自己的选择为准。</p></div>';
+                                + '访客在登录页右上角切换后以自己的选择为准；保存默认语言会清掉你本浏览器的个人选择，立即按新默认显示。</p></div>';
                         })())
 
                         + '<button class="ow-btn ow-btn-primary" onclick="OwAdmin.settingsSave()">保存设置</button>';
@@ -6771,7 +6771,17 @@
                 debug_mode: swv('owS_debug_mode'),
                 // v1.3.44 站点默认语言（语言组未渲染时给空串，后端跳过该键）
                 ow_lang_default: $('owS_ow_lang_default') ? $('owS_ow_lang_default').value : ''
-            }, function (r) { toast(r.msg); });
+            }, function (r) {
+                toast(r.msg);
+                // v1.3.45：本浏览器只要在登录页切换器里选过语言，ow_lang cookie 就盖住后台默认值，
+                // 表现是「后台改了没效果」。管理员刚保存的就是语言项时，清掉这个个人偏好并刷新，
+                // 让改动立刻可见（其他访客浏览器各自的 cookie 不受影响）。
+                var sel = $('owS_ow_lang_default');
+                if (r && r.ok && sel && sel.value !== (document.body.getAttribute('data-lang') || 'zh')) {
+                    document.cookie = 'ow_lang=; path=/; max-age=0';
+                    setTimeout(function () { location.reload(); }, 800);
+                }
+            });
         }
     };
 

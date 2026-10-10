@@ -734,12 +734,25 @@ input[type=range] {
     border: 1px solid var(--ow-border);
     border-radius: 10px;
     padding: 32px 28px;
+    position: relative;   /* v1.3.45：语言切换器挂在卡片右上角，需要卡片做定位父级 */
 }
 .ow-auth-logo { text-align: center; margin-bottom: 24px; }
 .ow-auth-logo img { width: 64px; height: 64px; }
 .ow-auth-logo h1 { font-size: 24px; font-weight: 600; color: var(--ow-text-title); line-height: 1.3; margin-top: 10px; }
 .ow-auth-logo p { font-size: 12px; color: var(--ow-text-sub); }
 .ow-auth-links { display: flex; display: -webkit-flex; justify-content: space-between; -webkit-justify-content: space-between; margin-top: 16px; font-size: 13px; }
+
+/* v1.3.45：登录页语言切换器（地球图标）。
+   定位在 ow-auth-card 内右上角 —— 页面右上角会脱离卡片视觉，看着像浏览器插件。 */
+.ow-lang-box { position: absolute; top: 10px; right: 12px; z-index: 5; }
+.ow-lang-btn { display: inline-flex; align-items: center; gap: 4px; border: none; background: transparent; color: var(--ow-text-sub); cursor: pointer; padding: 6px; border-radius: 6px; line-height: 0; }
+.ow-lang-btn:hover { background: var(--ow-bg-sub); color: var(--ow-text); }
+.ow-lang-caret { font-size: 10px; line-height: 1; }
+.ow-lang-menu { display: none; position: absolute; top: 34px; right: 0; min-width: 132px; background: var(--ow-bg); border: 1px solid var(--ow-border); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.16); padding: 4px; max-height: 280px; overflow: auto; }
+.ow-lang-item { padding: 8px 12px; border-radius: 6px; cursor: pointer; color: var(--ow-text); font-size: 14px; white-space: nowrap; }
+.ow-lang-item:hover { background: var(--ow-bg-sub); }
+/* 选中项：14px 才敢用 600（≤13px 的中文加粗会糊） */
+.ow-lang-item.ow-lang-on { background: var(--ow-bg-sub); font-weight: 600; color: var(--ow-primary); }
 
 /* ==========================================================================
    聊天主界面
