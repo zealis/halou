@@ -33,6 +33,7 @@ require __DIR__ . '/core/mail.php';
 require __DIR__ . '/core/auth.php';
 require __DIR__ . '/core/plugin.php';
 require __DIR__ . '/core/chat.php';
+require __DIR__ . '/core/notice.php';
 require __DIR__ . '/core/upload.php';
 require __DIR__ . '/core/upgrade.php';
 require __DIR__ . '/core/admin.php';
@@ -475,6 +476,12 @@ if ($action !== '') {
             $list = Chat::conversations($actor);
             // total = 会话总数（群聊数 + 私聊会话数），侧栏「聊天」徽标用
             Api::json(['ok' => true, 'data' => $list, 'total' => count($list)]);
+
+        case 'notices':         // v1.3.52 系统通知：取最近通知并整批标为已读（红点随之清零）
+            // 游客没有账号，通知一律按 user_id 存 —— 返回空列表而不是 403，
+            // 免得前端为一个「本来就没有」的状态走错误分支。
+            if (($actor['kind'] ?? '') !== 'user') Api::json(['ok' => true, 'data' => []]);
+            Api::json(['ok' => true, 'data' => Notice::forUser((int)$actor['id'])]);
 
         /* ---------- 私聊会话操作（v1.2.28，右侧栏四个入口的后端） ---------- */
         case 'dm_pin':          // 设为置顶 / 取消置顶（按当前状态取反）
@@ -1348,9 +1355,17 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
     // ⚠️ 按钮的 data-tab 与 switchTab 的面板标识同名；核心只认 chat / friends。
     // ⚠️ 按钮内带 <span class="ow-rail-lb"> 文字标签：桌面隐藏（纯图标条），
     //    窄屏（≤720px）rail 沉底变标签栏时显示 —— 插件注册的入口建议同样带 span。
+    // v1.3.52：通知入口只对**注册用户**开放 —— 通知按 user_id 存，游客没有账号，
+    // 给一个永远点不出内容的标签比不给更容易让人困惑。
+    // 红点数字服务端就渲染出来（首屏即正确，不等 JS 再拉一次），点开通知流后由前端清零。
+    $noticeUnread = ($actor['kind'] ?? '') === 'user' ? Notice::unread((int)($actor['id'] ?? 0)) : 0;
     echo '<nav class="ow-rail" id="owRail">'
        . '<button class="ow-rail-btn is-active" data-tab="chat" type="button" title="消息" aria-label="消息">' . ow_icon('chat', 20) . '<span class="ow-rail-lb">消息</span></button>'
        . '<button class="ow-rail-btn" data-tab="friends" type="button" title="联系人" aria-label="联系人">' . ow_icon('users', 20) . '<span class="ow-rail-lb">联系人</span></button>'
+       . (($actor['kind'] ?? '') === 'user'
+           ? '<button class="ow-rail-btn" data-tab="notice" type="button" title="系统通知" aria-label="系统通知">' . ow_icon('bell', 20) . '<span class="ow-rail-lb">通知</span>'
+             . '<span class="ow-rail-badge" id="owNoticeBadge"' . ($noticeUnread > 0 ? '' : ' style="display:none"') . '>' . $noticeUnread . '</span></button>'
+           : '')
        . Plugin::collect('sidebar.rail')
        . '</nav>';
 
@@ -1370,6 +1385,10 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
        . ow_icon('search', 15) . '<span>搜索</span></button>'
        // 聊天面板（核心两个面板之一是「消息」，另一个是「联系人」）
        . '<ul class="ow-room-list ow-tab-panel is-active" id="owRoomList" data-panel="chat"></ul>'
+       // v1.3.52：系统通知面板。与 #owRoomList 共用 .ow-room-list / .ow-tab-panel 样式，
+       // 里面只有一行「系统通知」会话（内容由前端 loadNotices 渲染），所以初始隐藏、
+       // 显隐统一交给 _paintTabs 管，避免两处各写一份 display 逻辑。
+       . '<ul class="ow-room-list ow-tab-panel" id="owNoticeList" data-panel="notice" style="display:none"></ul>'
        // 插件面板容器：由 OwChat 在切换时创建/复用，插件标签对应的内容挂这里
        . '<div class="ow-tab-panels" id="owSidePanels" style="display:none"></div>'
        . '<div class="ow-me" id="owMe"></div>'
@@ -1480,6 +1499,12 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
             'avatar' => (string)($actor['avatar'] ?? ''),
         ],
         'rooms' => $rooms,
+        // v1.3.52：未读系统通知数。rail 红点与侧栏那一行的徽标首屏就要正确，
+        // 让前端再拉一次接口只会多一个来回（而且点开通知时服务端已顺手全部标读）。
+        'notice_unread' => (int)($noticeUnread ?? 0),
+        // v1.3.52：系统通知的固定头像（小可爱第 36 号）。服务端算一次，
+        // 侧栏那一行与通知流共用 —— 两处各自拼 URL 迟早不一致。
+        'notice_avatar' => ($actor['kind'] ?? '') === 'user' ? Notice::avatarUrl() : '',
         // v1.3.1：游客未点选任何群时下发 0，前端据此禁用输入区（进入后才解锁）
         'room' => $entered ? (int)$first['id'] : 0,
         'site_url' => ow_site_url(),

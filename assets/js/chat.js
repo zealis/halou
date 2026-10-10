@@ -1113,6 +1113,9 @@
 
             this.loadConversations();   // 会话列表（群聊+私聊聚合）——私聊路由要靠它取昵称
             this.renderConversations();
+            // v1.3.52：通知标签的侧栏行首屏就渲染出来（红点数取自 boot，不必等接口）。
+            // 游客没有该标签、#owNoticeList 也不存在，函数内部自行返回。
+            this.renderNoticeRow();
             this.startConvPoll();       // v1.1.0：列表低频轮询，新消息会话自动前置（不打断当前聊天）
             this.bindFocusRead();       // v1.3.19：窗口聚焦时补标当前会话已读
             this.renderMe();
@@ -1884,6 +1887,9 @@
             if (!tab) return;
             if (tab === this.view) return;
             this.view = tab;
+            // 离开通知标签要先还原顶栏：标题、群聊信息按钮、延迟显示都属于房间，
+            // 而它们是被 paintNoticeChrome 藏起来的，不还原就会一直缺着。
+            if (tab !== 'notice') this.exitNotices();
             this._paintTabs();
             if (tab === 'chat') {
                 this.renderConversations();
@@ -1901,6 +1907,9 @@
                 // 顺序不能反 —— 否则名单渲染完又被随后的清理逻辑影响。
                 this.blankChatForFriends();
                 this.loadFriends();
+            } else if (tab === 'notice') {
+                // v1.3.52：系统通知。渲染与拉数据都在 openNotices 里（它会先停掉房间轮询）
+                this.openNotices();
             } else {
                 // 插件标签：把面板容器交给插件自己填
                 this._showExtPanel(tab);
@@ -1921,11 +1930,18 @@
                     else btns[i].className = on ? 'ow-rail-btn is-active' : 'ow-rail-btn';
                 }
             }
-            // 核心面板：只有「消息 / 联系人」两个，共用 #owRoomList
+            // 核心面板：「消息 / 联系人」共用 #owRoomList，「通知」用自己的 #owNoticeList；
+            // 两者都不是插件面板，所以 #owSidePanels 在这三个标签下都要让位。
             var isCore = (this.view === 'chat' || this.view === 'friends');
-            var list = $('owRoomList'), panels = $('owSidePanels');
+            var isNotice = this.view === 'notice';
+            var list = $('owRoomList'), panels = $('owSidePanels'), nlist = $('owNoticeList');
             if (list) list.style.display = isCore ? '' : 'none';
-            if (panels) panels.style.display = isCore ? 'none' : '';
+            if (nlist) {
+                nlist.style.display = isNotice ? '' : 'none';
+                // 面板类名与 #owRoomList 同源（ow-tab-panel is-active），显隐仍由 style 管
+                if (nlist.classList) nlist.classList[isNotice ? 'add' : 'remove']('is-active');
+            }
+            if (panels) panels.style.display = (isCore || isNotice) ? 'none' : '';
         },
 
         /** 插件面板：在 #owSidePanels 里为该标签准备一个容器并回调插件填充 */
@@ -3730,6 +3746,116 @@
             this.applyInputGate('friend');
         },
 
+        /* =====================================================================
+         * 系统通知（v1.3.52）
+         * ---------------------------------------------------------------------
+         * 与「消息 / 联系人」并列的第三个核心标签：侧栏一行「系统通知」会话
+         * （复用 ChatList 与 .ow-room-list 样式，与消息列表同源），主区是**只读**消息流。
+         * 通知按 user_id 存在 notices 表（core/notice.php），游客没有账号，
+         * 所以 index.php 根本不给他这个 rail 按钮。
+         * =================================================================== */
+        noticeMode: false,
+        notices: [],
+
+        /** 侧栏那一行：交给 ChatList 渲染，保证与消息列表逐像素一致 */
+        renderNoticeRow: function () {
+            var box = $('owNoticeList');
+            if (!box) return;
+            var last = (this.notices && this.notices.length) ? this.notices[0] : null;
+            var unread = this.noticeMode ? 0 : ((this.cfg.notice_unread | 0) || 0);
+            ChatList.render([{
+                conv: 'dm', peer: 'notice', name: '系统通知',
+                // v1.3.52：固定头像「小可爱第36号」，由服务端算好下发（Notice::avatarUrl）
+                avatar: this.cfg.notice_avatar || '',
+                last_at: last ? (last.created_at | 0) : 0,
+                last_text: last ? String(last.body || '') : '暂无系统通知',
+                unread: unread
+            }], {
+                container: 'owNoticeList',
+                activeKey: this.noticeMode ? 'dm:notice' : '',
+                onClick: function () { OwChat.openNotices(); }
+            });
+        },
+
+        /** 进入通知模式：先停掉群聊/私聊长轮询，再把主区换成通知流 */
+        openNotices: function () {
+            var self = this;
+            if (!this.noticeMode) {
+                this._titleBefore = ($('owRoomName') || {}).textContent || '';
+                this.noticeMode = true;
+            }
+            // 世代号 +1 让在飞的轮询自己作废（与 blankChatForFriends 同一手法）
+            this.pollGen = (this.pollGen || 0) + 1;
+            this.dmGen = (this.dmGen || 0) + 1;
+            this._roomPollRunning = false;
+            this.dm = null; this.room = 0; this.since = 0;
+            this.historyDone = true;          // 通知流没有「上滚加载更早」
+            this.loadingHistory = false;
+            ChatList.activate('owRoomList', '');
+            this.renderNoticeRow();
+            this.paintNoticeChrome(true);
+            this.applyInputGate('notice');
+            var box = $('owMessages');
+            if (box) box.innerHTML = '<div class="ow-notice-pending">加载中…</div>';
+            OwApi.post('notices', {}, function (r) {
+                self.notices = (r && r.ok && r.data) ? r.data : [];
+                self.renderNoticeStream();
+                // 服务端在返回时就整批标已读了，红点必须跟着清零
+                self.cfg.notice_unread = 0;
+                self.clearNoticeBadge();
+                self.renderNoticeRow();
+            });
+        },
+
+        /** 离开通知标签：还回顶栏那几样与房间绑定的控件，并清掉通知态 */
+        exitNotices: function () {
+            if (!this.noticeMode) return;
+            this.noticeMode = false;
+            this.paintNoticeChrome(false);
+            var n = $('owRoomName');
+            if (n && this._titleBefore != null) n.textContent = this._titleBefore;
+        },
+
+        /** 顶栏联动：通知态收起「群聊信息」按钮与延迟显示（它们都属于某个房间） */
+        paintNoticeChrome: function (on) {
+            var p = $('owTogglePanel'); if (p) p.style.display = on ? 'none' : '';
+            var l = $('owLatency'); if (l) l.style.display = on ? 'none' : '';
+            var n = $('owRoomName');
+            if (n && on) n.textContent = '系统通知';
+        },
+
+        /** 主区通知流：旧→新（与消息流同向），普通气泡 + 元信息，不用 .system 那套弱化样式 */
+        renderNoticeStream: function () {
+            var box = $('owMessages');
+            if (!box) return;
+            var rows = (this.notices || []).slice().reverse(), h = '', i, r;
+            var av = this.cfg.notice_avatar || '';
+            if (!rows.length) {
+                box.innerHTML = '<div class="ow-notice-pending">暂无系统通知</div>';
+                return;
+            }
+            for (i = 0; i < rows.length; i++) {
+                r = rows[i];
+                // 头像用 .ow-msg-av（它负责排版），但通知没有资料卡可看，
+                // 可点暗示与悬停反馈由 CSS 的 .ow-msg-notice 规则关掉。
+                h += '<div class="ow-msg ow-msg-notice">'
+                   + (av ? '<span class="ow-msg-av">' + avatarHtml(av, '系统通知') + '</span>' : '')
+                   + '<div class="ow-msg-body">'
+                   + '<div class="ow-msg-meta"><span class="ow-msg-nick ow-notice-nick">系统通知</span>'
+                   + '<span class="ow-msg-time">' + esc(ChatList.time(r.created_at | 0)) + '</span></div>'
+                   + '<span class="ow-msg-content">' + esc(r.body || '') + '</span>'
+                   + '</div></div>';
+            }
+            box.innerHTML = h;
+            box.scrollTop = box.scrollHeight;
+        },
+
+        /** rail 红点：进入通知流后清零（服务端已把整批标为已读） */
+        clearNoticeBadge: function () {
+            var b = $('owNoticeBadge');
+            if (b) { b.textContent = '0'; b.style.display = 'none'; }
+        },
+
         /**
          * 输入区闸门（v1.2.29 统一入口）。此前只有 applyJoinGate 一条路，
          * 现在要覆盖三种「不能发」的原因，抽成一处，避免多路径互相覆盖。
@@ -3760,6 +3886,13 @@
                 return;
             }
             input.disabled = true;
+            // v1.3.52：系统通知是**单向**的 —— 账号安全事件不需要回复入口。
+            // 这里只禁用不隐藏：保留输入区高度，切回普通会话时布局不跳。
+            if (kind === 'notice') {
+                if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+                input.placeholder = '系统通知不能回复';
+                return;
+            }
             if (kind === 'join') {
                 if (box) {
                     box.innerHTML = '<span>你还没有加入该群聊，加入后即可发言</span>'

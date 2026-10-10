@@ -261,6 +261,14 @@ class DB
             // peer_key 与 conversation_pins 同口径：'room:5' / 'dm:user:20'。
             "CREATE TABLE IF NOT EXISTS conversation_reads (
                 id $id, user_id $int NOT NULL, peer_key $str NOT NULL, last_id $int NOT NULL DEFAULT 0, updated_at $ts NOT NULL)",
+            // 系统通知（v1.3.52）：**按用户**存，绝不复用 rooms/messages ——
+            // 密码修改、封禁解封这类内容属于账号隐私，放进全局房间会让 A 看到 B 的通知。
+            // kind 是事件类型（pwd / email / twofa_on / twofa_off / locked / banned / unbanned），
+            // 前端按它挑图标；body 存成品文案，避免把中文文案散到 JS 里。
+            // read_at=0 表示未读，用于 rail 上的红点计数。
+            "CREATE TABLE IF NOT EXISTS notices (
+                id $id, user_id $int NOT NULL, kind $str NOT NULL DEFAULT 'system',
+                body $text, created_at $ts NOT NULL, read_at $int NOT NULL DEFAULT 0)",
         ];
         foreach ($tables as $sql) self::$pdo->exec($sql);
 
@@ -277,6 +285,8 @@ class DB
             // 同一用户对同一会话只能置顶一次，重复点由代码先查后写，这里兜底防重行
             'CREATE UNIQUE INDEX IF NOT EXISTS idx_conv_pins_key ON conversation_pins (user_id, peer_key)',
             'CREATE UNIQUE INDEX IF NOT EXISTS idx_conv_reads_key ON conversation_reads (user_id, peer_key)',
+            // 通知永远是「按用户取最近 N 条」和「按用户数未读」，没有跨用户查询
+            'CREATE INDEX IF NOT EXISTS idx_notices_user ON notices (user_id, id)',
         ] as $sql) {
             try { self::$pdo->exec($sql); } catch (Throwable $e) { /* MySQL 8 不支持 IF NOT EXISTS，忽略 */ }
         }

@@ -35,10 +35,12 @@
     var SKIP_TAGS_TEXT = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, PRE: 1, CODE: 1, KBD: 1, SAMP: 1, NOSCRIPT: 1, TEMPLATE: 1 };
     var SKIP_TAGS_ATTR = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEMPLATE: 1 };
     var SKIP_SEL = '#owMessages,#owRoomList,#owOnlineList';   // 用户内容密集区：消息流/会话列表/成员列表
-    // 用户内容区里唯一的系统文字：消息行的身份角标（群主/会员/管理员）。
+    // 用户内容区里的系统文字白名单：① 消息行身份角标（群主/会员/管理员）；
+    // ② 系统通知流的正文与署名（v1.3.52 —— 通知正文由服务端从固定文案表生成，
+    //    永远不是用户输入，所以可以和角标同等放行）。
     // 放行按**父元素 class** 判定，消息正文 .ow-msg-content 不在名单内，
     // 所以「会员」作为消息内容发出去也不会被改。
-    var RESCUE_SEL = '.ow-tag';
+    var RESCUE_SEL = '.ow-tag, .ow-msg-notice .ow-msg-content, .ow-notice-nick';
     var ATTRS = ['placeholder', 'title', 'aria-label'];
 
     function trim(s) { return String(s == null ? '' : s).replace(/^\s+|\s+$/g, ''); }

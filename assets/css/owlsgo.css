@@ -1519,6 +1519,19 @@ input[type=range] {
    与「撤回」同款虚线弱化样式——两者都表示「这里原本有内容但现在不可见」，
    文案不同（该消息已删除 / 此消息已撤回）以区分是管理删除还是用户撤回。 */
 .ow-msg.deleted .ow-msg-content { background: transparent; border: 1px dashed var(--ow-border); color: var(--ow-text-sub); font-size: 12px; }
+/* v1.3.52：系统通知流。通知不是聊天，但也不该长得像「撤回/删除」那种弱化占位，
+   所以走正常气泡，只把「系统通知」这个署名压成副文本色，与真人昵称区分开。 */
+.ow-msg-notice .ow-msg-nick { color: var(--ow-text-sub); font-weight: 400; }
+/* 通知没有资料卡：去掉从普通消息继承来的可点暗示（.ow-msg-av 的 cursor/hover、
+   .ow-msg-meta .ow-msg-nick 的 cursor），否则会诱导用户去点一个点不动的东西。 */
+.ow-msg-notice .ow-msg-av,
+.ow-msg-notice .ow-msg-nick { cursor: default; }
+.ow-msg-notice .ow-msg-av:hover { opacity: 1; }
+/* 时间必须常显：安全事件要能对上时刻。普通消息是「悬停满 2 秒才显示」
+   （.ow-msg-meta .ow-msg-time { display:none }），那套交互对通知不成立。 */
+.ow-msg-notice .ow-msg-time { display: inline; }
+/* 空态与加载态：消息区里的一条居中小字 */
+.ow-notice-pending { text-align: center; color: var(--ow-text-sub); font-size: 12px; padding: 24px 8px; }
 /* v1.2.13：图片 / 文件消息的**无气泡容器**（取代 .ow-msg-content）。
    去掉白色底座后，靠这三点保证观感不塌：
      1. overflow:hidden —— 图片按气泡圆角裁切，不出现方形硬角外露

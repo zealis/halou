@@ -296,6 +296,9 @@ class Auth
         if (!Mailer::verifyCode($email, 'reset', $code)) return [false, '验证码错误或已过期'];
         DB::run('UPDATE users SET password=? WHERE id=?', [password_hash($password, PASSWORD_DEFAULT), $user['id']]);
         Sec::log('reset_password', $user['nickname']);
+        // v1.3.52：账号安全事件留痕。改密码后原会话仍然有效（不强制下线是既有行为），
+        // 所以站内通知是用户察觉「密码被人动过」的唯一途径。
+        Notice::push((int)$user['id'], 'pwd');
         return [true, '密码已重置，请重新登录'];
     }
 

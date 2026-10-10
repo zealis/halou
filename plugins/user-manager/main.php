@@ -114,6 +114,10 @@ Plugin::route('plugin_user_manager_status', function (array $ctx) use ($umGuard)
         Api::json(['ok' => false, 'msg' => '超级管理员（1 号账号）不可禁用']);
     }
     DB::run('UPDATE users SET status=? WHERE id=?', [$status, $id]);
+    // v1.3.52：封禁/解封要让用户本人知道。被禁用的人登不进来，看不到这条 ——
+    // 但解封后他会进站，那条 banned 记录连同 unbanned 一起出现在通知里，
+    // 正好构成一段完整的账号处置留痕。
+    Notice::push($id, $status === 1 ? 'unbanned' : 'banned');
     Api::json(['ok' => true, 'msg' => '已更新']);
 });
 Plugin::sensitive('plugin_user_manager_status');   // 禁用账号：敏感（v1.0.91）

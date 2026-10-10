@@ -293,6 +293,19 @@
         '按 GitHub 仓库逐文件比对，只更新有差异的代码文件。保护路径永不动：core/config.php、data/、uploads/；覆盖前自动备份到 data/backup/，可一键恢复。需服务器能访问 api.github.com；搬入阶段文件瞬时替换，避开高峰操作。': 'Compares the GitHub repository file by file and updates only what differs. Protected paths are never touched: core/config.php, data/, uploads/. Before overwriting, a backup goes to data/backup/ for one-click restore. Requires outbound access to api.github.com; files swap momentarily during the move, so avoid busy hours.',
         '只翻译系统界面文字（含提示），聊天消息、昵称、群名等用户内容不翻译。访客在登录页右上角切换后以自己的选择为准；保存默认语言会清掉你本浏览器的个人选择，立即按新默认显示。': 'Translates interface text and notices only — messages, nicknames and room names stay as written. A visitor who switches language on the sign-in page keeps their own choice; saving a default here clears this browser’s personal choice so the new default shows at once.',
 
+        /* ---------- system notices (v1.3.52) ---------- */
+        '通知': 'Notices',
+        '系统通知': 'System notice',
+        '暂无系统通知': 'No system notices yet',
+        '加载中…': 'Loading…',
+        '系统通知不能回复': 'System notices cannot be replied to',
+        '你的登录密码已修改。如果不是你本人操作，请立即再次修改密码并检查账号安全。': 'Your login password was changed. If this wasn’t you, change it again right away and review your account security.',
+        '你的账号邮箱已修改。如果不是你本人操作，请立即联系管理员。': 'Your account email was changed. If this wasn’t you, contact an administrator right away.',
+        '两步验证已开启，之后登录需要输入动态验证码。': 'Two-factor authentication is now on; signing in will require a one-time code.',
+        '两步验证已关闭，登录不再需要动态验证码。': 'Two-factor authentication is now off; signing in no longer needs a one-time code.',
+        '你的账号已被管理员封禁，暂时无法登录与发言。': 'Your account was suspended by an administrator. You cannot sign in or post for now.',
+        '你的账号已被解封，可以正常登录与发言。': 'Your account suspension was lifted. You can sign in and post again.',
+
         /* ---------- server API messages (routed through OwI18n.t in the toast) ---------- */
         '需要管理员权限': 'Admin permission required',
         '请先登录': 'Sign in first',

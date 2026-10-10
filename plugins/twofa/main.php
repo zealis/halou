@@ -267,6 +267,7 @@ Plugin::route('plugin_twofa_enable', function (array $ctx) use ($twofaUserGuard)
     ], ['user_id']);
     unset($_SESSION['twofa_setup_secret']);
     Sec::log('twofa_enable', $actor['nickname'], ['uid' => $uid]);
+    Notice::push($uid, 'twofa_on');   // v1.3.52 账号安全事件站内留痕
     Api::json(['ok' => true, 'recovery_codes' => $plain]);
 });
 
@@ -282,6 +283,7 @@ Plugin::route('plugin_twofa_disable', function (array $ctx) use ($twofaUserGuard
     }
     DB::run('UPDATE plugin_twofa SET enabled=0, secret=?, recovery_codes=? WHERE user_id=?', ['', '[]', $uid]);
     Sec::log('twofa_disable', $actor['nickname'], ['uid' => $uid]);
+    Notice::push($uid, 'twofa_off');   // v1.3.52：关闭 2FA 是高风险动作，必须让本人看得到
     Api::json(['ok' => true, 'msg' => '两步验证已关闭']);
 });
 Plugin::sensitive('plugin_twofa_disable');   // 关闭两步验证：敏感（v1.0.91）
