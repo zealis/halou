@@ -18,6 +18,15 @@ class DB
             case 'mysql':
                 $dsn = "mysql:host={$db['host']};port={$db['port']};dbname={$db['name']};charset={$db['charset']}";
                 self::$pdo = new PDO($dsn, $db['user'], $db['pass'], self::opts());
+                // 存储引擎必须在**连接层**钉死。phpStudy 的 my.ini 常把 default-storage-engine
+                // 设成 MyISAM，而本项目所有建表语句都不带 ENGINE 子句 → 表会整片落到 MyISAM 上。
+                // 后果有两层，第二层才致命：
+                //  ① MyISAM 索引上限 1000 字节，rate_limits 的主键 (bucket, ident) = 191×4×2 = 1528
+                //     → 建表直接 1071（InnoDB 是 767 / DYNAMIC 下 3072）；
+                //  ② **MyISAM 不支持事务**：安装的 beginTransaction()、消息与附件的多表写入会被
+                //     静默忽略，「装一半」的保护等于没有，而且不报错、看不出来。
+                // 会话层设一次就覆盖核心与所有插件的 DDL，不必给每条建表拼 ENGINE=InnoDB。
+                self::$pdo->exec('SET SESSION default_storage_engine=InnoDB');
                 break;
             case 'pgsql':
                 $dsn = "pgsql:host={$db['host']};port={$db['port']};dbname={$db['name']}";
@@ -338,6 +347,22 @@ class DB
                 body $text, params $text, created_at $ts NOT NULL, read_at $int NOT NULL DEFAULT 0)",
         ];
         foreach ($tables as $sql) self::$pdo->exec($sql);
+
+        // v1.3.61：把历史上落成 MyISAM 的表就地转成 InnoDB（自愈，不需要重建库）。
+        // 上面那条 SET 只影响**之后**的建表；这次迁移之前已经建好的表还是 MyISAM，
+        // 而 CREATE TABLE IF NOT EXISTS 不会动它们 —— 不转就会留下「一半支持事务、一半不支持」
+        // 的库，比全是 MyISAM 更难查。information_schema 这条查询很便宜，且正常情况下返回 0 行。
+        if (self::$driver === 'mysql') {
+            $myisam = self::all(
+                "SELECT table_name AS t FROM information_schema.tables
+                 WHERE table_schema=DATABASE() AND engine='MyISAM'"
+            );
+            foreach ($myisam as $row) {
+                $t = (string)($row['t'] ?? '');
+                if ($t === '' || !preg_match('/^[a-zA-Z0-9_]+$/', $t)) continue;   // 只认本项目风格的表名
+                self::$pdo->exec('ALTER TABLE `' . $t . '` ENGINE=InnoDB');
+            }
+        }
 
         // v1.3.56：存量库补 notices.params —— 通知改存「kind + 参数」，body 只作渲染快照。
         // 为什么两样都留：params 让语言包能翻译模板（动态文案拼成整句就永远匹配不上字典），
