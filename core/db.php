@@ -527,6 +527,13 @@ class DB
     {
         if (self::hasColumn($table, $col)) return;
         $t = self::t($type);
+        // MySQL 的 TEXT/BLOB/JSON **不能有默认值**（1101），而且给已有行的表加
+        // NOT NULL 列还会报 1364/1138 —— 所以大字段一律退化成可空无默认。
+        // 与 DB::textCol() 同一口径：读取侧本来就都是 (string) 强转。
+        if (self::$driver === 'mysql' && preg_match('/^(TEXT|BLOB|MEDIUMTEXT|LONGTEXT|TINYTEXT|JSON)$/i', $t)) {
+            self::$pdo->exec("ALTER TABLE $table ADD COLUMN $col $t NULL");
+            return;
+        }
         self::$pdo->exec("ALTER TABLE $table ADD COLUMN $col $t NOT NULL DEFAULT $default");
     }
 
