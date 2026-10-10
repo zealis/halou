@@ -387,7 +387,9 @@
     function jsAttr(s) { return esc(JSON.stringify(String(s == null ? '' : s))); }
     function toast(msg, ms) {
         var t = $('owToast'); if (!t) return;
-        t.innerHTML = esc(msg); t.style.display = 'block';
+        // v1.3.44：提示文案过 i18n 词典（精确命中才替换）——API 返回的中文 msg
+        // 也能被语言包覆盖，不用改任何接口的服务端文案。
+        t.innerHTML = esc(w.OwI18n ? OwI18n.t(msg) : msg); t.style.display = 'block';
         clearTimeout(t._tm);
         t._tm = setTimeout(function () { t.style.display = 'none'; }, ms || 2200);
     }
@@ -6357,6 +6359,22 @@
                             + '需服务器能访问 api.github.com；搬入阶段文件瞬时替换，避开高峰操作。</p></div>'
                             + '<div id="owUpdPanel" class="ow-card" style="display:none;margin:6px 0 12px"></div>')
 
+                        /* ---------- ⑥ 语言（v1.3.44）----------
+                           选项来自 OwI18n.list()（语言包插件 register 注入），
+                           没装任何语言包时只有「简体中文」一项，功能自然隐身。 */
+                        + sec('语言', (function () {
+                            var langs = (w.OwI18n && w.OwI18n.list) ? w.OwI18n.list() : [];
+                            var cur = (d.ow_lang_default === undefined || d.ow_lang_default === '') ? 'zh' : d.ow_lang_default;
+                            var opts = '<option value="zh"' + (cur === 'zh' ? ' selected' : '') + '>简体中文（默认，不翻译）</option>';
+                            for (var li = 0; li < langs.length; li++) {
+                                opts += '<option value="' + esc(langs[li].code) + '"' + (cur === langs[li].code ? ' selected' : '') + '>' + esc(langs[li].label) + '</option>';
+                            }
+                            return '<div class="ow-form-item"><label>站点默认语言</label>'
+                                + '<select class="ow-input" id="owS_ow_lang_default">' + opts + '</select>'
+                                + '<p style="font-size:12px;color:var(--ow-text-sub)">只翻译系统界面文字（含提示），聊天消息、昵称、群名等用户内容不翻译。'
+                                + '访客在登录页右上角切换后以自己的选择为准。</p></div>';
+                        })())
+
                         + '<button class="ow-btn ow-btn-primary" onclick="OwAdmin.settingsSave()">保存设置</button>';
 
                     // 开关视觉同步（is-on 类）：新增 DOM 后必须调，轨道才有开/关配色
@@ -6750,7 +6768,9 @@
                 login_lock_minutes: $('owS_login_lock_minutes') ? $('owS_login_lock_minutes').value : '',
                 sound_default: swv('owS_sound_default'),
                 // v1.2.51 调试模式（v1.2.52 起也是开关）
-                debug_mode: swv('owS_debug_mode')
+                debug_mode: swv('owS_debug_mode'),
+                // v1.3.44 站点默认语言（语言组未渲染时给空串，后端跳过该键）
+                ow_lang_default: $('owS_ow_lang_default') ? $('owS_ow_lang_default').value : ''
             }, function (r) { toast(r.msg); });
         }
     };

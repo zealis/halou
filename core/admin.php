@@ -466,7 +466,9 @@ class Admin
                           // v1.1.14：普通用户能否创建不公开群聊（管理员始终可）
                           'room_private_create_allow',
                           // v1.2.51 调试模式：开 = 记录 debug 级日志 + 出错页显示详细报错（排错用，勿常开）
-                          'debug_mode'];
+                          'debug_mode',
+                          // v1.3.44 站点默认语言（语言包插件注册可选项；zh=不翻译）
+                          'ow_lang_default'];
                 // 数值型设置统一收敛为非负整数：负数会让间隔/保留期这类
                 // 「窗口秒数」「天数」直接失效或行为诡异，前端输入框挡不住。
                 $intKeys = ['guest_msg_interval', 'msg_retain_days'];

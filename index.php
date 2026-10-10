@@ -1138,6 +1138,17 @@ function ageFieldHtml(): string
         . '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">注册需年满 ' . $min . ' 周岁（按出生日期精确计算）。</p></div>';
 }
 
+/** 页面语言（v1.3.44）：cookie ow_lang（登录页切换器写）优先，回落后台默认语言。
+ *  只输出合法 code；zh 或非法值 = 不翻译。实际翻译由 assets/js/i18n.js 引擎 + 语言包插件完成。
+ *  ⚠️ 「没带 cookie」和「cookie 里写的是 zh」是两回事：后者是访客在切换器里**主动选了中文**，
+ *     若一并回落到后台默认语言，站点默认设成英文后就没有任何访客能切回中文。 */
+function ow_lang(): string
+{
+    $c = isset($_COOKIE['ow_lang']) ? trim((string)$_COOKIE['ow_lang']) : '';
+    if ($c === '') $c = trim((string)DB::setting('ow_lang_default', 'zh'));
+    return preg_match('/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/', $c) ? $c : 'zh';
+}
+
 function pageHead(string $title): void
 {
     // 动态页禁止缓存：页面内含会话密钥，缓存旧页会导致提交时签名对不上
@@ -1215,7 +1226,7 @@ function renderAuth(string $mode): void
 {
     pageHead(['login' => '登录', 'register' => '注册', 'forgot' => '找回密码'][$mode]);
     $titles = ['login' => '欢迎回来', 'register' => '创建账号', 'forgot' => '找回密码'];
-    echo '<body class="ow-auth-body"><div class="ow-auth-card">'
+    echo '<body class="ow-auth-body" data-lang="' . ow_lang() . '"><div class="ow-auth-card">'
        . '<div class="ow-auth-logo"><img src="assets/img/logo.svg" alt="Owlsgo-Chat"><h1>' . $titles[$mode] . '</h1>'
        . '<p>' . Sec::e(DB::setting('site_name', 'Owlsgo-Chat')) . '</p></div>';
     if ($mode === 'login') {
@@ -1262,7 +1273,8 @@ function renderAuth(string $mode): void
            . '<button class="ow-btn ow-btn-primary ow-btn-block" type="submit">重置密码</button><div class="ow-form-msg"></div></form>'
            . '<div class="ow-auth-links"><a href="?page=login">返回登录</a></div>';
     }
-    echo '</div><script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>'
+    echo '</div><script src="assets/js/i18n.js?v=' . OWLSGO_VERSION . '"></script>'
+       . '<script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>'
        . '<script>OwAuth.init(' . json_encode(['key' => Sec::anonKey(), 'ts' => time()]) . ');</script>';
     Plugin::fire('page.footer');
     echo '</body></html>';
@@ -1297,7 +1309,7 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
         ) ? '1' : '0',
     ];
     pageHead('群聊');
-    echo '<body class="ow-chat-body">';
+    echo '<body class="ow-chat-body" data-lang="' . ow_lang() . '">';
     echo '<div class="ow-layout">';
 
     // ---------- 顶部品牌条（v1.3.6） ----------
@@ -1471,7 +1483,8 @@ function renderChat(array $actor, ?array $user, ?array $guest): void
     //    不标记的话聊天页会**加载两遍**合并包 —— 插件 JS 跑两次，
     //    凡「往数组里注册」的扩展点（onCardMetaTop 等）都会重复注册一行。
     define('OWLSGO_ASSETS_JS_EMITTED', true);
-    echo '<script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>'
+    echo '<script src="assets/js/i18n.js?v=' . OWLSGO_VERSION . '"></script>'
+       . '<script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>'
        . '<script>OwChat.init(' . json_encode($boot, JSON_UNESCAPED_UNICODE) . ');</script>'
        . '<script src="?action=assets&type=js"></script>';
     Plugin::fire('page.footer');
@@ -1509,7 +1522,7 @@ function renderAdmin(array $actor): void
     // ⚠️ 同 renderChat()：标记「合并资源已输出」，阻止插件在 page.footer 里再补一份
     //    （否则后台页也会把插件 JS 跑两遍）。用 if 包裹避免同请求内重复 define 报警告。
     if (!defined('OWLSGO_ASSETS_JS_EMITTED')) define('OWLSGO_ASSETS_JS_EMITTED', true);
-    echo '<body class="ow-admin-body">'
+    echo '<body class="ow-admin-body" data-lang="' . ow_lang() . '">'
        // 移动端顶栏：汉堡开关 + 标题 + 返回前台（桌面端隐藏，侧栏常驻）
        . '<div class="ow-admin-bar">'
        . '<button class="ow-icon-btn" id="owAdminToggle" aria-label="菜单">' . ow_icon('menu') . '</button>'
@@ -1537,6 +1550,7 @@ function renderAdmin(array $actor): void
        // 移动端抽屉遮罩：点空白收起侧栏（桌面端不显示）
        . '<div class="ow-admin-mask" id="owAdminMask" style="display:none"></div>'
        . '<div class="ow-toast" id="owToast" style="display:none"></div>'
+       . '<script src="assets/js/i18n.js?v=' . OWLSGO_VERSION . '"></script>'
        . '<script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>'
        // 插件注册的 JS 资源合并输出（用户管理等插件的后台交互脚本）
        . '<script src="?action=assets&type=js"></script>'
