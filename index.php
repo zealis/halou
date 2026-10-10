@@ -408,7 +408,20 @@ if ($action !== '') {
             if ($lockSec > 0) {
                 Api::json(['ok' => false, 'msg' => '失败次数过多，已临时锁定 ' . (int)ceil($lockSec / 60) . ' 分钟', 'locked' => true]);
             }
-            if (Sec::needCaptcha($key)) {
+            // v1.3.54：人机验证插件接管时，先做服务端二次校验。
+            // 顺序很关键：必须排在图形码判定**之前** —— 接管状态下那一行根本没渲染，
+            // 再要求用户填一个界面上不存在的框就把人彻底锁死在登录页了。
+            $cvTakenOver = Plugin::collect('captcha.takeover') === '1';
+            if ($cvTakenOver) {
+                $cvOk = true; $cvMsg = '';
+                Plugin::fire('captcha.enforce', [&$cvOk, &$cvMsg, ['scene' => 'login', 'post' => $_POST]]);
+                if (!$cvOk) {
+                    // 与「图形码填错」同口径计入失败，保证锁定依然可达（否则可以无限试密码）
+                    Sec::loginFail($key);
+                    Api::json(['ok' => false, 'msg' => $cvMsg !== '' ? $cvMsg : '请先完成人机验证']);
+                }
+            }
+            if (!$cvTakenOver && Sec::needCaptcha($key)) {
                 $code = $p('captcha');
                 if ($code === '') {
                     Sec::loginFail($key);   // 验证码为空同样计入失败，保证锁定可达
@@ -422,7 +435,7 @@ if ($action !== '') {
             [$ok, $msg] = Auth::login($identity, (string)($_POST['password'] ?? ''));
             Api::json([
                 'ok' => $ok, 'msg' => $msg,
-                'captcha' => !$ok && Sec::needCaptcha($key),
+                'captcha' => !$cvTakenOver && !$ok && Sec::needCaptcha($key),
                 'locked' => !$ok && Sec::lockSeconds($key) > 0,
             ]);
 
@@ -1256,13 +1269,19 @@ function renderAuth(string $mode): void
         $regTip = isset($_GET['registered'])
             ? '<p style="color:var(--ow-green);font-size:13px;margin:0 0 10px">注册成功，请使用注册邮箱或用户 ID 登录。</p>'
             : '';
+        // v1.3.54：人机验证插件（captcha-verify）接管时，SVG 图形码那一行**整块不输出**
+        // —— 不是 display:none。留着它会让前端仍有机会提交 captcha 字段，
+        // 而服务端已经改由插件判定，两边口径不一致。
+        // 组件非空即代表插件已启用且配置齐全（判定在插件的 owCVActive() 里）。
+        $cvHtml = Plugin::collect('captcha.form', [['scene' => 'login']]);
         echo '<form class="ow-auth-form" data-mode="login">'
            . $regTip
            . Sec::signField(Sec::anonKey(), 'login')
            . '<div class="ow-form-item"><label>邮箱或用户 ID</label><input class="ow-input" name="identity" required autocomplete="username" placeholder="注册邮箱或用户 ID"></div>'
            . '<div class="ow-form-item"><label>密码</label><input class="ow-input" type="password" name="password" required autocomplete="current-password"></div>'
-           . '<div class="ow-form-item" id="owCaptchaRow" style="display:none"><label>图形验证码</label>'
-           . '<div class="ow-captcha-row"><input class="ow-input" name="captcha"><img src="?action=captcha" id="owCaptchaImg" alt="验证码" title="点击刷新"></div></div>'
+           . ($cvHtml !== '' ? $cvHtml
+               : '<div class="ow-form-item" id="owCaptchaRow" style="display:none"><label>图形验证码</label>'
+                 . '<div class="ow-captcha-row"><input class="ow-input" name="captcha"><img src="?action=captcha" id="owCaptchaImg" alt="验证码" title="点击刷新"></div></div>')
            . '<button class="ow-btn ow-btn-primary ow-btn-block" type="submit">登 录</button><div class="ow-form-msg"></div></form>'
            . '<div class="ow-auth-links"><a href="?page=register">注册账号</a><a href="?page=forgot">忘记密码</a><a href="?page=chat">返回聊天</a></div>';
     } elseif ($mode === 'register') {
@@ -1296,8 +1315,16 @@ function renderAuth(string $mode): void
            . '<div class="ow-auth-links"><a href="?page=login">返回登录</a></div>';
     }
     echo '</div><script src="assets/js/i18n.js?v=' . OWLSGO_VERSION . '"></script>'
-       . '<script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>'
-       . '<script>OwAuth.init(' . json_encode(['key' => Sec::anonKey(), 'ts' => time()]) . ');</script>';
+       . '<script src="assets/js/chat.js?v=' . OWLSGO_VERSION . '"></script>';
+    // v1.3.54：登录页也要加载插件 JS 包 —— 人机验证组件（captcha-verify 的 widget.js）
+    // 就跑在这包里。此前只有聊天页与后台加载它，登录页拿不到，
+    // 之前是靠 lang-en 插件的 page.footer 顺带注入的（那个插件一停用就断）。
+    // 打上标记，插件自己的 page.footer 注入会被它自己的 define 判断跳过，不会重复加载。
+    if (!defined('OWLSGO_ASSETS_JS_EMITTED')) {
+        define('OWLSGO_ASSETS_JS_EMITTED', true);
+        echo '<script src="?action=assets&type=js"></script>';
+    }
+    echo '<script>OwAuth.init(' . json_encode(['key' => Sec::anonKey(), 'ts' => time()]) . ');</script>';
     Plugin::fire('page.footer');
     echo '</body></html>';
 }

@@ -43,8 +43,11 @@ class Upgrade
      * HTTPS 校验会报 "unable to get local issuer certificate"。
      * 按序找：php.ini 配置 → PHP 自带 extras → Git for Windows 的 Mozilla CA 包 → Linux 系统路径。
      * 全找不到就返回 null 走系统默认 —— 绝不关闭校验（下载的是代码）。
+     *
+     * v1.3.54 起 public：人机验证插件（captcha-verify）也要发 HTTPS 请求，
+     * 复用同一份发现结果 —— 两处各写一套 CA 查找，迟早有一边悄悄不验证书。
      */
-    private static function caBundle(): ?string
+    public static function caBundle(): ?string
     {
         static $found = false;
         static $path = null;

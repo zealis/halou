@@ -400,7 +400,33 @@
         '请先填写色系名称': 'Give the scheme a name first',
         '色系保存失败，请检查颜色值': 'Could not save the scheme — check the colour values',
         '自建色系已达 20 个上限，删除后才能再加。': 'Custom schemes are capped at 20 — delete one to add another.',
-        '内置 6 套 + 自建（最多 20 个），只改界面配色、不动消息内容，且仅对本浏览器生效。深色档下主色会自动提到可读亮度，所以同一色系在深浅两档看起来不完全一样。删除正在使用的色系会回到经典蓝。': 'Six built-in schemes plus up to 20 custom ones. Only interface colours change — messages are untouched, and the choice lives in this browser. In dark mode the brand colour is lifted to a readable brightness, so the same scheme looks different between the two modes. Deleting the scheme in use falls back to Classic blue.'
+        '内置 6 套 + 自建（最多 20 个），只改界面配色、不动消息内容，且仅对本浏览器生效。深色档下主色会自动提到可读亮度，所以同一色系在深浅两档看起来不完全一样。删除正在使用的色系会回到经典蓝。': 'Six built-in schemes plus up to 20 custom ones. Only interface colours change — messages are untouched, and the choice lives in this browser. In dark mode the brand colour is lifted to a readable brightness, so the same scheme looks different between the two modes. Deleting the scheme in use falls back to Classic blue.',
+
+        /* ---------- human verification plugin (captcha-verify, v1.3.54) ---------- */
+        '人机验证': 'Human verification',
+        '服务端二次验证': 'Server-side verification',
+        '关闭（用系统图形码）': 'Off (use the built-in image code)',
+        '开启（取代图形码）': 'On (replaces the image code)',
+        '验证服务商': 'Provider',
+        '极验 Geetest v4': 'GeeTest v4',
+        '实例地址': 'Instance URL',
+        '组件脚本地址': 'Widget script URL',
+        '验证单元 VID': 'Unit VID',
+        '验证单元 KEY': 'Unit KEY',
+        '测试校验连通性': 'Test connectivity',
+        '切换到此服务商需重新填写': 'Fill again to switch to this provider',
+        '请先完成人机验证': 'Please complete the human verification first',
+        '人机验证未正确配置，请联系管理员': 'Human verification is not configured correctly — please contact an administrator',
+        '人机验证组件加载失败，请刷新页面': 'The verification widget failed to load — please reload the page',
+        '验证失败，请重试': 'Verification failed, please try again',
+        '未知的验证服务商': 'Unknown verification provider',
+        '请填写该服务商的全部必填项': 'Fill in every required field for this provider',
+        '未开启或配置不完整，无法测试': 'Not enabled or incompletely configured — nothing to test',
+        'VAPTCHA 脚本加载失败': 'Failed to load the VAPTCHA script',
+        '未配置 VAPTCHA 验证单元 VID': 'VAPTCHA unit VID is not configured',
+        '极验脚本加载失败': 'Failed to load the GeeTest script',
+        '未配置极验 captcha_id': 'GeeTest captcha_id is not configured',
+        '接口返回通过（异常，请检查服务商设置）': 'The API reported success (unexpected — check your provider settings)'
     };
 
     w.OwI18n.register('en', 'English', dict);

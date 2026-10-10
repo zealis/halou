@@ -1,0 +1,15 @@
+/* captcha-verify · 组件容器（v1.3.54）
+   登录卡片只有 400px 宽，四家组件宽度不一（Turnstile flexible 约 300px、
+   Cap 与 VAPTCHA 300px 左右），所以给容器留一条最小高度：
+   脚本还没加载完时不会塌成一条线，加载完也不会把下面的按钮顶得跳一下。 */
+.ow-cv { margin: 12px 0 4px; }
+.ow-cv-box {
+    display: flex; align-items: center;
+    min-height: 65px;
+}
+.ow-cv-box:empty { min-height: 0; }
+/* 组件加载失败 / 验证失败的提示位。空内容时完全不占位，避免多出一段空白 */
+.ow-cv-tip { font-size: 12px; color: var(--ow-red); margin-top: 6px; }
+.ow-cv-tip:empty { display: none; }
+/* Cap 的自定义元素默认 inline，撑不满容器会左贴；与另两家对齐 */
+.ow-cv-box cap-widget { display: block; }
