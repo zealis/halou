@@ -4754,9 +4754,6 @@
             if (persist) {
                 try { w.localStorage.setItem(this.themeKey, mode); } catch (e) {}
             }
-            // v1.3.50：色系行内变量的优先级高于 [data-theme="dark"] 块，切深浅时必须让引擎
-            // 按新档位重算一遍，否则日间色会赖在深色页上（表现为"切了深色按钮还是亮绿"）。
-            if (w.OwTheme) w.OwTheme.applyScheme(real);
         },
         /** 初始化：应用已存偏好 + 监听系统主题变化（仅 auto 时生效） */
         initTheme: function () {
@@ -4814,94 +4811,6 @@
             }
         },
 
-        /**
-         * 渲染色系卡片网格 + 自建表单（v1.3.50，从姊妹实现的「个性装扮·色系管理」移植）。
-         * 卡片三格色板 = 主色/悬浮/浅底，比例 50/30/20，与选中后界面里的实际占比一致。
-         * ⚠️ 自建色系的名称是用户输入，必须 esc() 再拼进 innerHTML。
-         */
-        schemeHtml: function () {
-            if (!w.OwTheme) return '';
-            var T = w.OwTheme, schemes = T.all(), cur = T.id(), ids = [], k;
-            for (k in schemes) { if (Object.prototype.hasOwnProperty.call(schemes, k)) ids.push(k); }
-            var h = '<div class="ow-scheme-grid" id="owSchemeGrid">';
-            for (var i = 0; i < ids.length; i++) {
-                var id = ids[i], s = schemes[id], on = (id === cur);
-                h += '<span class="ow-scheme-card' + (on ? ' is-active' : '') + '">'
-                   + '<button type="button" class="ow-scheme-pick" data-scheme="' + esc(id) + '"'
-                   + ' aria-pressed="' + (on ? 'true' : 'false') + '">'
-                   + '<span class="ow-scheme-sw" aria-hidden="true">'
-                   + '<i style="background:' + esc(s.brand) + '"></i>'
-                   + '<i style="background:' + esc(s.hover) + '"></i>'
-                   + '<i style="background:' + esc(s.soft) + '"></i></span>'
-                   + '<span class="ow-scheme-name">' + esc(s.name) + '</span></button>'
-                   + (s.custom ? '<button type="button" class="ow-scheme-del" data-scheme-del="' + esc(id) + '"'
-                       + ' title="删除该色系" aria-label="删除色系 ' + esc(s.name) + '">×</button>' : '')
-                   + '</span>';
-            }
-            h += '</div>';
-            if (T.customSchemes().length >= T.MAX_CUSTOM) {
-                h += '<p class="ow-form-hint">自建色系已达 ' + T.MAX_CUSTOM + ' 个上限，删除后才能再加。</p>';
-            } else {
-                h += '<div class="ow-scheme-add">'
-                   + '<input class="ow-input" type="text" id="owSchemeName" maxlength="12" placeholder="色系名称" aria-label="色系名称">'
-                   + '<label class="ow-scheme-color">主色<input type="color" id="owSchemeBrand" value="#00a0e9"></label>'
-                   + '<label class="ow-scheme-color">悬浮<input type="color" id="owSchemeHover" value="#0086c9"></label>'
-                   + '<label class="ow-scheme-color">浅底<input type="color" id="owSchemeSoft" value="#e6f7ff"></label>'
-                   + '<button type="button" class="ow-btn ow-btn-ghost" onclick="OwChat.schemeCreate()">新增色系</button>'
-                   + '</div>';
-            }
-            return h;
-        },
-        /** 切换色系：立即生效 + 落 localStorage，不经过「保存」按钮（与日夜模式同一逻辑） */
-        schemePick: function (id) {
-            if (!w.OwTheme) return;
-            w.OwTheme.save(id);
-            w.OwTheme.apply();
-            this.refreshSchemes();
-            toast('已切换到「' + (w.OwTheme.all()[id] || {}).name + '」色系');
-        },
-        /** 删除自建色系；删的是当前用的就落回经典蓝 */
-        schemeRemove: function (id) {
-            if (!w.OwTheme) return;
-            var T = w.OwTheme, was = T.id();
-            if (!T.remove(id)) return;
-            if (was === id) { T.save('classic'); }
-            T.apply();
-            this.refreshSchemes();
-            toast('色系已删除');
-        },
-        /** 新增自建色系并立即启用 */
-        schemeCreate: function () {
-            if (!w.OwTheme) return;
-            var g = function (i) { return $(i) ? $(i).value : ''; };
-            var name = g('owSchemeName').trim();
-            if (name === '') { toast('请先填写色系名称'); var n = $('owSchemeName'); if (n) n.focus(); return; }
-            var s = w.OwTheme.add({ name: name, brand: g('owSchemeBrand'), hover: g('owSchemeHover'), soft: g('owSchemeSoft') });
-            if (!s) { toast('色系保存失败，请检查颜色值'); return; }
-            w.OwTheme.save(s.id);
-            w.OwTheme.apply();
-            this.refreshSchemes();
-            toast('色系「' + s.name + '」已创建并启用');
-        },
-        /** 重绘网格（增删改选后调用；只换网格，不关弹窗、不丢其它输入框的内容） */
-        refreshSchemes: function () {
-            var box = $('owSchemeWrap');
-            if (!box) return;
-            box.innerHTML = this.schemeHtml();
-            this.bindSchemes();
-        },
-        /** 网格用事件委托绑一次即可；重绘后重新绑（refreshSchemes 会换掉子节点） */
-        bindSchemes: function () {
-            var self = this, grid = $('owSchemeGrid');
-            if (!grid) return;
-            grid.onclick = function (e) {
-                var t = e.target, pick = t && t.closest ? t.closest('[data-scheme]') : null;
-                if (pick) { self.schemePick(pick.getAttribute('data-scheme')); return; }
-                var del = t && t.closest ? t.closest('[data-scheme-del]') : null;
-                if (del) self.schemeRemove(del.getAttribute('data-scheme-del'));
-            };
-        },
-
         openSettings: function () {
             var me = this.cfg.me;
             if (!me) return;
@@ -4924,15 +4833,8 @@
                 + '<div class="ow-form-item"><label>日夜模式</label>'
                 + this.themeSegHtml()
                 + '<p class="ow-form-hint">跟随系统会随操作系统的深浅色设置自动切换。</p></div>'
-                // v1.3.50：色系（主色/悬浮/浅底一套三色）。与日夜模式同为**本机外观偏好**，
-                // 点了立即生效、不进「保存」。长说明交给 OwTip 收进 ⓘ（必须是 .ow-form-item
-                // 的直接子 <p>，oneItem() 只扫 item.children，藏在 #owSchemeWrap 里收不到）。
-                + (w.OwTheme ? '<div class="ow-form-item"><label>色系</label>'
-                    + '<div id="owSchemeWrap">' + this.schemeHtml() + '</div>'
-                    + '<p style="font-size:12px;color:var(--ow-text-sub)">内置 6 套 + 自建（最多 '
-                    + w.OwTheme.MAX_CUSTOM + ' 个），只改界面配色、不动消息内容，且仅对本浏览器生效。'
-                    + '深色档下主色会自动提到可读亮度，所以同一色系在深浅两档看起来不完全一样。'
-                    + '删除正在使用的色系会回到经典蓝。</p></div>' : '')
+                // v1.3.51：色系段已剥离为 color-schemes 插件（它自己包装 openSettings 注入），
+                // 核心不再认识它 —— 插件停用时这里就只剩日夜模式。
                 + ((w.OwOauth) ? '<div class="ow-form-item"><label>第三方授权</label>'
                     + '<button class="ow-btn ow-btn-ghost ow-btn-block" onclick="OwOauth.open()">管理应用授权</button>'
                     + '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">'
@@ -4941,7 +4843,6 @@
             );
             var self = this;
             this.bindThemeSeg();   // v1.3.25：日夜模式分段控件
-            this.bindSchemes();    // v1.3.50：色系卡片（事件委托，重绘后需重绑）
             $('owSetAvatarFile').onchange = function () {
                 if (!this.files || !this.files[0]) return;
                 // 选完图不直接上传：先进入裁剪弹窗，由滑块手动缩放后再导出

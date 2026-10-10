@@ -1,5 +1,11 @@
 /**
- * 色系引擎（v1.3.50）—— 从 owlsgo 姊妹实现（参考文献/forum）的 theme-boot.js 移植。
+ * color-schemes · 色系引擎（v1.3.51 起是本插件的文件，此前在核心 assets/js/）
+ * —— 色系系统从姊妹实现（参考文献/forum）的 theme-boot.js 移植。
+ *
+ * 加载位置：<head> 内、由插件的 page.head 钩子以阻塞脚本注入
+ * （`?action=assets&type=js&plugin=color-schemes`）。放不进 body 末尾的合并总包 ——
+ * 那样每次刷新都会先按经典蓝画一帧再变色。
+ * **插件停用时本文件根本不加载**：没有行内变量，界面就是样式表默认值（经典蓝）。
  *
  * 与日夜模式的分工：日夜由 index.php 的内联预置脚本落成 <html data-theme>（那份必须内联，
  * 它只有 5 行且不能 404）；本文件只负责**色系**，读已定好的 data-theme，不再自己判深浅 ——
@@ -21,6 +27,10 @@
  */
 (function (w, d) {
     'use strict';
+    // 本文件同时在两处出现：<head> 里由插件的 page.head 注入（?…&file=boot.js，为了首帧前定色），
+    // 以及 body 末尾的插件合并总包（清单里注册了它）。第二次执行必须直接退出，
+    // 否则会把已生效的行内变量重算一遍、并覆盖 window.OwTheme 上的实例。
+    if (w.OwTheme) return;
 
     var SCHEME_KEY = 'owl_scheme';
     var CUSTOM_KEY = 'owl_schemes_custom';

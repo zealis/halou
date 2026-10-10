@@ -573,15 +573,32 @@ class Plugin
 
     // ---------- 资源合并（清单驱动，无需加载 main.php） ----------
 
-    public static function renderAssets(string $type): string
+    /**
+     * @param string $only 非空时只取**该插件**注册的资源。
+     * @param string $file 非空时再按文件名（如 boot.js）挑出其中一个。
+     *                     两个参数是为了切出「同一插件、不同时机」的脚本：引擎必须在 <head>
+     *                     同步执行（放 body 末尾的合并总包里会先闪一帧默认色），UI 则必须等
+     *                     chat.js 之后。一份清单即可切出两种子集，不必新增注册类型。
+     * 插件名只与「已启用清单」比对、文件名只用于**过滤已注册的路径**，两者都不参与拼路径，
+     * 所以不存在任意文件读取；未启用的插件返回空串 = 停用即回到核心默认。
+     */
+    public static function renderAssets(string $type, string $only = '', string $file = ''): string
     {
         if (!in_array($type, ['css', 'js'], true)) return '';
+        if ($only !== '' && !in_array($only, self::$order, true)) return '';
+        if ($file !== '' && !preg_match('/^[a-zA-Z0-9._-]+$/', $file)) return '';
         // 启用插件清单中的资源（未加载的插件也算上）+ 本请求运行时注册的资源
         $files = [];
         foreach (self::$order as $name) {
+            if ($only !== '' && $name !== $only) continue;
             foreach (self::$manifest[$name]['assets'][$type] ?? [] as $p) $files[] = $p;
         }
-        foreach (self::$assets[$type] ?? [] as $p) $files[] = $p;
+        if ($only === '' && $file === '') {
+            foreach (self::$assets[$type] ?? [] as $p) $files[] = $p;
+        }
+        if ($file !== '') {
+            $files = array_values(array_filter($files, fn($p) => basename(str_replace('\\', '/', $p)) === $file));
+        }
         $files = array_values(array_unique($files));
 
         // 合并缓存：参与文件集合与 mtime 未变则直接复用
@@ -590,7 +607,7 @@ class Plugin
             $f = self::$dir . '/' . ltrim($p, '/');
             $sig[$p] = is_file($f) ? (int)@filemtime($f) : 0;
         }
-        $key = md5(json_encode([$type, $sig]));
+        $key = md5(json_encode([$type, $only, $file, $sig]));
         $cfile = self::$cacheDir !== '' ? self::$cacheDir . '/assets-' . $key . '.json' : '';
         if ($cfile !== '' && is_file($cfile)) {
             $c = json_decode((string)file_get_contents($cfile), true);
@@ -606,9 +623,11 @@ class Plugin
             $tmp = $cfile . '.' . (string)getmypid() . '.tmp';
             if (@file_put_contents($tmp, json_encode(['sig' => $sig, 'out' => $out], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX) !== false) {
                 @rename($tmp, $cfile);
-                foreach (glob(self::$cacheDir . '/assets-*.json') ?: [] as $old) {   // 清理过期合并缓存
-                    if ($old !== $cfile) @unlink($old);
-                }
+                // 过期缓存清理：保留**最近 6 份**而不是只留刚写的这一份 —— 单插件资源（$only）
+                // 与总包是不同 key，若「只留一份」就会互相踢掉，每次请求都重新合并。
+                $keep = glob(self::$cacheDir . '/assets-*.json') ?: [];
+                usort($keep, fn($a, $b) => (int)@filemtime($b) <=> (int)@filemtime($a));
+                foreach (array_slice($keep, 6) as $old) @unlink($old);
             }
         }
         return $out;

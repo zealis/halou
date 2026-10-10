@@ -314,9 +314,14 @@ if ($action !== '') {
     // 否则 <script src="?action=assets&type=js"> 无法在页面加载
     if ($action === 'assets') {
         $type = ($_GET['type'] ?? '') === 'js' ? 'js' : 'css';
+        // plugin= / file=：切出某个插件的某个资源，供需要在 <head> 同步执行的引擎用。
+        // 这里只做字符白名单；「是否启用」由 Plugin::renderAssets() 按启用清单判定。
+        $ok = static fn(string $k): string => preg_match('/^[a-zA-Z0-9._-]+$/', (string)($_GET[$k] ?? '')) ? (string)$_GET[$k] : '';
+        $only = $ok('plugin');
+        $oneFile = $ok('file');
         header($type === 'js' ? 'Content-Type: text/javascript; charset=utf-8' : 'Content-Type: text/css; charset=utf-8');
         header('Cache-Control: no-store');
-        echo Plugin::renderAssets($type);
+        echo Plugin::renderAssets($type, $only, $oneFile);
         exit;
     }
 
@@ -1172,11 +1177,9 @@ function pageHead(string $title): void
        . '<title>' . Sec::e($title) . ' - ' . $site . '</title>'
        . '<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">'
        . owThemeBootstrap()   // v1.3.25：先定主题再加载样式，避免首屏闪一下浅色
-       // v1.3.50：色系引擎。放在样式表**之前**且不加 defer/async —— 阻塞脚本仍在首帧绘制前
-       // 执行，刷新时才会直接以目标色系上色（放 body 末尾就会先闪一帧经典蓝）。
-       // 只写行内 CSS 变量，不碰 data-theme（那是上面内联脚本的职责，两处各算必漂移）。
-       . '<script src="assets/js/theme-boot.js?v=' . OWLSGO_VERSION . '"></script>'
        . '<link rel="stylesheet" href="assets/css/owlsgo.css?v=' . OWLSGO_VERSION . '">';
+    // v1.3.51：色系引擎不再是核心文件 —— 改由 color-schemes 插件在 page.head 注入。
+    // 该钩子在样式表之后，但注入的是**阻塞脚本**，仍在首帧绘制前执行完，不会闪色。
     Plugin::fire('page.head');
     echo '</head>';
 }
