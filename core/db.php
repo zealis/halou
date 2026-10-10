@@ -268,9 +268,14 @@ class DB
             // read_at=0 表示未读，用于 rail 上的红点计数。
             "CREATE TABLE IF NOT EXISTS notices (
                 id $id, user_id $int NOT NULL, kind $str NOT NULL DEFAULT 'system',
-                body $text, created_at $ts NOT NULL, read_at $int NOT NULL DEFAULT 0)",
+                body $text, params $text, created_at $ts NOT NULL, read_at $int NOT NULL DEFAULT 0)",
         ];
         foreach ($tables as $sql) self::$pdo->exec($sql);
+
+        // v1.3.56：存量库补 notices.params —— 通知改存「kind + 参数」，body 只作渲染快照。
+        // 为什么两样都留：params 让语言包能翻译模板（动态文案拼成整句就永远匹配不上字典），
+        // body 让管理员直接读库时也看得懂、且旧前端不改也能继续显示。
+        self::ensureColumn('notices', 'params', 'text', "''");
 
         // 计划任务表的复合唯一索引：SQLite / MySQL / PostgreSQL 都要求先有唯一列才能建，
         // 且 SQLite 的 CREATE UNIQUE INDEX IF NOT EXISTS 三驱动均支持（MySQL 8 见下方兜底）。

@@ -526,8 +526,10 @@ if ($action !== '') {
         case 'notices':         // v1.3.52 系统通知：取最近通知并整批标为已读（红点随之清零）
             // 游客没有账号，通知一律按 user_id 存 —— 返回空列表而不是 403，
             // 免得前端为一个「本来就没有」的状态走错误分支。
-            if (($actor['kind'] ?? '') !== 'user') Api::json(['ok' => true, 'data' => []]);
-            Api::json(['ok' => true, 'data' => Notice::forUser((int)$actor['id'])]);
+            // v1.3.56：连同模板表一起下发（texts）—— 通知正文改存 kind+参数后，
+            // 前端要拿模板走语言包翻译，再填参数；只回 body 会让英文界面冒出一句中文。
+            if (($actor['kind'] ?? '') !== 'user') Api::json(['ok' => true, 'data' => [], 'texts' => Notice::texts()]);
+            Api::json(['ok' => true, 'data' => Notice::forUser((int)$actor['id']), 'texts' => Notice::texts()]);
 
         /* ---------- 私聊会话操作（v1.2.28，右侧栏四个入口的后端） ---------- */
         case 'dm_pin':          // 设为置顶 / 取消置顶（按当前状态取反）

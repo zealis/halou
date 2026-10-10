@@ -305,10 +305,12 @@
         '两步验证已关闭，登录不再需要动态验证码。': 'Two-factor authentication is now off; signing in no longer needs a one-time code.',
         '你的账号已被管理员封禁，暂时无法登录与发言。': 'Your account was suspended by an administrator. You cannot sign in or post for now.',
         '你的账号已被解封，可以正常登录与发言。': 'Your account suspension was lifted. You can sign in and post again.',
-        '你的账号已被禁言。': 'Your account has been muted.',
-        // ⚠️ 禁言通知的正文带群号与时长（「在群聊 #12 被禁言 24 小时。」），
-        // 是动态串，精确匹配的词典命中不了 —— 英文模式下这类会保持中文。
-        // 要覆盖它得把 notices 改成存 kind+参数、由前端套模板，等真有需求再做。
+        // v1.3.56：通知改存 kind + 参数，前端拿**整条模板**翻译后再填 {room_id} / {hours}，
+        // 所以这里的键就是带占位符的模板原文（占位符原样保留，不要翻成 {小时}）。
+        '你在群聊 #{room_id} 被禁言 {hours} 小时。': 'You were muted for {hours} hour(s) in group chat #{room_id}.',
+        '你在群聊 #{room_id} 被永久禁言。': 'You were permanently muted in group chat #{room_id}.',
+        '你的账号被全站禁言 {hours} 小时。': 'Your account was muted site-wide for {hours} hour(s).',
+        '你的账号被全站永久禁言。': 'Your account was permanently muted site-wide.',
 
         /* ---------- server API messages (routed through OwI18n.t in the toast) ---------- */
         '需要管理员权限': 'Admin permission required',

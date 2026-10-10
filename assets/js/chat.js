@@ -942,6 +942,23 @@
             + svg + '<span class="ow-panel-entry-t">' + esc(label) + '</span>' + arrow + '</div>';
     }
 
+    /**
+     * 通知正文渲染（v1.3.56）。
+     * 库里存的是 kind + 参数，模板表随 ?action=notices 一起下发：
+     * **先翻译整条模板、再填参数** —— 语言包按中文原文整句精确匹配，
+     * 先把参数拼成整句就永远匹配不上，英文界面会冒出一句中文。
+     * 拿不到模板（未知 kind / 老数据）才回落到 body 快照，保证不出现空白行。
+     */
+    function owNoticeText(row, texts) {
+        var tpl = (texts && texts[row.kind]) ? String(texts[row.kind]) : '';
+        if (!tpl) return String(row.body || '');
+        if (w.OwI18n && w.OwI18n.t) tpl = w.OwI18n.t(tpl);
+        var p = row.params || {};
+        return tpl.replace(/\{([a-z_]+)\}/gi, function (m, key) {
+            return (p[key] === undefined || p[key] === null) ? '' : String(p[key]);
+        });
+    }
+
     /* ==========================================================================
        OwAuth：登录 / 注册 / 找回密码
        ========================================================================== */
@@ -3785,7 +3802,7 @@
                 // v1.3.52：固定头像「小可爱第36号」，由服务端算好下发（Notice::avatarUrl）
                 avatar: this.cfg.notice_avatar || '',
                 last_at: last ? (last.created_at | 0) : 0,
-                last_text: last ? String(last.body || '') : '暂无系统通知',
+                last_text: last ? owNoticeText(last, this.noticeTexts) : '暂无系统通知',
                 unread: unread
             }], {
                 container: 'owNoticeList',
@@ -3816,6 +3833,7 @@
             if (box) box.innerHTML = '<div class="ow-notice-pending">加载中…</div>';
             OwApi.post('notices', {}, function (r) {
                 self.notices = (r && r.ok && r.data) ? r.data : [];
+                if (r && r.ok && r.texts) self.noticeTexts = r.texts;
                 self.renderNoticeStream();
                 // 服务端在返回时就整批标已读了，红点必须跟着清零
                 self.cfg.notice_unread = 0;
@@ -3860,7 +3878,7 @@
                    + '<div class="ow-msg-body">'
                    + '<div class="ow-msg-meta"><span class="ow-msg-nick ow-notice-nick">系统通知</span>'
                    + '<span class="ow-msg-time">' + esc(ChatList.time(r.created_at | 0)) + '</span></div>'
-                   + '<span class="ow-msg-content">' + esc(r.body || '') + '</span>'
+                   + '<span class="ow-msg-content">' + esc(owNoticeText(r, this.noticeTexts)) + '</span>'
                    + '</div></div>';
             }
             box.innerHTML = h;
