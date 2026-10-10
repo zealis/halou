@@ -38,6 +38,14 @@ require __DIR__ . '/core/upgrade.php';
 require __DIR__ . '/core/admin.php';
 // v1.2.37：第三方应用授权已剥离为插件 oauth-core（按需加载），核心不再常驻它的表与路由。
 
+// v1.3.46 强制 HTTPS：必须排在**任何输出与会话初始化之前**。
+//   明文 GET → 301 到 https；明文 POST（发言/登录/上传等交互）→ 403，不做重定向降级；
+//   https 响应统一带 HSTS。放在这里而不是只写 vhost，是因为 phpStudy 面板会整文件
+//   重写 conf/vhosts/*.conf，写在 vhost 里的跳转可能被抹掉。
+//   trust_proxy：站点在「非本机反代」后面时才需要 true，否则客户端能伪造
+//   X-Forwarded-Proto 绕过跳转（默认 false；本机 nginx→php-cgi 不需要开）。
+Sec::enforceHttps(($CFG['trust_proxy'] ?? false) === true);
+
 class Api
 {
     public static function json(array $data, int $code = 200): void

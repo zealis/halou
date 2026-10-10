@@ -397,7 +397,9 @@ Plugin::route('plugin_chat_background_admin_save', function (array $ctx) use ($o
     $url = trim((string)($p['url'] ?? ''));
     $file = trim((string)($p['file'] ?? ''));
     if ($kind === 'url') {
-        if ($url === '' || !preg_match('#^https?://#i', $url)) Api::json(['ok' => false, 'msg' => '远程链接需以 http:// 或 https:// 开头'], 400);
+        // v1.3.46：只收 https://。本站已强制 HTTPS，存 http:// 外链会在页面里变成
+        // 混合内容被浏览器拦掉（背景图直接不显示），报错比静默失效更难排查，所以在入口就拒绝。
+        if ($url === '' || !preg_match('#^https://#i', $url)) Api::json(['ok' => false, 'msg' => '远程链接需以 https:// 开头'], 400);
         $file = '';
     } else {
         if ($file === '') Api::json(['ok' => false, 'msg' => '缺少背景文件'], 400);

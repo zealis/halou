@@ -318,9 +318,122 @@ class Sec
     }
 
     /** https 部署探测（本地 http 为 false，不影响现有部署） */
+    /**
+     * 当前请求是否走加密通道。
+     *
+     * 四种来源都要认：nginx 直挂 TLS 的 HTTPS 标记、反代改写的 X-Forwarded-Proto /
+     * X-Forwarded-Ssl、以及只透传端口不写标记的 443。
+     * ⚠️ 少认一种，v1.3.46 的强制 HTTPS 就会把**正常 https 请求**误判成明文并 301 回 https，
+     *    形成跳转死循环（站点看起来打得开其实一直 301，表现为「刷新个没完」）。
+     */
     public static function isHttps(): bool
     {
-        return !empty($_SERVER['HTTPS']) || strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+        if (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') return true;
+        // 多层反代时该头可能是 "https, http" 逗号串，只取第一跳（最外层客户端协议）
+        $xfp = strtolower(trim(explode(',', (string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]));
+        if ($xfp === 'https') return true;
+        if (strtolower(trim((string)($_SERVER['HTTP_X_FORWARDED_SSL'] ?? ''))) === 'on') return true;
+        return (int)($_SERVER['SERVER_PORT'] ?? 0) === 443;
+    }
+
+    /**
+     * 「确实走了 TLS」的**严格**判定 —— 强制 HTTPS 必须用它，不能用宽松的 isHttps()。
+     *
+     * ⚠️ 实测踩过的坑：isHttps() 认 X-Forwarded-Proto，那是给「生成绝对链接 / 决定 cookie
+     * 的 secure 标记」用的，猜错顶多一个链接协议不对。强制 HTTPS 若也拿它当依据，
+     * 等于让客户端自己声明「我已经在加密通道上了」—— 在明文请求里加一行
+     * `X-Forwarded-Proto: https` 就能整页绕过跳转，规则形同虚设（v1.3.46 实测复现）。
+     *
+     * 所以转发头只在这两种情况下作数：
+     *   ① 直连方是本机/内网 —— 反代与站点同机（nginx→php-cgi 时 $remote_addr 就是 127.0.0.1
+     *      或内网 IP），头只可能由本机反代写入；
+     *   ② 配置显式声明信任反代（core/config.php 里 'trust_proxy' => true），
+     *      给「独立 TLS 终结负载 + 内网以外地址」的部署留口子。默认不信任。
+     */
+    public static function tlsVerified(bool $trustProxy = false): bool
+    {
+        if (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') return true;
+        if ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443) return true;
+        if (!$trustProxy && !self::peerIsLocal()) return false;
+        $xfp = strtolower(trim(explode(',', (string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]));
+        if ($xfp === 'https') return true;
+        return strtolower(trim((string)($_SERVER['HTTP_X_FORWARDED_SSL'] ?? ''))) === 'on';
+    }
+
+    /** 直连方是否本机/内网：只有这种情况才敢信 X-Forwarded-* 这类客户端可伪造的头 */
+    private static function peerIsLocal(): bool
+    {
+        $ip = trim((string)($_SERVER['REMOTE_ADDR'] ?? ''));
+        if ($ip === '') return false;
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+            // 反向判定：加上「排除私网 + 排除保留段」后仍然合法，就是公网地址。
+            // （PHP 没有 FILTER_FLAG_PRIVATE；127.0.0.1 属保留段，同样落进「非公网」）
+            return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+        }
+        // IPv6：只认环回 ::1 与唯一本地地址 fc00::/7（公网 IPv6 客户端不算内网）
+        $low = strtolower($ip);
+        return $low === '::1' || str_starts_with($low, 'fd') || str_starts_with($low, 'fc');
+    }
+
+    /**
+     * 强制 HTTPS（v1.3.46）：页面与所有交互操作只允许走 TLS。
+     *
+     * ★ 为什么落在 PHP 而不是只写 nginx：phpStudy 面板每次改站点 / 切 PHP 版本都会
+     *   整文件重写 conf/vhosts/*.conf（本项目 README 里就记着这条坑），写在 vhost 的
+     *   跳转随时会被抹掉；index.php 是唯一必经入口，规则放这里才不会被配置面板悄悄关掉。
+     *
+     * ① https 请求：下发 HSTS（只在加密响应下发 —— 明文响应里的 HSTS 浏览器按规范忽略）。
+     * ② 明文的 GET / HEAD：301 到同主机同路径的 https 地址。
+     * ③ 明文的 POST 等**交互**请求：**不重定向**。301/302 会把 POST 降级成 GET 并丢掉请求体，
+     *    等于把用户刚提交的发言/表单/上传悄悄吞掉，再点一次就是重复提交 —— 直接 403 报错，
+     *    让调用方改用 https 重试。
+     */
+    public static function enforceHttps(bool $trustProxy = false): void
+    {
+        if (PHP_SAPI === 'cli') return;
+        if (self::tlsVerified($trustProxy)) {
+            // ⚠️ 刻意不带 includeSubDomains：HSTS 的作用域是「该主机所属的整个域名及其全部子域」，
+            // 加上它就会把同域下别的、可能没有证书的服务一起锁死（部署在 chat.example.com 时
+            // 波及 *.example.com）。本站强制 HTTPS 不需要这个范围。
+            header('Strict-Transport-Security: max-age=31536000');
+            return;
+        }
+        $m = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+        if ($m !== 'GET' && $m !== 'HEAD') {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'msg' => '本站强制 HTTPS，请通过 https:// 地址重试'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $host = self::plainHttpHost();
+        if ($host === '') {
+            // 主机取不到或含非法字符：宁可 400 也不拼一个可能指向别人域名的 Location
+            http_response_code(400);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'msg' => '无法确定站点主机，请直接使用 https:// 地址访问'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $uri = (string)($_SERVER['REQUEST_URI'] ?? '/');
+        // 只接受绝对路径；带控制字符（响应头注入）或协议相对写法的一律退回根
+        if (!preg_match('#^/[^\x00-\x1f\x7f]*$#', $uri)) $uri = '/';
+        header('Location: https://' . $host . $uri, true, 301);
+        exit;
+    }
+
+    /**
+     * 明文跳转的目标主机。
+     *
+     * ⚠️ 这里**不**读 X-Forwarded-Host（ow_site_url() 会读，因为生成绝对链接需要反代域名）：
+     * 没有反代时该头完全由客户端决定，拿它拼 Location 等于开放重定向 —— 攻击者可以用一个
+     * 带 X-Forwarded-Host: evil.com 的明文请求，把我们的 301 变成跳去他的域名。
+     * 走反代且反代终结 TLS 的请求根本进不到这个分支（isHttps() 已认 X-Forwarded-Proto）。
+     */
+    private static function plainHttpHost(): string
+    {
+        $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+        if ($host === '') $host = trim((string)($_SERVER['SERVER_NAME'] ?? ''));
+        if (!preg_match('#^[a-zA-Z0-9._\[\]:-]+$#', $host)) return '';
+        return (string)preg_replace('#:80$#', '', $host);   // 明文端口不带进 https 地址
     }
 
     /**
