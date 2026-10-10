@@ -34,6 +34,7 @@ require __DIR__ . '/core/auth.php';
 require __DIR__ . '/core/plugin.php';
 require __DIR__ . '/core/chat.php';
 require __DIR__ . '/core/upload.php';
+require __DIR__ . '/core/upgrade.php';
 require __DIR__ . '/core/admin.php';
 // v1.2.37：第三方应用授权已剥离为插件 oauth-core（按需加载），核心不再常驻它的表与路由。
 
@@ -342,6 +343,8 @@ if ($action !== '') {
         // v1.2.60 日志管理：批量删安全日志会抹掉审计流水、清空文件日志会抹掉排错线索，
         // 都属不可恢复操作，与 cron 日志清理同档，一律走一次性票据。
         'admin_logs_batch', 'admin_syslog_clear',
+        // v1.3.39 在线升级：覆盖整站代码文件 = 全站最高危操作，必须 POST + 一次性票据。
+        'admin_upgrade_apply', 'admin_upgrade_rollback',
     ];
     $isSensitive = in_array($action, $SENSITIVE, true) || Plugin::isSensitive($action);
     if ($isSensitive) {

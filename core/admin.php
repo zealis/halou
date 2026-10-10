@@ -409,6 +409,26 @@ class Admin
                 }
                 Api::json(['ok' => true, 'msg' => '已刷新编译脚本缓存']);
 
+            // ---------- 在线升级（v1.3.39，实现见 core/upgrade.php） ----------
+            case 'admin_upgrade_check':
+                $r = Upgrade::check($errUpd);
+                Api::json($r === null ? ['ok' => false, 'msg' => $errUpd] : ['ok' => true] + $r);
+
+            case 'admin_upgrade_apply':
+                // 敏感路由：POST + 一次性票据（index.php $SENSITIVE），且只认字符串 '1' 的降级授权
+                [$okUA, $resUA] = Upgrade::apply($p('allow_downgrade') === '1');
+                if ($okUA) Sec::log('upgrade_apply', (string)($actor['nickname'] ?? ''), is_array($resUA) ? $resUA : ['msg' => (string)$resUA]);
+                Api::json($okUA ? ['ok' => true] + (array)$resUA : ['ok' => false, 'msg' => (string)$resUA]);
+
+            case 'admin_upgrade_rollback':
+                // 敏感路由同上；默认恢复最近一次升级前的状态，可指定备份编号 ts
+                [$okRB, $resRB] = Upgrade::rollback($p('ts') !== '' ? $p('ts') : null);
+                if ($okRB) Sec::log('upgrade_rollback', (string)($actor['nickname'] ?? ''), is_array($resRB) ? $resRB : ['msg' => (string)$resRB]);
+                Api::json($okRB ? ['ok' => true] + (array)$resRB : ['ok' => false, 'msg' => (string)$resRB]);
+
+            case 'admin_upgrade_backups':
+                Api::json(['ok' => true, 'data' => Upgrade::backups()]);
+
             // ---------- 站点设置 ----------
             case 'admin_settings_get':
                 $rows = DB::all('SELECT k, v FROM settings');

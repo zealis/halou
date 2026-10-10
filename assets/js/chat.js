@@ -5786,6 +5786,98 @@
             });
         },
 
+        /* ---------- 在线升级（v1.3.39，后端 core/upgrade.php） ----------
+           检查 → 差异清单 → 确认升级（下载校验齐了才搬入，自动备份）→ 可恢复。
+           apply / rollback 是敏感路由，必须走 OwApi.secure（一次性票据）。 */
+        upgrade: {
+            info: null,
+
+            check: function () {
+                var btn = $('owUpdBtn'), panel = $('owUpdPanel');
+                if (!btn || !panel) return;
+                btn.disabled = true; btn.textContent = '检查中…';
+                panel.style.display = 'none';
+                OwApi.post('admin_upgrade_check', {}, function (r) {
+                    btn.disabled = false; btn.textContent = '检查更新';
+                    OwAdmin.upgrade.render(r);
+                });
+            },
+
+            render: function (r) {
+                var panel = $('owUpdPanel');
+                if (!panel) return;
+                panel.style.display = '';
+                if (!r || !r.ok) {
+                    panel.innerHTML = '<span style="color:#C41D1F">✗ ' + esc((r && r.msg) || '检查失败') + '</span>';
+                    return;
+                }
+                OwAdmin.upgrade.info = r;
+                var h = '<b>本地 v' + esc(r.local_version || '?') + ' → 远端 v' + esc(r.remote_version || '?') + '</b>'
+                    + '<span style="font-size:12px;color:var(--ow-text-sub)">（' + esc(r.repo) + '）</span>';
+                if (!r.has_update) {
+                    h += '<br><span style="color:#1a7f37">✓ 与远端一致，没有需要更新的文件。</span>';
+                } else {
+                    h += '<br>有更新：' + r.modified.length + ' 个文件将覆盖，' + r.added.length + ' 个文件新增。';
+                    var names = r.modified.slice(0, 50).concat(r.added.slice(0, 50).map(function (p) { return p + '（新）'; }));
+                    h += '<details style="margin:4px 0"><summary style="cursor:pointer;font-size:12px;color:var(--ow-text-sub)">文件清单</summary>'
+                        + '<div style="font-size:12px;max-height:200px;overflow:auto;font-family:Consolas,monospace;margin-top:4px">'
+                        + names.map(esc).join('<br>') + '</div></details>';
+                    if (r.downgrade) {
+                        h += '<label style="display:block;margin:6px 0;font-size:13px;color:#8a5a00">'
+                            + '<input type="checkbox" id="owUpdDown"> 远端版本低于本地，允许降级（一般应该用「恢复备份」而不是降级）</label>';
+                    }
+                    h += '<button class="ow-btn ow-btn-primary" style="margin-top:6px" onclick="OwAdmin.upgrade.apply()">升级</button>';
+                }
+                h += '<div id="owUpdResult" style="margin-top:8px;font-size:13px"></div>'
+                    + '<div id="owUpdBak" style="margin-top:8px;font-size:12px;color:var(--ow-text-sub)"></div>';
+                panel.innerHTML = h;
+                OwAdmin.upgrade.loadBackups();
+            },
+
+            apply: function () {
+                var r = OwAdmin.upgrade.info;
+                if (!r || !r.has_update) return;
+                var down = $('owUpdDown');
+                var msg = '即将升级：覆盖 ' + r.modified.length + ' 个文件、新增 ' + r.added.length + ' 个。\n'
+                    + '被覆盖的文件会先备份到 data/backup/，可一键恢复；'
+                    + 'core/config.php、data/、uploads/ 永不受影响。\n确认执行？';
+                OwAdmin.confirm(msg, function () {
+                    var out = $('owUpdResult');
+                    if (out) out.innerHTML = '下载并校验中…（站点尚未改动，全部就绪才会一次性搬入）';
+                    OwApi.secure('admin_upgrade_apply', { allow_downgrade: down && down.checked ? '1' : '0' }, function (rr) {
+                        if (!rr || !rr.ok) {
+                            if (out) out.innerHTML = '<span style="color:#C41D1F">✗ ' + esc((rr && rr.msg) || '升级失败') + '</span>';
+                            return;
+                        }
+                        if (out) out.innerHTML = '<span style="color:#1a7f37">✓ ' + esc(rr.msg || '升级完成') + '</span>'
+                            + ' <button class="ow-btn ow-btn-mini" onclick="OwAdmin.opcacheReset()">清理 OPcache</button>'
+                            + ' <button class="ow-btn ow-btn-mini ow-btn-primary" onclick="location.reload()">刷新页面</button>';
+                        OwAdmin.upgrade.loadBackups();
+                    });
+                });
+            },
+
+            rollback: function () {
+                OwAdmin.confirm('恢复到最近一次升级之前的代码状态？\n当前代码文件会被备份替换（数据、配置、上传不受影响）。', function () {
+                    OwApi.secure('admin_upgrade_rollback', {}, function (rr) {
+                        toast((rr && rr.msg) || '恢复失败');
+                        if (rr && rr.ok) setTimeout(function () { location.reload(); }, 900);
+                    });
+                });
+            },
+
+            loadBackups: function () {
+                OwApi.post('admin_upgrade_backups', {}, function (r) {
+                    var el = $('owUpdBak');
+                    if (!el || !r || !r.ok || !r.data.length) return;
+                    var b = r.data[0];
+                    el.innerHTML = '最近备份：' + esc(b.ts) + '（v' + esc(b.from_version) + ' → v' + esc(b.to_version)
+                        + '，覆盖 ' + b.modified + ' / 新增 ' + b.added + '） '
+                        + '<button type="button" class="ow-btn ow-btn-ghost ow-btn-mini" onclick="OwAdmin.upgrade.rollback()">恢复</button>';
+                });
+            },
+        },
+
         confirm: function (text, onOk) {
             var mask = document.createElement('div');
             mask.className = 'ow-modal-mask';
@@ -6236,7 +6328,14 @@
                             // v1.3.38 版本号：只读展示（后台 boot 下发），不是设置项、不进保存表单
                             + '<div class="ow-form-item"><label>版本号</label>'
                             + '<span style="font-size:13px;color:var(--ow-text);padding-top:6px">v'
-                            + esc(OwAdmin.version || '?') + '</span></div>')
+                            + esc(OwAdmin.version || '?') + '</span></div>'
+                            // v1.3.39 在线升级：入口按钮 + 内联模块面板（检查/升级/恢复备份）
+                            + '<div class="ow-form-item"><label>在线升级</label>'
+                            + '<button type="button" class="ow-btn ow-btn-ghost" id="owUpdBtn" onclick="OwAdmin.upgrade.check()">检查更新</button>'
+                            + '<p style="font-size:12px;color:var(--ow-text-sub);margin-top:4px">按 GitHub 仓库逐文件比对，只更新有差异的代码文件。'
+                            + '保护路径永不动：core/config.php、data/、uploads/；覆盖前自动备份到 data/backup/，可一键恢复。'
+                            + '需服务器能访问 api.github.com；搬入阶段文件瞬时替换，避开高峰操作。</p></div>'
+                            + '<div id="owUpdPanel" class="ow-card" style="display:none;margin:6px 0 12px"></div>')
 
                         + '<button class="ow-btn ow-btn-primary" onclick="OwAdmin.settingsSave()">保存设置</button>';
 
